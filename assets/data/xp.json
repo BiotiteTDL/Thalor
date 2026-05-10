@@ -1,0 +1,207 @@
+{
+  "personaggi": {
+    "ralph": {
+      "giocatore": "Alessandro",
+      "personaggio": "Ralph",
+      "ispirazione": 1,
+      "xp_totali": 3875,
+      "livello": 3,
+      "prossimo_livello": 6000,
+      "xp_mancanti": 2125,
+      "avanzamento": 0.2916666666666667
+    },
+    "abraxas": {
+      "giocatore": "Carlo",
+      "personaggio": "Abraxas",
+      "ispirazione": null,
+      "xp_totali": 4075,
+      "livello": 3,
+      "prossimo_livello": 6000,
+      "xp_mancanti": 1925,
+      "avanzamento": 0.35833333333333334
+    },
+    "igor": {
+      "giocatore": "Gerry",
+      "personaggio": "Igor",
+      "ispirazione": null,
+      "xp_totali": 3875,
+      "livello": 3,
+      "prossimo_livello": 6000,
+      "xp_mancanti": 2125,
+      "avanzamento": 0.2916666666666667
+    },
+    "arolf": {
+      "giocatore": "Ivan",
+      "personaggio": "Arolf",
+      "ispirazione": null,
+      "xp_totali": 3000,
+      "livello": 3,
+      "prossimo_livello": 6000,
+      "xp_mancanti": 3000,
+      "avanzamento": 0
+    },
+    "irven": {
+      "giocatore": "Ettore",
+      "personaggio": "Irven",
+      "ispirazione": null,
+      "xp_totali": 3875,
+      "livello": 3,
+      "prossimo_livello": 6000,
+      "xp_mancanti": 2125,
+      "avanzamento": 0.2916666666666667
+    }
+  },
+  "registro_xp": [
+    {
+      "evento": "Sessione 1 e 2",
+      "ralph": 3000,
+      "abraxas": 3000,
+      "igor": 3000,
+      "arolf": 3000,
+      "irven": 3000
+    },
+    {
+      "evento": "Riassunto",
+      "ralph": null,
+      "abraxas": 100,
+      "igor": null,
+      "arolf": null,
+      "irven": null
+    },
+    {
+      "evento": "Riassunto",
+      "ralph": null,
+      "abraxas": 100,
+      "igor": null,
+      "arolf": null,
+      "irven": null
+    },
+    {
+      "evento": "Sessione 3 encounter 1",
+      "ralph": 150,
+      "abraxas": 150,
+      "igor": 150,
+      "arolf": null,
+      "irven": 150
+    },
+    {
+      "evento": "Sessione 3 encounter 2",
+      "ralph": 225,
+      "abraxas": 225,
+      "igor": 225,
+      "arolf": null,
+      "irven": 225
+    },
+    {
+      "evento": "Sessione 3 exp generale",
+      "ralph": 500,
+      "abraxas": 500,
+      "igor": 500,
+      "arolf": null,
+      "irven": 500
+    }
+  ],
+  "tabella_xp": [
+    {
+      "livello": 1,
+      "xp_minimi": 0,
+      "xp_per_arrivarci": "-"
+    },
+    {
+      "livello": 2,
+      "xp_minimi": 1000,
+      "xp_per_arrivarci": 1000
+    },
+    {
+      "livello": 3,
+      "xp_minimi": 3000,
+      "xp_per_arrivarci": 2000
+    },
+    {
+      "livello": 4,
+      "xp_minimi": 6000,
+      "xp_per_arrivarci": 3000
+    },
+    {
+      "livello": 5,
+      "xp_minimi": 10000,
+      "xp_per_arrivarci": 4000
+    },
+    {
+      "livello": 6,
+      "xp_minimi": 15000,
+      "xp_per_arrivarci": 5000
+    },
+    {
+      "livello": 7,
+      "xp_minimi": 21000,
+      "xp_per_arrivarci": 6000
+    },
+    {
+      "livello": 8,
+      "xp_minimi": 28000,
+      "xp_per_arrivarci": 7000
+    },
+    {
+      "livello": 9,
+      "xp_minimi": 36000,
+      "xp_per_arrivarci": 8000
+    },
+    {
+      "livello": 10,
+      "xp_minimi": 45000,
+      "xp_per_arrivarci": 9000
+    },
+    {
+      "livello": 11,
+      "xp_minimi": 55000,
+      "xp_per_arrivarci": 10000
+    },
+    {
+      "livello": 12,
+      "xp_minimi": 66000,
+      "xp_per_arrivarci": 11000
+    },
+    {
+      "livello": 13,
+      "xp_minimi": 78000,
+      "xp_per_arrivarci": 12000
+    },
+    {
+      "livello": 14,
+      "xp_minimi": 91000,
+      "xp_per_arrivarci": 13000
+    },
+    {
+      "livello": 15,
+      "xp_minimi": 105000,
+      "xp_per_arrivarci": 14000
+    },
+    {
+      "livello": 16,
+      "xp_minimi": 120000,
+      "xp_per_arrivarci": 15000
+    },
+    {
+      "livello": 17,
+      "xp_minimi": 136000,
+      "xp_per_arrivarci": 16000
+    },
+    {
+      "livello": 18,
+      "xp_minimi": 153000,
+      "xp_per_arrivarci": 17000
+    },
+    {
+      "livello": 19,
+      "xp_minimi": 171000,
+      "xp_per_arrivarci": 18000
+    },
+    {
+      "livello": 20,
+      "xp_minimi": 190000,
+      "xp_per_arrivarci": 19000
+    }
+  ],
+  "excel": "../assets/files/Esperienza_player_bello.xlsx"
+}
