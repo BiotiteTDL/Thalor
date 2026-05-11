@@ -61,3 +61,21 @@ document.addEventListener("DOMContentLoaded", () => {
   if (details) details.open = true;
   setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
 });
+
+
+
+// v62 mobile nav
+document.addEventListener("DOMContentLoaded", () => {
+  const navToggle = document.querySelector(".nav-toggle");
+  const links = document.querySelector(".nav .links");
+
+  if (!navToggle || !links) return;
+
+  navToggle.addEventListener("click", () => {
+    links.classList.toggle("open");
+
+    const expanded = links.classList.contains("open");
+    navToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  });
+});
+

@@ -935,3 +935,38 @@ box-shadow:0 10px 30px rgba(0,0,0,.35);
   font-weight:700;
   letter-spacing:.08em;
 }
+
+
+/* v62 mobile menu fix */
+@media (max-width: 900px){
+
+  .nav{
+    position:relative;
+  }
+
+  .nav .links{
+    display:none;
+    flex-direction:column;
+    position:absolute;
+    top:100%;
+    right:0;
+    width:220px;
+    background:#121212;
+    border:1px solid rgba(201,168,97,.2);
+    border-radius:14px;
+    padding:14px;
+    z-index:9999;
+    box-shadow:0 12px 32px rgba(0,0,0,.45);
+  }
+
+  .nav .links.open{
+    display:flex;
+  }
+
+  .nav-toggle{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+  }
+}
