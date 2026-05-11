@@ -970,3 +970,163 @@ box-shadow:0 10px 30px rgba(0,0,0,.35);
     cursor:pointer;
   }
 }
+
+
+/* v63 - mobile layout polish: mappe/immagini larghe gestibili */
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+img, video, canvas, iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+.map-frame,
+.map-container,
+.map-panel,
+.panel:has(.map-frame) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.map-frame {
+  border-radius: 18px;
+}
+
+.map-frame img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+/* Desktop/tablet: mantiene la mappa grande e bella */
+@media (min-width: 821px) {
+  .map-frame img {
+    max-height: none;
+  }
+}
+
+/* Mobile: le immagini orizzontali non spaccano la pagina */
+@media (max-width: 820px) {
+  .page {
+    width: 100%;
+    max-width: 100%;
+    padding-left: 14px;
+    padding-right: 14px;
+    box-sizing: border-box;
+  }
+
+  .panel,
+  .card,
+  .hero,
+  .character-hero,
+  .place-hero,
+  .city-hero {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .grid,
+  .session-grid,
+  .places-grid-two,
+  .character-layout {
+    grid-template-columns: 1fr !important;
+    width: 100%;
+  }
+
+  .hero-title {
+    font-size: clamp(2rem, 12vw, 3.2rem) !important;
+    line-height: 1.03;
+    overflow-wrap: anywhere;
+  }
+
+  .hero-subtitle,
+  .section-note,
+  .panel p,
+  .card p {
+    overflow-wrap: break-word;
+  }
+
+  .map-frame {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    background: rgba(0,0,0,.24);
+  }
+
+  /*
+    Le mappe orizzontali restano leggibili:
+    si adattano al viewport, ma se sono molto panoramiche possono scorrere in orizzontale
+    dentro il riquadro, senza allargare tutta la pagina.
+  */
+  .map-frame img {
+    width: 100%;
+    min-width: min(760px, 185vw);
+    max-width: none;
+  }
+
+  .doc-list {
+    width: 100%;
+  }
+
+  .doc-row,
+  .doc-preview {
+    display: grid !important;
+    grid-template-columns: 72px 1fr;
+    gap: 12px;
+    align-items: center;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .doc-row img {
+    width: 72px !important;
+    height: 96px !important;
+    object-fit: cover;
+  }
+
+  .extractum-gallery {
+    grid-template-columns: 1fr !important;
+  }
+
+  .nav .links {
+    left: 0;
+    right: 0;
+    width: auto !important;
+    margin: 0 12px;
+  }
+}
+
+/* Mobile molto stretto */
+@media (max-width: 480px) {
+  .page {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .panel,
+  .card {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .map-frame img {
+    min-width: min(680px, 200vw);
+  }
+
+  .doc-row,
+  .doc-preview {
+    grid-template-columns: 58px 1fr;
+  }
+
+  .doc-row img,
+  .doc-thumb-text {
+    width: 58px !important;
+    height: 78px !important;
+  }
+}
