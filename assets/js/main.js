@@ -25,3 +25,39 @@ document.addEventListener('DOMContentLoaded', () => {
   wrap.addEventListener('touchmove', move, {passive:true});
   wrap.addEventListener('mouseleave', () => lens.style.display = 'none');
 });
+
+
+// v43 mobile navigation
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll(".nav").forEach((nav) => {
+    const btn = nav.querySelector(".nav-toggle");
+    const links = nav.querySelector(".links");
+    if (!btn || !links) return;
+
+    btn.addEventListener("click", () => {
+      const open = nav.classList.toggle("nav-open");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+
+    links.querySelectorAll("a").forEach((a) => {
+      a.addEventListener("click", () => {
+        nav.classList.remove("nav-open");
+        btn.setAttribute("aria-expanded", "false");
+      });
+    });
+  });
+});
+
+
+// v55 open archive document details from hash
+document.addEventListener("DOMContentLoaded", () => {
+  const hash = window.location.hash ? window.location.hash.slice(1) : "";
+  if (!hash) return;
+  const target = document.getElementById(hash);
+  if (!target) return;
+  const details = target.tagName && target.tagName.toLowerCase() === "details"
+    ? target
+    : target.closest("details");
+  if (details) details.open = true;
+  setTimeout(() => target.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
+});
