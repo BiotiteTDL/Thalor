@@ -27,28 +27,6 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// v43 mobile navigation
-document.addEventListener("DOMContentLoaded", () => {
-  document.querySelectorAll(".nav").forEach((nav) => {
-    const btn = nav.querySelector(".nav-toggle");
-    const links = nav.querySelector(".links");
-    if (!btn || !links) return;
-
-    btn.addEventListener("click", () => {
-      const open = nav.classList.toggle("nav-open");
-      btn.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-
-    links.querySelectorAll("a").forEach((a) => {
-      a.addEventListener("click", () => {
-        nav.classList.remove("nav-open");
-        btn.setAttribute("aria-expanded", "false");
-      });
-    });
-  });
-});
-
-
 // v55 open archive document details from hash
 document.addEventListener("DOMContentLoaded", () => {
   const hash = window.location.hash ? window.location.hash.slice(1) : "";
@@ -64,18 +42,41 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
 
-// v62 mobile nav
-document.addEventListener("DOMContentLoaded", () => {
-  const navToggle = document.querySelector(".nav-toggle");
-  const links = document.querySelector(".nav .links");
 
-  if (!navToggle || !links) return;
 
-  navToggle.addEventListener("click", () => {
-    links.classList.toggle("open");
+// v64 mobile nav robust
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".nav").forEach(function (nav) {
+    const toggle = nav.querySelector(".nav-toggle");
+    const links = nav.querySelector(".links");
+    if (!toggle || !links) return;
 
-    const expanded = links.classList.contains("open");
-    navToggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+    toggle.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const isOpen = nav.classList.toggle("nav-open");
+      links.classList.toggle("open", isOpen);
+      toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    });
+
+    links.querySelectorAll("a").forEach(function (link) {
+      link.addEventListener("click", function () {
+        nav.classList.remove("nav-open");
+        links.classList.remove("open");
+        toggle.setAttribute("aria-expanded", "false");
+      });
+    });
+  });
+
+  document.addEventListener("click", function (event) {
+    document.querySelectorAll(".nav.nav-open").forEach(function (nav) {
+      if (nav.contains(event.target)) return;
+      const toggle = nav.querySelector(".nav-toggle");
+      const links = nav.querySelector(".links");
+      nav.classList.remove("nav-open");
+      if (links) links.classList.remove("open");
+      if (toggle) toggle.setAttribute("aria-expanded", "false");
+    });
   });
 });
-
