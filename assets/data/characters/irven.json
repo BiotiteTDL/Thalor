@@ -1,0 +1,787 @@
+{
+  "schemaVersion": 2,
+  "meta": {
+    "slug": "irven",
+    "theme": "blight",
+    "crest": "☣",
+    "profileUrl": "irven.html",
+    "sourcePdf": "../assets/files/Irven_Till_Blightborn.pdf",
+    "status": "Scheda dinamica Step 1: formule automatiche, righe aggiungibili, salvataggio locale. Supabase sarà collegato nello step successivo.",
+    "subtitle": "Piaga, guarigione e fiammelle nere.",
+    "accent": "#8fa86a"
+  },
+  "identity": {
+    "name": "Irven  Till \"Blightborn\"",
+    "player": "Ettore",
+    "race": "Umano",
+    "classLevel": "Anima Prescelta 2",
+    "alignment": "NM",
+    "deity": "Talona",
+    "xp": "3875",
+    "level": 3
+  },
+  "portrait": {
+    "image": "../assets/img/Irven_Till_Blightborn.jpeg",
+    "alt": "Irven Till “Blightborn”",
+    "quote": "La piaga non è solo rovina. È appartenenza."
+  },
+  "appearance": {
+    "size": "Media",
+    "age": "33",
+    "sex": "M",
+    "height": "1.80",
+    "weight": "80 kg",
+    "eyes": "Azzurri",
+    "hair": "Rossi",
+    "skin": "Bianca",
+    "marks": "Aspetto consumato dalla malattia, mantello scuro, abiti grigi e presenza febbrile."
+  },
+  "abilities": {
+    "FOR": {
+      "label": "Forza",
+      "score": 14,
+      "temp": 0,
+      "standard": "FOR"
+    },
+    "DES": {
+      "label": "Destrezza",
+      "score": 15,
+      "temp": 0,
+      "standard": "DES"
+    },
+    "COS": {
+      "label": "Costituzione",
+      "score": 15,
+      "temp": 0,
+      "standard": "COS"
+    },
+    "INT": {
+      "label": "Intelligenza",
+      "score": 14,
+      "temp": 0,
+      "standard": "INT"
+    },
+    "SAG": {
+      "label": "Saggezza",
+      "score": 17,
+      "temp": 0,
+      "standard": "SAG"
+    },
+    "CAR": {
+      "label": "Carisma",
+      "score": 16,
+      "temp": 0,
+      "standard": "CAR"
+    }
+  },
+  "combat": {
+    "hpMax": 22.0,
+    "hpCurrent": 22.0,
+    "nonlethal": 0,
+    "initiativeMisc": 0,
+    "speed": "9 m / 6 m (armatura)",
+    "bab": "+2",
+    "grappleMisc": 0,
+    "resistances": ""
+  },
+  "armorClass": {
+    "base": 10,
+    "armor": 5.0,
+    "shield": 0,
+    "natural": 0,
+    "deflection": 0,
+    "dodge": 0,
+    "size": 0,
+    "misc": 0,
+    "touchMisc": 0,
+    "flatFootedMisc": 0,
+    "maxDex": ""
+  },
+  "saves": {
+    "tempra": {
+      "label": "Tempra",
+      "ability": "COS",
+      "base": 0,
+      "magic": 0,
+      "misc": 0
+    },
+    "riflessi": {
+      "label": "Riflessi",
+      "ability": "DES",
+      "base": 0,
+      "magic": 0,
+      "misc": 0
+    },
+    "volonta": {
+      "label": "Volontà",
+      "ability": "SAG",
+      "base": 0,
+      "magic": 0,
+      "misc": 0
+    }
+  },
+  "attacks": [
+    {
+      "name": "Morning star",
+      "bonus": "+4",
+      "damage": "1d8+2",
+      "critical": "20x2",
+      "range": "",
+      "type": "Contundente / Perforante",
+      "notes": ""
+    },
+    {
+      "name": "Balestra leggera",
+      "bonus": "+4",
+      "damage": "1d8",
+      "critical": "19-20/x2",
+      "range": "24 m",
+      "type": "Perforante",
+      "notes": ""
+    }
+  ],
+  "defenses": [
+    {
+      "name": "Corazza a scaglie",
+      "bonus": "+4",
+      "type": "Media",
+      "maxDex": "+3",
+      "checkPenalty": "-4",
+      "spellFailure": "25%",
+      "weight": "15"
+    },
+    {
+      "name": "Scudo leggero di metallo",
+      "bonus": "+1",
+      "type": "",
+      "maxDex": "",
+      "checkPenalty": "-1",
+      "spellFailure": "5%",
+      "weight": "3"
+    }
+  ],
+  "skills": [
+    {
+      "name": "Acrobazia",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Addestrare Animali",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Artigianato",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Artista della Fuga",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Ascoltare",
+      "ability": "SAG",
+      "standardAbility": "SAG",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Cavalcare",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Cercare",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Concentrazione",
+      "ability": "COS",
+      "standardAbility": "COS",
+      "ranks": 1.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Arcane",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Architettura e Ingegneria",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Dungeon",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Geografia",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Locali",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 6.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Natura",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 5.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Nobiltà e Regalità",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Piani",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Conoscenze Religioni",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Decifrare Scritture",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Diplomazia",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Disattivare Congegni",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Equilibrio",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Falsificare",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 2.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Guarire",
+      "ability": "SAG",
+      "standardAbility": "SAG",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Intimidire",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Intrattenere",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Muoversi Silenziosamente",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Nascondersi",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 6.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Nuotare",
+      "ability": "FOR",
+      "standardAbility": "FOR",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Osservare",
+      "ability": "SAG",
+      "standardAbility": "SAG",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Percepire Intenzioni",
+      "ability": "SAG",
+      "standardAbility": "SAG",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Professione",
+      "ability": "SAG",
+      "standardAbility": "SAG",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Raccogliere Informazioni",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Rapidità di Mano",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Raggirare",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Saltare",
+      "ability": "FOR",
+      "standardAbility": "FOR",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Sapienza Magica",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Scalare",
+      "ability": "FOR",
+      "standardAbility": "FOR",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Scassinare Serrature",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Sopravvivenza",
+      "ability": "SAG",
+      "standardAbility": "SAG",
+      "ranks": 4.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Utilizzare Corde",
+      "ability": "DES",
+      "standardAbility": "DES",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "Sì",
+      "notes": ""
+    },
+    {
+      "name": "Utilizzare Oggetti Magici",
+      "ability": "CAR",
+      "standardAbility": "CAR",
+      "ranks": 0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    },
+    {
+      "name": "Valutare",
+      "ability": "INT",
+      "standardAbility": "INT",
+      "ranks": 0.0,
+      "misc": 0,
+      "armorPenalty": 0,
+      "classSkill": "",
+      "notes": ""
+    }
+  ],
+  "feats": [
+    {
+      "name": "Incantare in Combattimento",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Aumentare Guarigione",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Destino eroico (razze)",
+      "description": "",
+      "source": ""
+    }
+  ],
+  "features": [
+    {
+      "name": "Armi semplici",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Armature leggere e medie",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Competenza Falcione",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Cura della fede",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Specialista conoscenze",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Presenza Vile",
+      "description": "",
+      "source": ""
+    },
+    {
+      "name": "Favore della divinità",
+      "description": "",
+      "source": ""
+    }
+  ],
+  "languages": [
+    {
+      "name": "Comune",
+      "notes": ""
+    },
+    {
+      "name": "Nanico",
+      "notes": ""
+    },
+    {
+      "name": "Elfico",
+      "notes": ""
+    },
+    {
+      "name": "Draconico",
+      "notes": ""
+    }
+  ],
+  "spells": {
+    "0": [
+      {
+        "name": "Cura ferite minori (V) (S) Azione standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Guida (V) (S) Azione standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Infliggi ferite minori (V) (S) Azione standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Resistenza (V) (S) (FD) Azione standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Virtù (V) (S) (FD) Azione standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Lettura del magico (V) (S) (F) Azione Standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Cura ferite leggere (V) (S) [Manuale del giocatore] Azione stan",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Mal di cuore (V) (S) (FD) [Libro delle fosche tenebre] Azione",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Pena (V) (S) (M, 1 lacrima) [Libro delle fosche tenebre] Azione",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      },
+      {
+        "name": "Vigore Inferiore (V) (S) [Perfetto Sacerdote] Azione standard",
+        "school": "",
+        "time": "",
+        "target": "",
+        "description": ""
+      }
+    ],
+    "1": [],
+    "2": [],
+    "3": [],
+    "4": [],
+    "5": [],
+    "6": [],
+    "7": [],
+    "8": [],
+    "9": []
+  },
+  "inventory": [
+    {
+      "name": "Moneta (FD)",
+      "qty": "",
+      "weight": "",
+      "notes": ""
+    },
+    {
+      "name": "Quadrelli (100)",
+      "qty": "",
+      "weight": "",
+      "notes": ""
+    },
+    {
+      "name": "Borsa conservante IV (750kg)",
+      "qty": "",
+      "weight": "30",
+      "notes": ""
+    }
+  ],
+  "money": {
+    "MP": 0,
+    "MO": 0.0,
+    "MA": 0,
+    "MR": 0
+  },
+  "narrative": {
+    "summary": "Anima prescelta sospesa tra guarigione e pestilenza. Vede nella malattia una forma di accettazione e nella non morte una possibile fine della fuga.",
+    "bonds": [
+      "Talona",
+      "Loviatar come tentazione/corruzione del destino",
+      "Il sogno delle fiammelle nere"
+    ],
+    "visions": [
+      "Fiammelle bianche che diventano nere, malate come lui, senza dolore."
+    ],
+    "privateNotes": "Area per preghiere, contagio, guarigione e conflitti interiori."
+  },
+  "classLevels": [
+    {
+      "name": "Anima Prescelta",
+      "level": 3,
+      "notes": ""
+    }
+  ],
+  "conditions": [],
+  "changeLog": []
+}

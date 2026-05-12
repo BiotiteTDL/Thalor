@@ -80,3 +80,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 });
+
+
+// v68: pulsanti scheda dentro le card personaggi senza rompere il link al profilo
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('[data-sheet-href]').forEach(function(btn){
+    function go(e){ e.preventDefault(); e.stopPropagation(); window.location.href = btn.getAttribute('data-sheet-href'); }
+    btn.addEventListener('click', go);
+    btn.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ go(e); } });
+  });
+});

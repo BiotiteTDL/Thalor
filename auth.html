@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Thalor — Accesso</title>
+  <link href="assets/css/style.css" rel="stylesheet"/>
+</head>
+<body class="auth-body">
+  <div class="topbar">
+    <nav class="nav">
+      <a class="brand" href="index.html">Thalor</a>
+      <button class="nav-toggle" type="button" aria-label="Apri menu" aria-expanded="false">☰</button>
+      <div class="links">
+        <a href="luoghi.html">Luoghi</a>
+        <a href="personaggi.html">Personaggi</a>
+        <a href="diario.html">Diario</a>
+        <a href="archivio.html">Archivio</a>
+        <a class="auth-nav-link" href="auth.html">Accesso</a>
+      </div>
+    </nav>
+  </div>
+
+  <main class="page auth-page-clean">
+    <section class="auth-shell panel">
+      <div class="auth-copy">
+        <p class="eyebrow">Portale giocatori</p>
+        <h1>Accesso a Thalor</h1>
+        <p class="section-note">Entra con il tuo account. Quando Supabase sarà configurato, ogni giocatore potrà modificare solo la propria scheda; il Master potrà modificare tutto.</p>
+        <div id="authStatus" class="auth-status-card">Caricamento…</div>
+      </div>
+
+      <form class="auth-card" id="authForm" autocomplete="on">
+        <label>Email
+          <input id="authEmail" type="email" autocomplete="email" placeholder="nome@email.it" required>
+        </label>
+        <label>Password
+          <input id="authPassword" type="password" autocomplete="current-password" placeholder="Password" required>
+        </label>
+        <div class="auth-actions-clean">
+          <button class="button primary-action" id="loginBtn" type="submit">Accedi</button>
+          <button class="button ghost-button" id="signupBtn" type="button">Registrati</button>
+          <button class="button ghost-button danger-action" id="logoutBtn" type="button">Esci</button>
+        </div>
+        <p class="auth-mini-note">Se Supabase non è ancora configurato, il sito resta in modalità locale.</p>
+      </form>
+    </section>
+  </main>
+
+  <script src="assets/js/main.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="assets/js/supabase-config.js"></script>
+  <script src="assets/js/supabase-auth.js"></script>
+  <script>
+  (async()=>{
+    await window.ThalorAuth.init();
+    const st=document.getElementById('authStatus');
+    const form=document.getElementById('authForm');
+    const refresh=()=>{st.textContent=window.ThalorAuth.statusText();};
+    refresh();
+    async function doLogin(){
+      try{
+        const {error}=await window.ThalorAuth.signIn(authEmail.value,authPassword.value);
+        if(error)throw error;
+        st.textContent='Accesso effettuato.';
+        setTimeout(()=>location.reload(),500);
+      }catch(e){st.textContent=e.message||e;}
+    }
+    form.addEventListener('submit', async(e)=>{e.preventDefault(); await doLogin();});
+    signupBtn.onclick=async()=>{
+      try{
+        const {error}=await window.ThalorAuth.signUp(authEmail.value,authPassword.value);
+        if(error)throw error;
+        st.textContent='Registrazione inviata. Controlla email se Supabase richiede conferma.';
+      }catch(e){st.textContent=e.message||e;}
+    };
+    logoutBtn.onclick=async()=>{await window.ThalorAuth.signOut(); location.reload();};
+  })();
+  </script>
+</body>
+</html>
