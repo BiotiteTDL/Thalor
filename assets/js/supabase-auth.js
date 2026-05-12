@@ -36,7 +36,10 @@
         state.access=a||[];
       }
       state.ready=true;
-      client.auth.onAuthStateChange(()=>{ setTimeout(()=>location.reload(),150); });
+      client.auth.onAuthStateChange(async (_event, session) => {
+  state.session = session || null;
+  state.user = session?.user || null;
+});
     }catch(err){ state.error=err.message||String(err); state.ready=true; }
     return state;
   }
