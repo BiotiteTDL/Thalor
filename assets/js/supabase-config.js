@@ -3,6 +3,6 @@
 // 2) Copia Project URL e anon public key qui sotto
 // 3) Lascia SERVICE_ROLE fuori dal sito: NON inserirla mai qui.
 window.THALOR_SUPABASE = {
-  url: 'INSERISCI_PROJECT_URL_SUPABASE',
-  anonKey: 'INSERISCI_ANON_PUBLIC_KEY_SUPABASE'
+  url: 'https://dzbtbaoakqgaruuswgho.supabase.co/rest/v1/',
+  anonKey: 'sb_publishable_enSm4eFWWuIqzAgx3o_KNw_Iosqqp-p'
 };
