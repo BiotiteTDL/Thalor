@@ -19,19 +19,13 @@
     error: null
   };
 
-  function normalizeRole(role){
-    return String(role || '').trim().toLowerCase();
-  }
-
-  function normalizeSlug(slug){
-    return String(slug || '').trim().toLowerCase();
-  }
+  function norm(v){ return String(v || '').trim().toLowerCase(); }
 
   function statusText(){
     if(!state.configured) return 'Supabase non configurato: modalità locale.';
     if(state.error) return 'Supabase: ' + state.error;
     if(!state.user) return 'Non hai effettuato l’accesso.';
-    if(normalizeRole(state.profile?.role) === 'master') return 'Accesso Master: puoi modificare tutto.';
+    if(norm(state.profile?.role) === 'master') return 'Accesso Master: puoi modificare tutto.';
     const chars = (state.access || []).map(a => a.character_slug).filter(Boolean).join(', ');
     return chars ? 'Accesso giocatore: ' + chars : 'Accesso effettuato, ma nessun personaggio assegnato.';
   }
@@ -46,74 +40,71 @@
   async function ensureProfile(client){
     if(!state.user) return null;
 
-    let { data:p, error:profileError } = await client
+    const found = await client
       .from('profiles')
       .select('*')
       .eq('user_id', state.user.id)
       .maybeSingle();
 
-    if(profileError) {
-      console.warn('profiles select error:', profileError);
-    }
+    if(found.error) console.warn('profiles select error:', found.error);
+
+    let p = found.data || null;
 
     if(!p){
       const displayName = state.user.user_metadata?.full_name || state.user.email || 'Giocatore';
-      const ins = await client
+      const created = await client
         .from('profiles')
         .insert({ user_id: state.user.id, display_name: displayName, role: 'player' })
         .select('*')
         .maybeSingle();
 
-      if(ins.error){
-        console.warn('profiles insert error:', ins.error);
-      }
-      p = ins.data || null;
+      if(created.error) console.warn('profiles insert error:', created.error);
+      p = created.data || null;
     }
 
-    state.profile = p || null;
-    return state.profile;
+    state.profile = p;
+    return p;
   }
 
   async function refreshAccess(){
     const client = makeClient();
-    if(!client || !state.user) {
+    if(!client || !state.user){
       state.access = [];
       return [];
     }
 
-    const { data:a, error } = await client
+    const res = await client
       .from('character_access')
       .select('character_slug, can_edit')
       .eq('user_id', state.user.id)
       .eq('can_edit', true);
 
-    if(error){
-      console.warn('character_access select error:', error);
+    if(res.error){
+      console.warn('character_access select error:', res.error);
       state.access = [];
       return [];
     }
 
-    state.access = a || [];
+    state.access = res.data || [];
     return state.access;
   }
 
   async function init(force=false){
     if(state.ready && !force) return state;
     if(state.loading) return state;
-    state.loading = true;
 
+    state.loading = true;
     try{
       const client = makeClient();
       if(!client){
         state.ready = true;
-        state.loading = false;
         return state;
       }
 
-      const { data:sdata, error:serr } = await client.auth.getSession();
-      if(serr) throw serr;
+      const s = await client.auth.getSession();
+      if(s.error) throw s.error;
 
-      state.session = sdata.session || null;
+      state.session = s.data.session || null;
       state.user = state.session?.user || null;
       state.profile = null;
       state.access = [];
@@ -123,8 +114,8 @@
         await refreshAccess();
       }
 
-      state.ready = true;
       state.error = null;
+      state.ready = true;
 
       if(!state._listenerAttached){
         state._listenerAttached = true;
@@ -157,16 +148,16 @@
   }
 
   function isMaster(){
-    return normalizeRole(state.profile?.role) === 'master';
+    return norm(state.profile?.role) === 'master';
   }
 
   function canEdit(slug){
-    if(!state.configured) return true; // modalità locale prima di Supabase
+    if(!state.configured) return true;
     if(isMaster()) return true;
 
-    const wanted = normalizeSlug(slug);
+    const wanted = norm(slug);
     return !!(state.access || []).find(a =>
-      normalizeSlug(a.character_slug) === wanted &&
+      norm(a.character_slug) === wanted &&
       a.can_edit === true
     );
   }
@@ -175,18 +166,18 @@
     await init();
     if(!state.configured || !state.client) return fallback;
 
-    const { data, error } = await state.client
+    const res = await state.client
       .from('character_sheets')
       .select('data')
       .eq('slug', slug)
       .maybeSingle();
 
-    if(error){
-      console.warn('Supabase loadCharacter:', error);
+    if(res.error){
+      console.warn('Supabase loadCharacter:', res.error);
       return fallback;
     }
 
-    return data?.data || fallback;
+    return res.data?.data || fallback;
   }
 
   async function saveCharacter(slug, data){
@@ -201,11 +192,11 @@
       updated_by: state.user?.id || null
     };
 
-    const { error } = await state.client
+    const res = await state.client
       .from('character_sheets')
       .upsert(row, { onConflict:'slug' });
 
-    if(error) throw error;
+    if(res.error) throw res.error;
     return { mode:'cloud' };
   }
 
