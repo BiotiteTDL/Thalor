@@ -112,17 +112,56 @@
   async function ensureFreshSession(options={}){
     const client = makeClient();
     if(!client) return null;
+
     const timeoutMs = options.timeoutMs || 12000;
-    let current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
-    if(current.error) throw current.error;
-    let session = current.data.session || null;
-    if(!session || sessionExpiresSoon(session, options.refreshWindowSeconds ?? 300)){
-      const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
-      if(refreshed.error) throw refreshed.error;
-      session = refreshed.data.session || session;
+    const allowStale = options.allowStale !== false;
+    const currentStateSession = state.session || null;
+
+    // Caso normale e veloce: Supabase ha già una sessione in memoria e non è quasi scaduta.
+    // Non blocchiamo il salvataggio con getSession(), perché in alcuni browser dopo cambio tab
+    // quella chiamata può restare in attesa del lock interno di supabase-js.
+    if(currentStateSession && !sessionExpiresSoon(currentStateSession, options.refreshWindowSeconds ?? 180)){
+      return currentStateSession;
     }
+
+    let session = currentStateSession;
+
+    try{
+      const current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
+      if(current.error) throw current.error;
+      session = current.data.session || session || null;
+    }catch(err){
+      // Se abbiamo già una sessione/utente in memoria, non trasformare un timeout del controllo
+      // preliminare in un fallimento del salvataggio: l'upsert Supabase può comunque usare
+      // la sessione persistita dal client.
+      if(allowStale && (session || state.user)){
+        console.warn('Controllo sessione non completato, uso sessione già presente:', err);
+        return session || state.session || null;
+      }
+      throw err;
+    }
+
+    if(!session){
+      setUserFromSession(null);
+      return null;
+    }
+
+    if(sessionExpiresSoon(session, options.refreshWindowSeconds ?? 180)){
+      try{
+        const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
+        if(refreshed.error) throw refreshed.error;
+        session = refreshed.data.session || session;
+      }catch(err){
+        if(allowStale && (session || state.user)){
+          console.warn('Rinnovo sessione non completato, provo con sessione esistente:', err);
+        }else{
+          throw err;
+        }
+      }
+    }
+
     setUserFromSession(session || null);
-    return state.session;
+    return state.session || session;
   }
 
   let wakeTimer = null;
@@ -370,15 +409,26 @@
   }
 
   async function saveCharacter(slug, data){
-    await init(false);
+    const client = makeClient();
+    if(!state.ready && !state.loading) await init(false);
     // File aperto offline/localhost: salva solo in locale senza richiedere sessione o permessi online.
     if(isLocalPreview()) return { mode:'local-preview' };
     if(state.localMaster) return { mode:'local-master' };
-    if(!state.configured || !state.client) return { mode:'local' };
+    if(!state.configured || !client) return { mode:'local' };
 
-    await ensureFreshSession({ timeoutMs: 20000, refreshWindowSeconds: 240 });
-    if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
-    await ensureAccessLoaded({ timeoutMs: 20000 });
+    // Salvataggio rapido e robusto: usa la sessione già persistita dal client Supabase.
+    // Il controllo sessione non deve diventare un collo di bottiglia dopo cambio tab/browser sleep.
+    if(!state.user && !state.session){
+      await ensureFreshSession({ timeoutMs: 8000, refreshWindowSeconds: 120, allowStale: false });
+    }else{
+      await ensureFreshSession({ timeoutMs: 3000, refreshWindowSeconds: 120, allowStale: true });
+    }
+    if(!state.user && !state.session) throw new Error('Sessione non attiva: rifai login e riprova.');
+
+    // Permessi: usa prima cache/runtime. Rilegge online solo se non c'è alcun permesso noto.
+    if(!canEdit(slug)){
+      await ensureAccessLoaded({ timeoutMs: 8000 });
+    }
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
@@ -388,33 +438,15 @@
       updated_by: state.user.id
     };
 
-    let lastError = null;
-    for(let attempt=1; attempt<=3; attempt++){
-      try{
-        if(attempt > 1){
-          await ensureFreshSession({ timeoutMs: 20000, refreshWindowSeconds: 600 });
-        }
+    // NON usare withTimeout qui: il salvataggio deve poter completare anche dopo cambio tab.
+    const res = await state.client
+      .from('character_sheets')
+      .upsert(row, { onConflict:'slug' })
+      .select('slug, updated_at')
+      .single();
 
-        const query = state.client
-          .from('character_sheets')
-          .upsert(row, { onConflict:'slug' })
-          .select('slug, updated_at')
-          .single();
-
-        const res = await withTimeout(query, attempt === 1 ? 45000 : 60000, 'Salvataggio online');
-        if(res.error) throw res.error;
-        if(!res.data || !res.data.slug) throw new Error('Supabase ha risposto senza confermare la riga salvata.');
-        return { mode:'cloud', row: res.data, attempt };
-      }catch(err){
-        lastError = err;
-        console.warn('saveCharacter attempt failed:', attempt, err);
-        if(attempt < 3){
-          await new Promise(resolve => setTimeout(resolve, 700 * attempt));
-        }
-      }
-    }
-
-    throw lastError || new Error('Salvataggio online non completato.');
+    if(res.error) throw res.error;
+    return { mode:'cloud', row: res.data };
   }
 
   async function signIn(email,password){
