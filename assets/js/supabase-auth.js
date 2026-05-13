@@ -130,6 +130,71 @@
     return exp - Math.floor(Date.now()/1000) < windowSeconds;
   }
 
+
+  function restBaseUrl(){
+    return String(cfg.url || '').replace(/\/rest\/v1\/?$/,'').replace(/\/$/,'') + '/rest/v1';
+  }
+
+  function timeoutFetch(url, options={}, ms=30000, label='Richiesta Supabase'){
+    const controller = new AbortController();
+    const external = options.signal;
+    if(external){
+      if(external.aborted) controller.abort();
+      else external.addEventListener('abort', () => controller.abort(), { once:true });
+    }
+    const timer = setTimeout(() => controller.abort(new Error(label + ' non completata entro ' + Math.round(ms/1000) + ' secondi.')), ms);
+    const started = performance && performance.now ? performance.now() : Date.now();
+    return fetch(url, Object.assign({}, options, { signal: controller.signal }))
+      .then(async response => {
+        const elapsed = Math.round((performance && performance.now ? performance.now() : Date.now()) - started);
+        let body = '';
+        try{ body = await Promise.race([response.text(), new Promise((_, reject)=>setTimeout(()=>reject(new Error('lettura risposta timeout')), 5000))]); }
+        catch(e){ body = ''; }
+        return { response, body, elapsed };
+      })
+      .catch(err => {
+        const elapsed = Math.round((performance && performance.now ? performance.now() : Date.now()) - started);
+        err._thalorElapsedMs = elapsed;
+        throw err;
+      })
+      .finally(() => clearTimeout(timer));
+  }
+
+  async function directRestUpsertCharacter(slug, row){
+    const token = state.session?.access_token || null;
+    if(!token) throw new Error('Token sessione assente: rifai login e riprova.');
+    const base = restBaseUrl();
+    const url = base + '/character_sheets?on_conflict=slug';
+    const payload = JSON.stringify(row);
+    saveDebug('save:direct-fetch:start', { slug, bytes: payload.length, url: '/rest/v1/character_sheets?on_conflict=slug' });
+    const { response, body, elapsed } = await timeoutFetch(url, {
+      method: 'POST',
+      headers: {
+        'apikey': cfg.anonKey,
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates,return=minimal'
+      },
+      body: payload,
+      cache: 'no-store',
+      keepalive: false
+    }, 30000, 'Salvataggio diretto Supabase');
+
+    saveDebug('save:direct-fetch:response', { status: response.status, ok: response.ok, elapsedMs: elapsed, body: body ? body.slice(0, 500) : '' });
+    if(!response.ok){
+      let msg = body || ('HTTP ' + response.status + ' ' + response.statusText);
+      try{
+        const parsed = JSON.parse(body);
+        msg = parsed.message || parsed.details || parsed.hint || msg;
+      }catch(e){}
+      const err = new Error(msg);
+      err.status = response.status;
+      err.body = body;
+      throw err;
+    }
+    return { mode:'cloud', row:{ slug, updated_at: row.updated_at }, status: response.status, elapsedMs: elapsed };
+  }
+
   function cachedSessionUsable(windowSeconds=60){
     if(!state.session || !state.user) return false;
     const exp = Number(state.session.expires_at || 0);
@@ -492,35 +557,22 @@
         const row = { slug, data, updated_at: new Date().toISOString(), updated_by: state.user.id };
         saveDebug('save:upsert:start', { slug, bytes: (()=>{try{return JSON.stringify(data).length}catch(e){return 0}})() });
 
-        // Più stabile: niente .select().single() dopo l'upsert. La conferma è l'assenza di errore HTTP.
-        // Con return=minimal evitiamo payload grandi e riduciamo il rischio di richieste appese.
-        let query = client
-          .from('character_sheets')
-          .upsert(row, { onConflict:'slug' });
-
-        let aborter = null;
-        if(typeof AbortController !== 'undefined' && typeof query.abortSignal === 'function'){
-          aborter = new AbortController();
-          query = query.abortSignal(aborter.signal);
-        }
-        const timer = aborter ? setTimeout(() => {
-          saveDebug('save:upsert:abort-timeout', { slug });
-          aborter.abort();
-        }, 45000) : null;
-        let res;
+        // Non usiamo più supabase-js .upsert() qui: nel debug reale restava pendente
+        // senza arrivare a save:upsert:ok/error. Usiamo PostgREST diretto con fetch,
+        // così vediamo status HTTP, corpo errore e tempo reale della richiesta.
         try{
-          res = await withTimeout(query, 47000, 'Salvataggio online');
-        }finally{
-          if(timer) clearTimeout(timer);
+          const direct = await directRestUpsertCharacter(slug, row);
+          saveDebug('save:upsert:ok', { slug, updated_at: row.updated_at, status: direct.status, elapsedMs: direct.elapsedMs, transport: 'direct-fetch' });
+          return direct;
+        }catch(err){
+          saveDebug('save:upsert:error', {
+            message: err.message || String(err),
+            status: err.status || null,
+            elapsedMs: err._thalorElapsedMs || null,
+            body: err.body ? String(err.body).slice(0,500) : ''
+          });
+          throw err;
         }
-
-        if(res.error){
-          saveDebug('save:upsert:error', { message: res.error.message || String(res.error), code: res.error.code || null });
-          throw res.error;
-        }
-        const savedAt = row.updated_at;
-        saveDebug('save:upsert:ok', { slug, updated_at: savedAt, status: res.status || null });
-        return { mode:'cloud', row: { slug, updated_at: savedAt } };
       }finally{
         state.saving = false;
         state.savePromise = null;
