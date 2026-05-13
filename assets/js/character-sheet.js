@@ -7,18 +7,13 @@ const isCompanion=Number.isInteger(companionIndex)&&companionIndex>=0;
 const parentStorageKey=`thalor.sheet.${slug}.v5`;
 const storageKey=isCompanion?`thalor.sheet.${slug}.companion.${companionIndex}.v1`:parentStorageKey;
 const oldKeys=isCompanion?[]:[`thalor.sheet.${slug}.v4`,`thalor.sheet.${slug}.v3`,`thalor.sheet.${slug}.v2`];
-let lastSaveCompleted=false;
 let authState={configured:false,ready:false};
 function authAvailable(){return !!window.ThalorAuth;}
 function sheetCanEdit(){return !authAvailable() || window.ThalorAuth.canEdit(slug);}
 async function refreshEditPermission(){
   if(!authAvailable()) return true;
   if(sheetCanEdit()) return true;
-  try{
-    if(!window.ThalorAuth.state?.ready && window.ThalorAuth.init) await window.ThalorAuth.init();
-  }catch(e){
-    console.warn('Auth recheck failed:', e);
-  }
+  try{ await window.ThalorAuth.init(false); }catch(e){ console.warn('Auth recheck failed:', e); }
   return sheetCanEdit();
 }
 function emergencyDraftKey(){return `thalor.unsaved.${slug}${isCompanion?'.companion.'+companionIndex:''}.v1`;}
@@ -28,35 +23,19 @@ function saveEmergencyDraft(data,reason){
   }catch(e){ console.warn('Emergency draft failed:', e); }
 }
 function authStatusText(){return authAvailable()?window.ThalorAuth.statusText():'Modalità locale.';}
-function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il personaggio assegnato, oppure tutto se sei Master. Il salvataggio online non è stato eseguito.';}
-function withTimeout(promise, ms, label){
-  let timer;
-  return Promise.race([
-    promise.finally(()=>clearTimeout(timer)),
-    new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(label||'Operazione scaduta')),ms);})
-  ]);
+function markSessionPreparing(reason){
+  const ls=document.getElementById('localStatus');
+  if(ls && app.classList.contains('editing')) ls.textContent='Sessione pronta al rientro nella tab…';
 }
-
-async function saveOnlineWithRetry(payload){
-  const attempts = 2;
-  let lastErr = null;
-  for(let i=1;i<=attempts;i++){
+if(authAvailable()){
+  window.addEventListener('thalor-auth-warmed',()=>{
     const ls=document.getElementById('localStatus');
-    if(ls) ls.textContent=i===1?'Salvataggio online in corso…':`Salvataggio online in corso… tentativo ${i}/${attempts}`;
-    try{
-      // ThalorAuth.saveCharacter controlla già sessione valida + permessi cache.
-      // Evitiamo un doppio refresh prima di ogni salvataggio.
-      return await withTimeout(window.ThalorAuth.saveCharacter(slug, payload), 18000, 'Supabase non ha completato il salvataggio entro 18 secondi');
-    }catch(err){
-      lastErr = err;
-      console.warn('Tentativo salvataggio online fallito:', i, err);
-      if(i < attempts){
-        await new Promise(resolve=>setTimeout(resolve, 700));
-      }
-    }
-  }
-  throw lastErr || new Error('Salvataggio online non completato.');
+    if(ls && app.classList.contains('editing')) ls.textContent='Sessione pronta. Puoi salvare online.';
+  });
+  window.addEventListener('focus', markSessionPreparing);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') markSessionPreparing(); });
 }
+function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il personaggio assegnato, oppure tutto se sei Master. Ho creato una copia di emergenza locale per non perdere i dati.';}
 
 // Permessi UI: in sola lettura mostra solo il ritorno al profilo/scheda principale.
 (function(){
@@ -661,7 +640,6 @@ function bindSpellDescriptionEditors(){
 }
 
 async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
-  lastSaveCompleted=false;
   closeSpellDescriptionPopovers();
   // fromDom=true: normale salvataggio dagli input visibili.
   // fromDom=false: salvataggio diretto dell'oggetto già modificato, utile per azioni rapide
@@ -672,11 +650,6 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
     alert(editDeniedMessage());
     const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Sessione non valida: copia locale/emergenza salvata, ma non pubblicata online.';
-    if(keepEdit!==null){
-      let comp=updateCompendiumFromSheet(draft);
-      rerender(draft,xpData,comp,!!keepEdit);
-      enable(!!keepEdit);
-    }
     return draft;
   }
   let previous=null;try{previous=JSON.parse(localStorage.getItem(storageKey)||'null')}catch(e){}
@@ -684,7 +657,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   if(previous)pushSnapshot(previous,detail||'Prima del salvataggio');
   let u=draft;
   u.changeLog=u.changeLog||[];
-  u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate online.'});
+  u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate nel browser e compendio locale aggiornato.'});
   let parentForCloud=null;
   if(isCompanion){
     let parent=null;try{parent=JSON.parse(localStorage.getItem(parentStorageKey)||'null')}catch(e){}
@@ -701,30 +674,20 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     localStorage.setItem(storageKey,JSON.stringify(u));
     oldKeys.forEach(k=>localStorage.removeItem(k));
   }
-  const onlineRequired = authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster;
   try{
-    if(onlineRequired){
-      await saveOnlineWithRetry(isCompanion ? parentForCloud : u);
-      lastSaveCompleted=true;
-      const ls2=document.getElementById('localStatus'); if(ls2)ls2.textContent='Modifiche salvate online.';
+    if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
+      const lsSaving=document.getElementById('localStatus'); if(lsSaving)lsSaving.textContent='Salvataggio online…';
+      const saved = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
+      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Modifiche salvate online' + (saved?.row?.updated_at ? ' alle ' + new Date(saved.row.updated_at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',second:'2-digit'}) : '.') ;
     }else{
-      lastSaveCompleted=true;
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
-
-    let finalEditState=keepEdit===null?app.classList.contains('editing'):!!keepEdit;
-    let comp=updateCompendiumFromSheet(u);
-    rerender(u,xpData,comp,finalEditState);
-    enable(finalEditState);
   }catch(err){
-    lastSaveCompleted=false;
     saveEmergencyDraft(u,'Salvataggio online fallito');
-    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online NON completato: '+(err.message||err)+'. Resto in modalità modifica: riprova Salva.';
-    console.warn('Salvataggio online non completato:', err);
-    if(onlineRequired){
-      enable(true);
-    }
+    alert('Salvataggio online non riuscito: '+(err.message||err)+'\nLa copia locale e una copia di emergenza sono state comunque aggiornate.');
   }
+  let comp=updateCompendiumFromSheet(u);
+  rerender(u,xpData,comp,keepEdit===null?app.classList.contains('editing'):!!keepEdit);
   return u;
 }
 function nearestSection(el){return el.closest('.sheet-dropdown,.section-panel,.xp-panel,.dynamic-portrait,.dynamic-hero,.panel');}
@@ -828,41 +791,13 @@ function bindPortraitUpload(data,xpData){
 }
 function bind(data,xpData,compendium){
   const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
-  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{
-    const btn=document.getElementById('floatEditSaveSheet')||floatEditSave;
-    if(btn.dataset.busy==='1')return;
-    if(app.classList.contains('editing')){
-      btn.dataset.busy='1';
-      btn.disabled=true;
-      btn.textContent='Salvataggio…';
-      try{
-        await withTimeout(saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false), 22000, 'Il salvataggio è rimasto bloccato nel browser');
-        if(lastSaveCompleted) keepViewportStable(()=>enable(false));
-        else keepViewportStable(()=>enable(true));
-      }catch(err){
-        lastSaveCompleted=false;
-        console.warn('Salvataggio bloccato o fallito:', err);
-        const ls=document.getElementById('localStatus');
-        if(ls) ls.textContent='Salvataggio online NON completato: '+(err.message||err)+'. Sei ancora in modifica: riprova.';
-        keepViewportStable(()=>enable(true));
-      }finally{
-        document.querySelectorAll('#floatEditSaveSheet').forEach(fresh=>{
-          fresh.dataset.busy='0';
-          fresh.disabled=false;
-          fresh.textContent=app.classList.contains('editing')?'Salva':'Modifica';
-        });
-      }
-    }else{
-      if(await refreshEditPermission())keepViewportStable(()=>enable(true));
-      else alert(editDeniedMessage());
-    }
-  };
+  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{if(app.classList.contains('editing')){await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);keepViewportStable(()=>enable(false));}else{if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());}};
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
   const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(normalize(collect(data)),null,2));
   const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};
   const exportCompendiumBtn=document.getElementById('exportCompendium'); if(exportCompendiumBtn) exportCompendiumBtn.onclick=()=>download('thalor-compendio-locale.json',JSON.stringify(mergeCompendium(window.__thalorCompendium||{}),null,2));
   const printSheetBtn=document.getElementById('floatPrintSheet'); if(printSheetBtn) printSheetBtn.onclick=()=>{document.querySelectorAll('details').forEach(d=>d.open=true);window.print();};
-  const importSheetInput=document.getElementById('importSheet'); if(importSheetInput) importSheetInput.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const u=normalize(JSON.parse(r.result));u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Import JSON',detail:'Scheda importata manualmente.'});saveCurrentSheet(u,xpData,'Scheda importata manualmente.',false,false);enable(false);document.getElementById('localStatus').textContent='Scheda importata e salvata nel browser.'}catch(err){alert('JSON non valido')}};r.readAsText(f)};
+  const importSheetInput=document.getElementById('importSheet'); if(importSheetInput) importSheetInput.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const u=normalize(JSON.parse(r.result));u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Import JSON',detail:'Scheda importata manualmente.'});saveCurrentSheet(u,xpData,'Scheda importata manualmente.',false,false);enable(false);document.getElementById('localStatus').textContent='Scheda importata e salvata.'}catch(err){alert('JSON non valido')}};r.readAsText(f)};
   document.querySelectorAll('.restore-snapshot').forEach(btn=>btn.onclick=e=>{e.preventDefault();e.stopPropagation();let arr=getSnapshots();let snap=arr[num(btn.dataset.snapshot)];if(!snap||!snap.data)return;let u=normalize(snap.data);u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Ripristino snapshot',detail:'Ripristinata versione del '+(snap.when||'')});saveCurrentSheet(u,xpData,'Snapshot ripristinato.',false,false);enable(false);document.getElementById('localStatus').textContent='Snapshot ripristinato.';});
   document.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{
     e.preventDefault();e.stopPropagation();

@@ -14,11 +14,6 @@
     user: null,
     profile: null,
     access: [],
-    accessLoaded: false,
-    permissionsStale: false,
-    accessLoadedForUserId: null,
-    profileLoadedForUserId: null,
-    lastUserId: null,
     ready: false,
     loading: false,
     error: null,
@@ -47,14 +42,75 @@
 
   function norm(v){ return String(v || '').trim().toLowerCase(); }
 
+
   function withTimeout(promise, ms, label){
     let timer;
     return Promise.race([
-      Promise.resolve(promise).finally(()=>clearTimeout(timer)),
-      new Promise((_, reject)=>{
-        timer = setTimeout(()=>reject(new Error(label || 'Operazione Supabase scaduta')), ms);
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error((label || 'Operazione Supabase') + ' non completata entro ' + Math.round(ms/1000) + ' secondi.')), ms);
       })
-    ]);
+    ]).finally(() => clearTimeout(timer));
+  }
+
+  function sessionExpiresSoon(session, windowSeconds=300){
+    const exp = Number(session?.expires_at || 0);
+    if(!exp) return true;
+    return exp - Math.floor(Date.now()/1000) < windowSeconds;
+  }
+
+  async function ensureFreshSession(options={}){
+    const client = makeClient();
+    if(!client) return null;
+    const timeoutMs = options.timeoutMs || 12000;
+    let current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
+    if(current.error) throw current.error;
+    let session = current.data.session || null;
+    if(!session || sessionExpiresSoon(session, options.refreshWindowSeconds ?? 300)){
+      const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
+      if(refreshed.error) throw refreshed.error;
+      session = refreshed.data.session || session;
+    }
+    state.session = session || null;
+    state.user = state.session?.user || null;
+    return state.session;
+  }
+
+  let wakeTimer = null;
+  let wakeRunning = false;
+  async function warmSession(reason='focus'){
+    if(!state.configured || !state.client || wakeRunning) return state.session;
+    wakeRunning = true;
+    try{
+      const session = await ensureFreshSession({ timeoutMs: 10000, refreshWindowSeconds: 600 });
+      if(session && !state.profile){
+        try{ await ensureProfile(state.client); }catch(e){ console.warn('warmSession profile:', e); }
+      }
+      state.error = null;
+      window.dispatchEvent(new CustomEvent('thalor-auth-warmed', { detail: { reason, state } }));
+      return session;
+    }catch(err){
+      console.warn('warmSession failed:', err);
+      state.error = err.message || String(err);
+      return null;
+    }finally{
+      wakeRunning = false;
+    }
+  }
+
+  function scheduleWarmSession(reason){
+    if(wakeTimer) clearTimeout(wakeTimer);
+    wakeTimer = setTimeout(() => warmSession(reason), 150);
+  }
+
+  function attachWakeHandlers(){
+    if(state._wakeHandlersAttached || typeof window === 'undefined') return;
+    state._wakeHandlersAttached = true;
+    window.addEventListener('focus', () => scheduleWarmSession('focus'));
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'visible') scheduleWarmSession('visible');
+    });
+    window.addEventListener('pageshow', () => scheduleWarmSession('pageshow'));
   }
 
   function statusText(){
@@ -79,32 +135,30 @@
         storageKey: 'thalor.supabase.auth'
       }
     });
+    attachWakeHandlers();
     return state.client;
   }
 
   async function ensureProfile(client){
     if(!state.user) return null;
 
-    const found = await withTimeout(client
+    const found = await client
       .from('profiles')
       .select('*')
       .eq('user_id', state.user.id)
-      .maybeSingle(), 12000, 'Lettura profilo Supabase scaduta');
+      .maybeSingle();
 
-    if(found.error){
-      console.warn('profiles select error:', found.error);
-      return state.profile || null;
-    }
+    if(found.error) console.warn('profiles select error:', found.error);
 
     let p = found.data || null;
 
     if(!p){
       const displayName = state.user.user_metadata?.full_name || state.user.email || 'Giocatore';
-      const created = await withTimeout(client
+      const created = await client
         .from('profiles')
         .insert({ user_id: state.user.id, display_name: displayName, role: 'player' })
         .select('*')
-        .maybeSingle(), 12000, 'Creazione profilo Supabase scaduta');
+        .maybeSingle();
 
       if(created.error) console.warn('profiles insert error:', created.error);
       p = created.data || null;
@@ -114,96 +168,27 @@
     return p;
   }
 
-  async function refreshAccess(force=false){
+  async function refreshAccess(){
     const client = makeClient();
     if(!client || !state.user){
       state.access = [];
-      state.accessLoaded = false;
-      state.accessLoadedForUserId = null;
-      state.permissionsStale = false;
       return [];
     }
 
-    // I permessi cambiano raramente: li teniamo in cache per tutta la sessione
-    // dell'utente. Si svuotano solo a logout/cambio account. Questo evita
-    // una query a character_access ad ogni salvataggio.
-    if(!force && state.accessLoaded && state.accessLoadedForUserId === state.user.id){
-      return state.access || [];
-    }
-
-    const res = await withTimeout(client
+    const res = await client
       .from('character_access')
       .select('character_slug, can_edit')
       .eq('user_id', state.user.id)
-      .eq('can_edit', true), 12000, 'Lettura permessi Supabase scaduta');
+      .eq('can_edit', true);
 
     if(res.error){
       console.warn('character_access select error:', res.error);
-      state.permissionsStale = true;
-      return state.access || [];
+      state.access = [];
+      return [];
     }
 
     state.access = res.data || [];
-    state.accessLoaded = true;
-    state.accessLoadedForUserId = state.user.id;
-    state.permissionsStale = false;
     return state.access;
-  }
-
-  async function ensureFreshSession(options={}){
-    const client = makeClient();
-    if(!client) return null;
-
-    const forceRefresh = !!options.forceRefresh;
-    let result = await withTimeout(client.auth.getSession(), 8000, 'Lettura sessione Supabase scaduta');
-    if(result.error) throw result.error;
-
-    let session = result.data.session || null;
-    const expiresAt = Number(session?.expires_at || 0);
-    const secondsLeft = expiresAt ? expiresAt - Math.floor(Date.now()/1000) : 0;
-
-    // Refresh solo se serve davvero. Prima lo facevamo troppo spesso e
-    // rallentava i salvataggi dopo qualche minuto di modifica.
-    if(session && (forceRefresh || secondsLeft < 90)){
-      const refreshed = await withTimeout(client.auth.refreshSession(), 12000, 'Refresh sessione Supabase scaduto');
-      if(refreshed.error) throw refreshed.error;
-      session = refreshed.data.session || session;
-    }
-
-    state.session = session;
-    const nextUser = session?.user || null;
-    const userChanged = (nextUser?.id || null) !== state.lastUserId;
-    state.user = nextUser;
-    state.lastUserId = nextUser?.id || null;
-
-    if(!state.user){
-      state.profile = null;
-      state.access = [];
-      state.accessLoaded = false;
-      state.accessLoadedForUserId = null;
-      state.profileLoadedForUserId = null;
-      state.permissionsStale = false;
-      return null;
-    }
-
-    if(userChanged){
-      state.profile = null;
-      state.access = [];
-      state.accessLoaded = false;
-      state.accessLoadedForUserId = null;
-      state.profileLoadedForUserId = null;
-      state.permissionsStale = false;
-    }
-
-    if(!state.profile || state.profileLoadedForUserId !== state.user.id){
-      await ensureProfile(client);
-      state.profileLoadedForUserId = state.user.id;
-    }
-    await refreshAccess(false);
-
-    state.error = null;
-    state.ready = true;
-    return state.session;
   }
 
   async function init(force=false){
@@ -219,34 +204,13 @@
         return state;
       }
 
-      const s = await withTimeout(client.auth.getSession(), 12000, 'Lettura sessione Supabase scaduta');
-      if(s.error) throw s.error;
+      await ensureFreshSession({ timeoutMs: 12000, refreshWindowSeconds: 300 });
+      state.profile = null;
+      state.access = [];
 
-      state.session = s.data.session || null;
-      const nextUser = state.session?.user || null;
-      const userChanged = (nextUser?.id || null) !== state.lastUserId;
-      state.user = nextUser;
-      state.lastUserId = nextUser?.id || null;
-
-      if(!state.user){
-        state.profile = null;
-        state.access = [];
-        state.accessLoaded = false;
-        state.permissionsStale = false;
-      }else{
-        // Se è lo stesso utente, conserva profilo e accessi finché il refresh non riesce.
-        // Così un controllo temporaneamente fallito non blocca il salvataggio in corso.
-        if(userChanged){
-          state.profile = null;
-          state.access = [];
-          state.accessLoaded = false;
-          state.accessLoadedForUserId = null;
-          state.profileLoadedForUserId = null;
-          state.permissionsStale = false;
-        }
+      if(state.user){
         await ensureProfile(client);
-        state.profileLoadedForUserId = state.user?.id || null;
-        await refreshAccess(false);
+        await refreshAccess();
       }
 
       state.error = null;
@@ -256,30 +220,16 @@
         state._listenerAttached = true;
         client.auth.onAuthStateChange(async (_event, session) => {
           state.session = session || null;
-          const nextUser = session?.user || null;
-          const userChanged = (nextUser?.id || null) !== state.lastUserId;
-          state.user = nextUser;
-          state.lastUserId = nextUser?.id || null;
+          state.user = session?.user || null;
+          state.profile = null;
+          state.access = [];
 
-          if(!state.user){
-            state.profile = null;
-            state.access = [];
-            state.accessLoaded = false;
-            state.permissionsStale = false;
-          }else{
-            if(userChanged){
-              state.profile = null;
-              state.access = [];
-              state.accessLoaded = false;
-              state.permissionsStale = false;
-            }
+          if(state.user){
             try{
               await ensureProfile(client);
-              state.profileLoadedForUserId = state.user?.id || null;
-              await refreshAccess(false);
+              await refreshAccess();
             }catch(err){
               console.warn('Auth refresh error:', err);
-              state.permissionsStale = true;
             }
           }
 
@@ -318,11 +268,11 @@
     await init();
     if(!state.configured || !state.client) return fallback;
 
-    const res = await withTimeout(state.client
+    const res = await state.client
       .from('character_sheets')
       .select('data')
       .eq('slug', slug)
-      .maybeSingle(), 15000, 'Lettura scheda Supabase scaduta');
+      .maybeSingle();
 
     if(res.error){
       console.warn('Supabase loadCharacter:', res.error);
@@ -333,35 +283,33 @@
   }
 
   async function saveCharacter(slug, data){
-    state.localMaster = localMasterEnabled();
+    await init(false);
     if(state.localMaster) return { mode:'local-master' };
-    if(!state.configured || !makeClient()) return { mode:'local' };
+    if(!state.configured || !state.client) return { mode:'local' };
 
-    // Salvataggio rapido: verifica solo che la sessione esista/il token sia valido.
-    // Profilo e permessi restano in cache fino a logout o cambio utente.
-    await ensureFreshSession();
-
-    if(!state.user) throw new Error('Accesso richiesto: sessione non trovata. Rientra con login e riprova.');
-    if(!canEdit(slug)){
-      await refreshAccess(false);
-      if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
-    }
+    await ensureFreshSession({ timeoutMs: 15000, refreshWindowSeconds: 180 });
+    if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
+    if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
       slug,
       data,
       updated_at: new Date().toISOString(),
-      updated_by: state.user?.id || null
+      updated_by: state.user.id
     };
 
-    const res = await withTimeout(state.client
-      .from('character_sheets')
-      .upsert(row, { onConflict:'slug' })
-      .select('slug, updated_at')
-      .single(), 20000, 'Salvataggio scheda Supabase scaduto');
+    const res = await withTimeout(
+      state.client
+        .from('character_sheets')
+        .upsert(row, { onConflict:'slug' })
+        .select('slug, updated_at')
+        .single(),
+      60000,
+      'Salvataggio online'
+    );
 
     if(res.error) throw res.error;
-    return { mode:'cloud', row: res.data || null };
+    return { mode:'cloud', row: res.data };
   }
 
   async function signIn(email,password){
@@ -392,6 +340,7 @@
     state,
     init,
     refreshAccess,
+    warmSession,
     ensureFreshSession,
     isMaster,
     canEdit,
