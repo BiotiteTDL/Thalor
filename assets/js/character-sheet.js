@@ -37,6 +37,28 @@ function withTimeout(promise, ms, label){
   ]);
 }
 
+async function saveOnlineWithRetry(payload){
+  const attempts = 3;
+  let lastErr = null;
+  for(let i=1;i<=attempts;i++){
+    const ls=document.getElementById('localStatus');
+    if(ls) ls.textContent=`Salvataggio online in corso… tentativo ${i}/${attempts}`;
+    try{
+      if(authAvailable() && window.ThalorAuth.ensureFreshSession){
+        await withTimeout(window.ThalorAuth.ensureFreshSession(), 60000, 'Refresh sessione Supabase non completato entro 60 secondi');
+      }
+      return await withTimeout(window.ThalorAuth.saveCharacter(slug, payload), 60000, 'Supabase non ha risposto entro 60 secondi');
+    }catch(err){
+      lastErr = err;
+      console.warn('Tentativo salvataggio online fallito:', i, err);
+      if(i < attempts){
+        await new Promise(resolve=>setTimeout(resolve, 1200 * i));
+      }
+    }
+  }
+  throw lastErr || new Error('Salvataggio online non completato.');
+}
+
 // Permessi UI: in sola lettura mostra solo il ritorno al profilo/scheda principale.
 (function(){
   if(document.getElementById('thalor-permission-ui-style')) return;
@@ -665,7 +687,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   if(previous)pushSnapshot(previous,detail||'Prima del salvataggio');
   let u=draft;
   u.changeLog=u.changeLog||[];
-  u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate nel browser e compendio locale aggiornato.'});
+  u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate online.'});
   let parentForCloud=null;
   if(isCompanion){
     let parent=null;try{parent=JSON.parse(localStorage.getItem(parentStorageKey)||'null')}catch(e){}
@@ -682,22 +704,26 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     localStorage.setItem(storageKey,JSON.stringify(u));
     oldKeys.forEach(k=>localStorage.removeItem(k));
   }
-  let finalEditState=keepEdit===null?app.classList.contains('editing'):!!keepEdit;
-  let comp=updateCompendiumFromSheet(u);
-  rerender(u,xpData,comp,finalEditState);
-  enable(finalEditState);
+  const onlineRequired = authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster;
   try{
-    if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvato nel browser. Pubblicazione online in corso…';
-      await withTimeout(window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u), 30000, 'Supabase non ha risposto entro 30 secondi');
+    if(onlineRequired){
+      await saveOnlineWithRetry(isCompanion ? parentForCloud : u);
       const ls2=document.getElementById('localStatus'); if(ls2)ls2.textContent='Modifiche salvate online.';
     }else{
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
+
+    let finalEditState=keepEdit===null?app.classList.contains('editing'):!!keepEdit;
+    let comp=updateCompendiumFromSheet(u);
+    rerender(u,xpData,comp,finalEditState);
+    enable(finalEditState);
   }catch(err){
     saveEmergencyDraft(u,'Salvataggio online fallito');
-    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online NON completato: '+(err.message||err);
+    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online NON completato: '+(err.message||err)+'. Resto in modalità modifica: riprova Salva.';
     console.warn('Salvataggio online non completato:', err);
+    if(onlineRequired){
+      enable(true);
+    }
   }
   return u;
 }
