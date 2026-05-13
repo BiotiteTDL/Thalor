@@ -735,6 +735,7 @@ function bindSpellDescriptionEditors(){
 
 async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   closeSpellDescriptionPopovers();
+  saveCurrentSheet.lastResult = { ok:false, mode:'pending' };
   // fromDom=true: normale salvataggio dagli input visibili.
   // fromDom=false: salvataggio diretto dell'oggetto già modificato, utile per azioni rapide
   // come aggiungi/rimuovi condizione o +/- slot, evitando che il vecchio DOM riaggiunga righe cancellate.
@@ -768,23 +769,29 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     localStorage.setItem(storageKey,JSON.stringify(u));
     oldKeys.forEach(k=>localStorage.removeItem(k));
   }
+  let saveOk=true;
+  let saveMode='local';
   try{
     if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
-      const ls0=document.getElementById('localStatus'); if(ls0)ls0.textContent='Salvataggio online in corso…';
-      const saved = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Modifiche salvate online.'+(saved?.attempt>1?' Tentativo '+saved.attempt+'.':'');
+      const onlineResult = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
+      saveMode = onlineResult?.mode || 'cloud';
+      const ls=document.getElementById('localStatus'); if(ls)ls.textContent=saveMode==='cloud'?'Modifiche salvate online.':'Modifiche salvate in locale.';
     }else{
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
+      saveMode = authAvailable()&&window.ThalorAuth.state.localMaster ? 'local-master' : 'browser';
+      const ls=document.getElementById('localStatus'); if(ls)ls.textContent=saveMode==='local-master'?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
   }catch(err){
+    saveOk=false;
+    saveMode='failed';
     saveEmergencyDraft(u,'Salvataggio online fallito');
-    const ls=document.getElementById('localStatus');
-    if(ls)ls.textContent='Salvataggio online non riuscito: resta in modifica, i dati sono in emergenza locale.';
-    alert('Salvataggio online non riuscito: '+(err.message||err)+'\nLa scheda NON è stata confermata online. Resta in modifica: riprova senza chiudere la pagina.');
-    throw err;
+    const msg='Salvataggio online non riuscito: '+(err.message||err)+'\nLa scheda NON è stata confermata online. Resta in modifica: riprova senza chiudere la pagina.';
+    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online non riuscito. Resta in modifica.';
+    alert(msg);
   }
+  saveCurrentSheet.lastResult = { ok:saveOk, mode:saveMode };
   let comp=updateCompendiumFromSheet(u);
-  rerender(u,xpData,comp,keepEdit===null?app.classList.contains('editing'):!!keepEdit);
+  const stayEditing = saveOk ? (keepEdit===null?app.classList.contains('editing'):!!keepEdit) : true;
+  rerender(u,xpData,comp,stayEditing);
   return u;
 }
 function nearestSection(el){return el.closest('.sheet-dropdown,.section-panel,.xp-panel,.dynamic-portrait,.dynamic-hero,.panel');}
@@ -890,18 +897,30 @@ function bind(data,xpData,compendium){
   const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
   const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{
     if(app.classList.contains('editing')){
-      floatEditSave.disabled=true;
+      if(floatEditSave.dataset.saving==='1') return;
       const oldText=floatEditSave.textContent;
+      floatEditSave.dataset.saving='1';
+      floatEditSave.disabled=true;
       floatEditSave.textContent='Salvataggio…';
+      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online in corso…';
       try{
         await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);
-        keepViewportStable(()=>enable(false));
-      }catch(err){
-        keepViewportStable(()=>enable(true));
+        if(saveCurrentSheet.lastResult?.ok){
+          keepViewportStable(()=>enable(false));
+        }else{
+          keepViewportStable(()=>enable(true));
+        }
       }finally{
-        floatEditSave.disabled=false;
-        if(app.classList.contains('editing')) floatEditSave.textContent='Salva';
-        else floatEditSave.textContent='Modifica';
+        const fresh=document.getElementById('floatEditSaveSheet');
+        if(fresh){
+          fresh.dataset.saving='0';
+          fresh.disabled=false;
+          fresh.textContent=app.classList.contains('editing')?'Salva':'Modifica';
+        }else{
+          floatEditSave.dataset.saving='0';
+          floatEditSave.disabled=false;
+          floatEditSave.textContent=app.classList.contains('editing')?'Salva':oldText;
+        }
       }
     }else{
       if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());
