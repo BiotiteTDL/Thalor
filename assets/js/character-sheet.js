@@ -7,6 +7,7 @@ const isCompanion=Number.isInteger(companionIndex)&&companionIndex>=0;
 const parentStorageKey=`thalor.sheet.${slug}.v5`;
 const storageKey=isCompanion?`thalor.sheet.${slug}.companion.${companionIndex}.v1`:parentStorageKey;
 const oldKeys=isCompanion?[]:[`thalor.sheet.${slug}.v4`,`thalor.sheet.${slug}.v3`,`thalor.sheet.${slug}.v2`];
+let lastSaveCompleted=false;
 let authState={configured:false,ready:false};
 function authAvailable(){return !!window.ThalorAuth;}
 function sheetCanEdit(){return !authAvailable() || window.ThalorAuth.canEdit(slug);}
@@ -45,9 +46,9 @@ async function saveOnlineWithRetry(payload){
     if(ls) ls.textContent=`Salvataggio online in corso… tentativo ${i}/${attempts}`;
     try{
       if(authAvailable() && window.ThalorAuth.ensureFreshSession){
-        await withTimeout(window.ThalorAuth.ensureFreshSession(), 60000, 'Refresh sessione Supabase non completato entro 60 secondi');
+        await withTimeout(window.ThalorAuth.ensureFreshSession(), 25000, 'Refresh sessione Supabase non completato entro 25 secondi');
       }
-      return await withTimeout(window.ThalorAuth.saveCharacter(slug, payload), 60000, 'Supabase non ha risposto entro 60 secondi');
+      return await withTimeout(window.ThalorAuth.saveCharacter(slug, payload), 25000, 'Supabase non ha completato il salvataggio entro 25 secondi');
     }catch(err){
       lastErr = err;
       console.warn('Tentativo salvataggio online fallito:', i, err);
@@ -662,21 +663,20 @@ function bindSpellDescriptionEditors(){
 }
 
 async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
+  lastSaveCompleted=false;
   closeSpellDescriptionPopovers();
   // fromDom=true: normale salvataggio dagli input visibili.
   // fromDom=false: salvataggio diretto dell'oggetto già modificato, utile per azioni rapide
   // come aggiungi/rimuovi condizione o +/- slot, evitando che il vecchio DOM riaggiunga righe cancellate.
   let draft=normalize(fromDom?collect(data):data);
   saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
-  const onlineRequired = authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster;
   if(authAvailable() && window.ThalorAuth.ensureFreshSession){
     try{ await window.ThalorAuth.ensureFreshSession(); }catch(e){ console.warn('Refresh sessione prima del salvataggio fallito:', e); }
   }
-  // Se Supabase è configurato, non bloccare qui con un controllo permessi basato
-  // sulla cache UI: il controllo vero avviene dentro saveCharacter dopo refresh JWT.
-  if(!onlineRequired && !await refreshEditPermission()){
+  if(!await refreshEditPermission()){
+    try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
     alert(editDeniedMessage());
-    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Accesso richiesto: salvataggio non eseguito.';
+    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Sessione non valida: copia locale/emergenza salvata, ma non pubblicata online.';
     if(keepEdit!==null){
       let comp=updateCompendiumFromSheet(draft);
       rerender(draft,xpData,comp,!!keepEdit);
@@ -706,11 +706,14 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     localStorage.setItem(storageKey,JSON.stringify(u));
     oldKeys.forEach(k=>localStorage.removeItem(k));
   }
+  const onlineRequired = authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster;
   try{
     if(onlineRequired){
       await saveOnlineWithRetry(isCompanion ? parentForCloud : u);
+      lastSaveCompleted=true;
       const ls2=document.getElementById('localStatus'); if(ls2)ls2.textContent='Modifiche salvate online.';
     }else{
+      lastSaveCompleted=true;
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
 
@@ -719,6 +722,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     rerender(u,xpData,comp,finalEditState);
     enable(finalEditState);
   }catch(err){
+    lastSaveCompleted=false;
     saveEmergencyDraft(u,'Salvataggio online fallito');
     const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online NON completato: '+(err.message||err)+'. Resto in modalità modifica: riprova Salva.';
     console.warn('Salvataggio online non completato:', err);
@@ -829,7 +833,35 @@ function bindPortraitUpload(data,xpData){
 }
 function bind(data,xpData,compendium){
   const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
-  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{if(floatEditSave.dataset.busy==='1')return;if(app.classList.contains('editing')){floatEditSave.dataset.busy='1';floatEditSave.disabled=true;floatEditSave.textContent='Salvataggio…';try{await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);keepViewportStable(()=>enable(false));}finally{const fresh=document.getElementById('floatEditSaveSheet');if(fresh){fresh.dataset.busy='0';fresh.disabled=false;fresh.textContent='Modifica';}}}else{if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());}};
+  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{
+    const btn=document.getElementById('floatEditSaveSheet')||floatEditSave;
+    if(btn.dataset.busy==='1')return;
+    if(app.classList.contains('editing')){
+      btn.dataset.busy='1';
+      btn.disabled=true;
+      btn.textContent='Salvataggio…';
+      try{
+        await withTimeout(saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false), 30000, 'Il salvataggio è rimasto bloccato nel browser');
+        if(lastSaveCompleted) keepViewportStable(()=>enable(false));
+        else keepViewportStable(()=>enable(true));
+      }catch(err){
+        lastSaveCompleted=false;
+        console.warn('Salvataggio bloccato o fallito:', err);
+        const ls=document.getElementById('localStatus');
+        if(ls) ls.textContent='Salvataggio online NON completato: '+(err.message||err)+'. Sei ancora in modifica: riprova.';
+        keepViewportStable(()=>enable(true));
+      }finally{
+        document.querySelectorAll('#floatEditSaveSheet').forEach(fresh=>{
+          fresh.dataset.busy='0';
+          fresh.disabled=false;
+          fresh.textContent=app.classList.contains('editing')?'Salva':'Modifica';
+        });
+      }
+    }else{
+      if(await refreshEditPermission())keepViewportStable(()=>enable(true));
+      else alert(editDeniedMessage());
+    }
+  };
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
   const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(normalize(collect(data)),null,2));
   const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};

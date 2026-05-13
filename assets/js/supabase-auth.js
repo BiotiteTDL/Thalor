@@ -45,6 +45,16 @@
 
   function norm(v){ return String(v || '').trim().toLowerCase(); }
 
+  function withTimeout(promise, ms, label){
+    let timer;
+    return Promise.race([
+      Promise.resolve(promise).finally(()=>clearTimeout(timer)),
+      new Promise((_, reject)=>{
+        timer = setTimeout(()=>reject(new Error(label || 'Operazione Supabase scaduta')), ms);
+      })
+    ]);
+  }
+
   function statusText(){
     state.localMaster = localMasterEnabled();
     if(state.localMaster) return 'Master offline attivo: puoi modificare tutto in locale senza cambiare i permessi online.';
@@ -64,8 +74,7 @@
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        storageKey: 'thalor.supabase.auth',
-        flowType: 'pkce'
+        storageKey: 'thalor.supabase.auth'
       }
     });
     return state.client;
@@ -74,11 +83,11 @@
   async function ensureProfile(client){
     if(!state.user) return null;
 
-    const found = await client
+    const found = await withTimeout(client
       .from('profiles')
       .select('*')
       .eq('user_id', state.user.id)
-      .maybeSingle();
+      .maybeSingle(), 12000, 'Lettura profilo Supabase scaduta');
 
     if(found.error){
       console.warn('profiles select error:', found.error);
@@ -89,11 +98,11 @@
 
     if(!p){
       const displayName = state.user.user_metadata?.full_name || state.user.email || 'Giocatore';
-      const created = await client
+      const created = await withTimeout(client
         .from('profiles')
         .insert({ user_id: state.user.id, display_name: displayName, role: 'player' })
         .select('*')
-        .maybeSingle();
+        .maybeSingle(), 12000, 'Creazione profilo Supabase scaduta');
 
       if(created.error) console.warn('profiles insert error:', created.error);
       p = created.data || null;
@@ -112,11 +121,11 @@
       return [];
     }
 
-    const res = await client
+    const res = await withTimeout(client
       .from('character_access')
       .select('character_slug, can_edit')
       .eq('user_id', state.user.id)
-      .eq('can_edit', true);
+      .eq('can_edit', true), 12000, 'Lettura permessi Supabase scaduta');
 
     if(res.error){
       console.warn('character_access select error:', res.error);
@@ -140,7 +149,7 @@
     // lo stato in memoria può essere vecchio anche se il refresh token è ancora valido.
     // Prima di salvare rileggo sempre la sessione reale da Supabase e, se sta per
     // scadere, forzo un refresh. Questo evita i "salvataggi fantasma" dopo 15/20 minuti.
-    let result = await client.auth.getSession();
+    let result = await withTimeout(client.auth.getSession(), 12000, 'Lettura sessione Supabase scaduta');
     if(result.error) throw result.error;
 
     let session = result.data.session || null;
@@ -148,7 +157,7 @@
     const secondsLeft = expiresAt ? expiresAt - Math.floor(Date.now()/1000) : 0;
 
     if(session && secondsLeft < 120){
-      const refreshed = await client.auth.refreshSession();
+      const refreshed = await withTimeout(client.auth.refreshSession(), 12000, 'Refresh sessione Supabase scaduto');
       if(refreshed.error) throw refreshed.error;
       session = refreshed.data.session || session;
     }
@@ -194,7 +203,7 @@
         return state;
       }
 
-      const s = await client.auth.getSession();
+      const s = await withTimeout(client.auth.getSession(), 12000, 'Lettura sessione Supabase scaduta');
       if(s.error) throw s.error;
 
       state.session = s.data.session || null;
@@ -289,25 +298,11 @@
     await init();
     if(!state.configured || !state.client) return fallback;
 
-    // Non interrogare character_sheets da anonimo: con RLS genera 401 e può
-    // mandare la scheda in stati incoerenti. Prima recupera/aggiorna la sessione.
-    try{
-      await ensureFreshSession();
-    }catch(err){
-      console.warn('Supabase loadCharacter refresh:', err);
-      return fallback;
-    }
-
-    if(!state.user){
-      console.warn('Supabase loadCharacter: sessione assente, uso dati locali/statici.');
-      return fallback;
-    }
-
-    const res = await state.client
+    const res = await withTimeout(state.client
       .from('character_sheets')
       .select('data')
       .eq('slug', slug)
-      .maybeSingle();
+      .maybeSingle(), 15000, 'Lettura scheda Supabase scaduta');
 
     if(res.error){
       console.warn('Supabase loadCharacter:', res.error);
@@ -340,12 +335,14 @@
       updated_by: state.user?.id || null
     };
 
-    const res = await state.client
+    const res = await withTimeout(state.client
       .from('character_sheets')
-      .upsert(row, { onConflict:'slug' });
+      .upsert(row, { onConflict:'slug' })
+      .select('slug, updated_at')
+      .single(), 20000, 'Salvataggio scheda Supabase scaduto');
 
     if(res.error) throw res.error;
-    return { mode:'cloud' };
+    return { mode:'cloud', row: res.data || null };
   }
 
   async function signIn(email,password){
@@ -370,24 +367,6 @@
     const c = makeClient();
     if(!c) return;
     return c.auth.signOut();
-  }
-
-
-  // Quando il browser sospende la tab o il player resta fermo a lungo, riallinea
-  // la sessione appena torna attivo. Evita richieste Supabase senza JWT.
-  if(typeof window !== 'undefined' && !window.__thalorAuthFocusRefresh){
-    window.__thalorAuthFocusRefresh = true;
-    let lastFocusRefresh = 0;
-    const refreshOnFocus = () => {
-      if(document.hidden) return;
-      if(Date.now() - lastFocusRefresh < 10000) return;
-      lastFocusRefresh = Date.now();
-      if(state.configured && state.client){
-        ensureFreshSession().catch(err => console.warn('Focus auth refresh:', err));
-      }
-    };
-    window.addEventListener('focus', refreshOnFocus, { passive:true });
-    document.addEventListener('visibilitychange', refreshOnFocus, { passive:true });
   }
 
   window.ThalorAuth = {
