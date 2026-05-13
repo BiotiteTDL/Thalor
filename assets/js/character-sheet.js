@@ -770,14 +770,18 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   }
   try{
     if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
-      await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Modifiche salvate online.';
+      const ls0=document.getElementById('localStatus'); if(ls0)ls0.textContent='Salvataggio online in corso…';
+      const saved = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
+      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Modifiche salvate online.'+(saved?.attempt>1?' Tentativo '+saved.attempt+'.':'');
     }else{
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
   }catch(err){
     saveEmergencyDraft(u,'Salvataggio online fallito');
-    alert('Salvataggio online non riuscito: '+(err.message||err)+'\nLa copia locale e una copia di emergenza sono state comunque aggiornate.');
+    const ls=document.getElementById('localStatus');
+    if(ls)ls.textContent='Salvataggio online non riuscito: resta in modifica, i dati sono in emergenza locale.';
+    alert('Salvataggio online non riuscito: '+(err.message||err)+'\nLa scheda NON è stata confermata online. Resta in modifica: riprova senza chiudere la pagina.');
+    throw err;
   }
   let comp=updateCompendiumFromSheet(u);
   rerender(u,xpData,comp,keepEdit===null?app.classList.contains('editing'):!!keepEdit);
@@ -884,7 +888,25 @@ function bindPortraitUpload(data,xpData){
 }
 function bind(data,xpData,compendium){
   const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
-  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{if(app.classList.contains('editing')){await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);keepViewportStable(()=>enable(false));document.getElementById('localStatus').textContent='Modifiche salvate nel browser.';}else{if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());}};
+  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{
+    if(app.classList.contains('editing')){
+      floatEditSave.disabled=true;
+      const oldText=floatEditSave.textContent;
+      floatEditSave.textContent='Salvataggio…';
+      try{
+        await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);
+        keepViewportStable(()=>enable(false));
+      }catch(err){
+        keepViewportStable(()=>enable(true));
+      }finally{
+        floatEditSave.disabled=false;
+        if(app.classList.contains('editing')) floatEditSave.textContent='Salva';
+        else floatEditSave.textContent='Modifica';
+      }
+    }else{
+      if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());
+    }
+  };
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
   const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(normalize(collect(data)),null,2));
   const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};

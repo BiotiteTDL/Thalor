@@ -376,12 +376,9 @@
     if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !state.client) return { mode:'local' };
 
-    // Versione stabile stile "sitoora": niente coda visibility e niente timeout corto sull'upsert.
-    // Quando il browser cambia tab, Chrome/Safari possono rallentare le fetch: un timeout manuale
-    // può fallire anche se Supabase completerebbe correttamente appena il tab torna attivo.
-    await ensureFreshSession({ timeoutMs: 15000, refreshWindowSeconds: 180 });
+    await ensureFreshSession({ timeoutMs: 20000, refreshWindowSeconds: 240 });
     if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
-    await ensureAccessLoaded({ timeoutMs: 15000 });
+    await ensureAccessLoaded({ timeoutMs: 20000 });
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
@@ -391,15 +388,33 @@
       updated_by: state.user.id
     };
 
-    // NON usare withTimeout qui: il salvataggio deve poter completare anche dopo cambio tab.
-    const res = await state.client
-      .from('character_sheets')
-      .upsert(row, { onConflict:'slug' })
-      .select('slug, updated_at')
-      .single();
+    let lastError = null;
+    for(let attempt=1; attempt<=3; attempt++){
+      try{
+        if(attempt > 1){
+          await ensureFreshSession({ timeoutMs: 20000, refreshWindowSeconds: 600 });
+        }
 
-    if(res.error) throw res.error;
-    return { mode:'cloud', row: res.data };
+        const query = state.client
+          .from('character_sheets')
+          .upsert(row, { onConflict:'slug' })
+          .select('slug, updated_at')
+          .single();
+
+        const res = await withTimeout(query, attempt === 1 ? 45000 : 60000, 'Salvataggio online');
+        if(res.error) throw res.error;
+        if(!res.data || !res.data.slug) throw new Error('Supabase ha risposto senza confermare la riga salvata.');
+        return { mode:'cloud', row: res.data, attempt };
+      }catch(err){
+        lastError = err;
+        console.warn('saveCharacter attempt failed:', attempt, err);
+        if(attempt < 3){
+          await new Promise(resolve => setTimeout(resolve, 700 * attempt));
+        }
+      }
+    }
+
+    throw lastError || new Error('Salvataggio online non completato.');
   }
 
   async function signIn(email,password){
