@@ -14,6 +14,7 @@
     user: null,
     profile: null,
     access: [],
+    accessUserId: null,
     ready: false,
     loading: false,
     error: null,
@@ -41,6 +42,55 @@
   }
 
   function norm(v){ return String(v || '').trim().toLowerCase(); }
+
+  function accessCacheKey(userId){
+    return userId ? 'thalor.characterAccess.' + userId : '';
+  }
+
+  function readCachedAccess(userId){
+    if(!userId) return [];
+    try{
+      const raw = localStorage.getItem(accessCacheKey(userId));
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    }catch(e){
+      return [];
+    }
+  }
+
+  function writeCachedAccess(userId, access){
+    if(!userId) return;
+    try{
+      localStorage.setItem(accessCacheKey(userId), JSON.stringify(Array.isArray(access) ? access : []));
+    }catch(e){
+      console.warn('character_access cache write error:', e);
+    }
+  }
+
+  function clearRuntimeAccess(){
+    state.access = [];
+    state.accessUserId = null;
+  }
+
+  function setUserFromSession(session){
+    const nextUser = session?.user || null;
+    const nextUserId = nextUser?.id || null;
+    const prevUserId = state.user?.id || null;
+
+    state.session = session || null;
+    state.user = nextUser;
+
+    if(nextUserId !== prevUserId){
+      state.profile = null;
+      state.access = nextUserId ? readCachedAccess(nextUserId) : [];
+      state.accessUserId = nextUserId;
+    }else if(nextUserId && state.accessUserId !== nextUserId){
+      state.access = readCachedAccess(nextUserId);
+      state.accessUserId = nextUserId;
+    }else if(!nextUserId){
+      clearRuntimeAccess();
+    }
+  }
 
 
   function withTimeout(promise, ms, label){
@@ -71,8 +121,7 @@
       if(refreshed.error) throw refreshed.error;
       session = refreshed.data.session || session;
     }
-    state.session = session || null;
-    state.user = state.session?.user || null;
+    setUserFromSession(session || null);
     return state.session;
   }
 
@@ -168,27 +217,53 @@
     return p;
   }
 
-  async function refreshAccess(){
+  async function refreshAccess(options={}){
     const client = makeClient();
-    if(!client || !state.user){
-      state.access = [];
+    const userId = state.user?.id || null;
+    if(!client || !userId){
+      clearRuntimeAccess();
       return [];
     }
 
-    const res = await client
-      .from('character_access')
-      .select('character_slug, can_edit')
-      .eq('user_id', state.user.id)
-      .eq('can_edit', true);
+    if(!options.force && state.accessUserId === userId && Array.isArray(state.access) && state.access.length){
+      return state.access;
+    }
+
+    const cached = readCachedAccess(userId);
+    if(!options.force && cached.length){
+      state.access = cached;
+      state.accessUserId = userId;
+      return state.access;
+    }
+
+    const res = await withTimeout(
+      client
+        .from('character_access')
+        .select('character_slug, can_edit')
+        .eq('user_id', userId)
+        .eq('can_edit', true),
+      options.timeoutMs || 15000,
+      'Lettura permessi personaggio'
+    );
 
     if(res.error){
       console.warn('character_access select error:', res.error);
-      state.access = [];
-      return [];
+      // Non cancellare permessi già validi/cached per un errore temporaneo.
+      state.access = cached.length ? cached : (state.accessUserId === userId ? (state.access || []) : []);
+      state.accessUserId = userId;
+      return state.access;
     }
 
     state.access = res.data || [];
+    state.accessUserId = userId;
+    writeCachedAccess(userId, state.access);
     return state.access;
+  }
+
+  async function ensureAccessLoaded(options={}){
+    if(state.localMaster || !state.configured || !state.user || isMaster()) return state.access || [];
+    if(state.accessUserId === state.user.id && Array.isArray(state.access) && state.access.length) return state.access;
+    return refreshAccess({ force: true, timeoutMs: options.timeoutMs || 15000 });
   }
 
   async function init(force=false){
@@ -205,12 +280,16 @@
       }
 
       await ensureFreshSession({ timeoutMs: 12000, refreshWindowSeconds: 300 });
-      state.profile = null;
-      state.access = [];
 
       if(state.user){
+        if(state.accessUserId !== state.user.id){
+          state.access = readCachedAccess(state.user.id);
+          state.accessUserId = state.user.id;
+        }
         await ensureProfile(client);
-        await refreshAccess();
+        if(!(state.access || []).length) await refreshAccess({ force: true });
+      }else{
+        clearRuntimeAccess();
       }
 
       state.error = null;
@@ -218,16 +297,22 @@
 
       if(!state._listenerAttached){
         state._listenerAttached = true;
-        client.auth.onAuthStateChange(async (_event, session) => {
-          state.session = session || null;
-          state.user = session?.user || null;
-          state.profile = null;
-          state.access = [];
+        client.auth.onAuthStateChange(async (event, session) => {
+          const previousUserId = state.user?.id || null;
+          setUserFromSession(session || null);
 
-          if(state.user){
+          if(event === 'SIGNED_OUT' || !state.user){
+            state.profile = null;
+            clearRuntimeAccess();
+          }else{
             try{
+              if(previousUserId !== state.user.id) state.profile = null;
+              if(state.accessUserId !== state.user.id){
+                state.access = readCachedAccess(state.user.id);
+                state.accessUserId = state.user.id;
+              }
               await ensureProfile(client);
-              await refreshAccess();
+              if(!(state.access || []).length) await refreshAccess({ force: true });
             }catch(err){
               console.warn('Auth refresh error:', err);
             }
@@ -289,6 +374,7 @@
 
     await ensureFreshSession({ timeoutMs: 15000, refreshWindowSeconds: 180 });
     if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
+    await ensureAccessLoaded({ timeoutMs: 15000 });
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
@@ -332,14 +418,21 @@
 
   async function signOut(){
     const c = makeClient();
+    const currentUserId = state.user?.id || null;
+    clearRuntimeAccess();
+    state.profile = null;
+    state.session = null;
+    state.user = null;
     if(!c) return;
-    return c.auth.signOut();
+    const res = await c.auth.signOut();
+    return res;
   }
 
   window.ThalorAuth = {
     state,
     init,
     refreshAccess,
+    ensureAccessLoaded,
     warmSession,
     ensureFreshSession,
     isMaster,
