@@ -61,6 +61,11 @@
           <button class="button ghost-button danger-action" id="logoutBtn" type="button">Esci</button>
         </div>
         <p class="auth-mini-note">Se Supabase non è ancora configurato, il sito resta in modalità locale.</p>
+        <div class="auth-actions-clean local-master-tools" id="localMasterTools" hidden>
+          <button class="button ghost-button" id="enableLocalMasterBtn" type="button">Attiva Master offline</button>
+          <button class="button ghost-button danger-action" id="disableLocalMasterBtn" type="button">Disattiva Master offline</button>
+        </div>
+        <p class="auth-mini-note local-master-tools" id="localMasterNote" hidden>Disponibile solo aprendo il sito in locale/localhost. Non modifica ruoli, permessi o login online.</p>
       </form>
     </section>
   </main>
@@ -74,7 +79,14 @@
     await window.ThalorAuth.init();
     const st=document.getElementById('authStatus');
     const form=document.getElementById('authForm');
-    const refresh=()=>{st.textContent=window.ThalorAuth.statusText();};
+    const localTools=document.getElementById('localMasterTools');
+    const localNote=document.getElementById('localMasterNote');
+    const refresh=()=>{
+      st.textContent=window.ThalorAuth.statusText();
+      const canLocal=window.ThalorAuth.isLocalPreview && window.ThalorAuth.isLocalPreview();
+      if(localTools)localTools.hidden=!canLocal;
+      if(localNote)localNote.hidden=!canLocal;
+    };
     refresh();
     async function doLogin(){
       try{
@@ -93,6 +105,8 @@
       }catch(e){st.textContent=e.message||e;}
     };
     logoutBtn.onclick=async()=>{await window.ThalorAuth.signOut(); location.reload();};
+    enableLocalMasterBtn.onclick=()=>{window.ThalorAuth.enableLocalMaster(); refresh();};
+    disableLocalMasterBtn.onclick=()=>{window.ThalorAuth.disableLocalMaster(); refresh();};
   })();
   </script>
 </body>

@@ -16,12 +16,35 @@
     access: [],
     ready: false,
     loading: false,
-    error: null
+    error: null,
+    localMaster: localMasterEnabled()
   };
+
+  function isLocalPreview(){
+    const h = location.hostname;
+    return location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h === '';
+  }
+
+  function localMasterEnabled(){
+    try{
+      const params = new URLSearchParams(location.search);
+      if(params.get('master') === 'offline' || params.get('thalorMaster') === '1'){
+        localStorage.setItem('thalor.offlineMaster','1');
+      }
+      if(params.get('master') === 'off' || params.get('thalorMaster') === '0'){
+        localStorage.removeItem('thalor.offlineMaster');
+      }
+      return isLocalPreview() && localStorage.getItem('thalor.offlineMaster') === '1';
+    }catch(e){
+      return false;
+    }
+  }
 
   function norm(v){ return String(v || '').trim().toLowerCase(); }
 
   function statusText(){
+    state.localMaster = localMasterEnabled();
+    if(state.localMaster) return 'Master offline attivo: puoi modificare tutto in locale senza cambiare i permessi online.';
     if(!state.configured) return 'Supabase non configurato: modalità locale.';
     if(state.error) return 'Supabase: ' + state.error;
     if(!state.user) return 'Non hai effettuato l’accesso.';
@@ -90,6 +113,7 @@
   }
 
   async function init(force=false){
+    state.localMaster = localMasterEnabled();
     if(state.ready && !force) return state;
     if(state.loading) return state;
 
@@ -148,10 +172,13 @@
   }
 
   function isMaster(){
-    return norm(state.profile?.role) === 'master';
+    state.localMaster = localMasterEnabled();
+    return state.localMaster || norm(state.profile?.role) === 'master';
   }
 
   function canEdit(slug){
+    state.localMaster = localMasterEnabled();
+    if(state.localMaster) return true;
     if(!state.configured) return true;
     if(isMaster()) return true;
 
@@ -181,7 +208,8 @@
   }
 
   async function saveCharacter(slug, data){
-    await init();
+    await init(true);
+    if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !state.client) return { mode:'local' };
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
@@ -235,6 +263,10 @@
     signIn,
     signUp,
     signOut,
-    statusText
+    statusText,
+    isLocalPreview,
+    localMasterEnabled,
+    enableLocalMaster(){ if(isLocalPreview()) localStorage.setItem('thalor.offlineMaster','1'); state.localMaster=localMasterEnabled(); return state.localMaster; },
+    disableLocalMaster(){ localStorage.removeItem('thalor.offlineMaster'); state.localMaster=false; return false; }
   };
 })();
