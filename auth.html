@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Thalor — Accesso</title>
-  <link href="assets/css/style.css?v=124" rel="stylesheet"/>
+  <link href="assets/css/style.css?v=154" rel="stylesheet"/>
 
 <style>
 .auth-actions-clean .button{
@@ -81,12 +81,20 @@
     const form=document.getElementById('authForm');
     const localTools=document.getElementById('localMasterTools');
     const localNote=document.getElementById('localMasterNote');
+    const shouldShowOfflineMasterTools=()=>{
+      const isLocal=window.ThalorAuth.isLocalPreview && window.ThalorAuth.isLocalPreview();
+      const isFile=location.protocol==='file:';
+      const browserOffline=navigator.onLine===false;
+      return !!isLocal && (isFile || browserOffline);
+    };
     const refresh=()=>{
       st.textContent=window.ThalorAuth.statusText();
-      const canLocal=window.ThalorAuth.isLocalPreview && window.ThalorAuth.isLocalPreview();
-      if(localTools)localTools.hidden=!canLocal;
-      if(localNote)localNote.hidden=!canLocal;
+      const showOfflineTools=shouldShowOfflineMasterTools();
+      if(localTools)localTools.hidden=!showOfflineTools;
+      if(localNote)localNote.hidden=!showOfflineTools;
     };
+    window.addEventListener('online', refresh);
+    window.addEventListener('offline', refresh);
     refresh();
     async function doLogin(){
       try{

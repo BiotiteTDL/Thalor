@@ -338,6 +338,8 @@
 
   function canEdit(slug){
     state.localMaster = localMasterEnabled();
+    // In anteprima locale/offline la scheda deve restare modificabile: i permessi Supabase valgono solo online.
+    if(isLocalPreview()) return true;
     if(state.localMaster) return true;
     if(!state.configured) return true;
     if(isMaster()) return true;
@@ -369,6 +371,8 @@
 
   async function saveCharacter(slug, data){
     await init(false);
+    // File aperto offline/localhost: salva solo in locale senza richiedere sessione o permessi online.
+    if(isLocalPreview()) return { mode:'local-preview' };
     if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !state.client) return { mode:'local' };
 
