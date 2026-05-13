@@ -668,13 +668,15 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   // come aggiungi/rimuovi condizione o +/- slot, evitando che il vecchio DOM riaggiunga righe cancellate.
   let draft=normalize(fromDom?collect(data):data);
   saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
+  const onlineRequired = authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster;
   if(authAvailable() && window.ThalorAuth.ensureFreshSession){
     try{ await window.ThalorAuth.ensureFreshSession(); }catch(e){ console.warn('Refresh sessione prima del salvataggio fallito:', e); }
   }
-  if(!await refreshEditPermission()){
-    try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
+  // Se Supabase è configurato, non bloccare qui con un controllo permessi basato
+  // sulla cache UI: il controllo vero avviene dentro saveCharacter dopo refresh JWT.
+  if(!onlineRequired && !await refreshEditPermission()){
     alert(editDeniedMessage());
-    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Sessione non valida: copia locale/emergenza salvata, ma non pubblicata online.';
+    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Accesso richiesto: salvataggio non eseguito.';
     if(keepEdit!==null){
       let comp=updateCompendiumFromSheet(draft);
       rerender(draft,xpData,comp,!!keepEdit);
@@ -704,7 +706,6 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     localStorage.setItem(storageKey,JSON.stringify(u));
     oldKeys.forEach(k=>localStorage.removeItem(k));
   }
-  const onlineRequired = authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster;
   try{
     if(onlineRequired){
       await saveOnlineWithRetry(isCompanion ? parentForCloud : u);

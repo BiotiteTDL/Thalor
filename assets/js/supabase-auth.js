@@ -59,7 +59,15 @@
   function makeClient(){
     if(!configured || !window.supabase || state.client) return state.client;
     const url = String(cfg.url).replace(/\/rest\/v1\/?$/,'').replace(/\/$/,'');
-    state.client = window.supabase.createClient(url, cfg.anonKey);
+    state.client = window.supabase.createClient(url, cfg.anonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storageKey: 'thalor.supabase.auth',
+        flowType: 'pkce'
+      }
+    });
     return state.client;
   }
 
@@ -281,6 +289,20 @@
     await init();
     if(!state.configured || !state.client) return fallback;
 
+    // Non interrogare character_sheets da anonimo: con RLS genera 401 e può
+    // mandare la scheda in stati incoerenti. Prima recupera/aggiorna la sessione.
+    try{
+      await ensureFreshSession();
+    }catch(err){
+      console.warn('Supabase loadCharacter refresh:', err);
+      return fallback;
+    }
+
+    if(!state.user){
+      console.warn('Supabase loadCharacter: sessione assente, uso dati locali/statici.');
+      return fallback;
+    }
+
     const res = await state.client
       .from('character_sheets')
       .select('data')
@@ -348,6 +370,24 @@
     const c = makeClient();
     if(!c) return;
     return c.auth.signOut();
+  }
+
+
+  // Quando il browser sospende la tab o il player resta fermo a lungo, riallinea
+  // la sessione appena torna attivo. Evita richieste Supabase senza JWT.
+  if(typeof window !== 'undefined' && !window.__thalorAuthFocusRefresh){
+    window.__thalorAuthFocusRefresh = true;
+    let lastFocusRefresh = 0;
+    const refreshOnFocus = () => {
+      if(document.hidden) return;
+      if(Date.now() - lastFocusRefresh < 10000) return;
+      lastFocusRefresh = Date.now();
+      if(state.configured && state.client){
+        ensureFreshSession().catch(err => console.warn('Focus auth refresh:', err));
+      }
+    };
+    window.addEventListener('focus', refreshOnFocus, { passive:true });
+    document.addEventListener('visibilitychange', refreshOnFocus, { passive:true });
   }
 
   window.ThalorAuth = {
