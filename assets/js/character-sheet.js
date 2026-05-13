@@ -459,7 +459,7 @@ function moveArrayRowTo(obj,fromArrPath,fromIndex,toArrPath,toIndex){
   toArr.splice(Math.max(0,Math.min(toArr.length,insert)),0,row);
   return true;
 }
-function dragHandle(path,label='Sposta'){return sheetCanEdit()?`<button type="button" class="drag-handle" draggable="true" data-drag-path="${esc(path)}" title="${esc(label)}" aria-label="${esc(label)}"><span></span><span></span><span></span></button>`:''}
+function dragHandle(path,label='Sposta'){return sheetCanEdit()?`<button type="button" class="drag-handle" draggable="true" data-drag-path="${esc(path)}" title="${esc(label)}" aria-label="${esc(label)}"><span></span><span></span><span></span></button>`:`<span class="drag-handle-spacer" aria-hidden="true"></span>`}
 function dragTh(){return sheetCanEdit()?'<th class="drag-head" aria-label="Sposta"></th>':''}
 function dragTd(path){return sheetCanEdit()?`<td class="drag-cell">${dragHandle(path)}</td>`:''}
 function dragDropAttrs(path){return sheetCanEdit()?` data-reorder-path="${esc(path)}"`:''}

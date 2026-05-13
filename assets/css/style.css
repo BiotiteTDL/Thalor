@@ -7744,3 +7744,28 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
   place-items:center!important;
   overflow:hidden!important;
 }
+
+
+/* v155 — viewer/no-permission layout parity
+   Mantiene lo stesso ingombro dei drag handle anche quando il giocatore non ha permessi.
+   Senza questo spacer, le grid di armi/spell/inventario/classi/linguaggi scalavano di una colonna
+   e alcuni testi tornavano stretti/verticali solo in lettura. */
+.dynamic-sheet-page .drag-handle-spacer{
+  width:34px!important;
+  min-width:34px!important;
+  height:34px!important;
+  display:inline-block!important;
+  flex:0 0 34px!important;
+  visibility:hidden!important;
+  pointer-events:none!important;
+}
+.dynamic-sheet-page .language-row .drag-handle-spacer,
+.dynamic-sheet-page .identity-class-card > .drag-handle-spacer{
+  width:24px!important;
+  min-width:24px!important;
+  height:24px!important;
+  flex-basis:24px!important;
+}
+#characterSheetApp.no-edit-permission .drag-handle-spacer{
+  display:inline-block!important;
+}
