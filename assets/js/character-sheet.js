@@ -735,7 +735,6 @@ function bindSpellDescriptionEditors(){
 
 async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   closeSpellDescriptionPopovers();
-  saveCurrentSheet.lastResult = { ok:false, mode:'pending' };
   // fromDom=true: normale salvataggio dagli input visibili.
   // fromDom=false: salvataggio diretto dell'oggetto già modificato, utile per azioni rapide
   // come aggiungi/rimuovi condizione o +/- slot, evitando che il vecchio DOM riaggiunga righe cancellate.
@@ -769,29 +768,24 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     localStorage.setItem(storageKey,JSON.stringify(u));
     oldKeys.forEach(k=>localStorage.removeItem(k));
   }
-  let saveOk=true;
-  let saveMode='local';
   try{
+    const ls=document.getElementById('localStatus');
     if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
-      const onlineResult = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
-      saveMode = onlineResult?.mode || 'cloud';
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent=saveMode==='cloud'?'Modifiche salvate online.':'Modifiche salvate in locale.';
+      if(ls)ls.textContent='Salvataggio online: controllo sessione…';
+      const result = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
+      if(ls)ls.textContent='Modifiche salvate online' + (result?.row?.updated_at ? ' alle ' + new Date(result.row.updated_at).toLocaleTimeString('it-IT') : '.');
     }else{
-      saveMode = authAvailable()&&window.ThalorAuth.state.localMaster ? 'local-master' : 'browser';
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent=saveMode==='local-master'?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
+      if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
   }catch(err){
-    saveOk=false;
-    saveMode='failed';
     saveEmergencyDraft(u,'Salvataggio online fallito');
-    const msg='Salvataggio online non riuscito: '+(err.message||err)+'\nLa scheda NON è stata confermata online. Resta in modifica: riprova senza chiudere la pagina.';
-    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online non riuscito. Resta in modifica.';
-    alert(msg);
+    const log = authAvailable() && window.ThalorAuth.debugLog ? window.ThalorAuth.debugLog() : [];
+    const last = log.slice(-6).map(x => x.step + (x.detail?.message ? ': ' + x.detail.message : '')).join(' → ');
+    alert('Salvataggio online non riuscito: '+(err.message||err)+'\n\nUltimi step: '+(last || 'non disponibili')+'\n\nLa scheda resta in modifica: non chiudere la pagina se vuoi riprovare.');
+    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online fallito. Apri Console e scrivi ThalorAuth.debugLog() per vedere gli step.';
   }
-  saveCurrentSheet.lastResult = { ok:saveOk, mode:saveMode };
   let comp=updateCompendiumFromSheet(u);
-  const stayEditing = saveOk ? (keepEdit===null?app.classList.contains('editing'):!!keepEdit) : true;
-  rerender(u,xpData,comp,stayEditing);
+  rerender(u,xpData,comp,keepEdit===null?app.classList.contains('editing'):!!keepEdit);
   return u;
 }
 function nearestSection(el){return el.closest('.sheet-dropdown,.section-panel,.xp-panel,.dynamic-portrait,.dynamic-hero,.panel');}
@@ -895,37 +889,7 @@ function bindPortraitUpload(data,xpData){
 }
 function bind(data,xpData,compendium){
   const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
-  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{
-    if(app.classList.contains('editing')){
-      if(floatEditSave.dataset.saving==='1') return;
-      const oldText=floatEditSave.textContent;
-      floatEditSave.dataset.saving='1';
-      floatEditSave.disabled=true;
-      floatEditSave.textContent='Salvataggio…';
-      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online in corso…';
-      try{
-        await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);
-        if(saveCurrentSheet.lastResult?.ok){
-          keepViewportStable(()=>enable(false));
-        }else{
-          keepViewportStable(()=>enable(true));
-        }
-      }finally{
-        const fresh=document.getElementById('floatEditSaveSheet');
-        if(fresh){
-          fresh.dataset.saving='0';
-          fresh.disabled=false;
-          fresh.textContent=app.classList.contains('editing')?'Salva':'Modifica';
-        }else{
-          floatEditSave.dataset.saving='0';
-          floatEditSave.disabled=false;
-          floatEditSave.textContent=app.classList.contains('editing')?'Salva':oldText;
-        }
-      }
-    }else{
-      if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());
-    }
-  };
+  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{if(app.classList.contains('editing')){await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);keepViewportStable(()=>enable(false));document.getElementById('localStatus').textContent='Modifiche salvate nel browser.';}else{if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());}};
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
   const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(normalize(collect(data)),null,2));
   const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};

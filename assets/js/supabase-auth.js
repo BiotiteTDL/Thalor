@@ -21,6 +21,23 @@
     localMaster: localMasterEnabled()
   };
 
+
+  const DEBUG_KEY = 'thalor.debug.save';
+  function debugEnabled(){
+    try{ return localStorage.getItem(DEBUG_KEY) === '1' || new URLSearchParams(location.search).get('debugSave') === '1'; }catch(e){ return false; }
+  }
+  function saveDebug(step, detail){
+    const entry = { when: new Date().toISOString(), step, detail: detail || null };
+    try{
+      window.__thalorLastSaveDebug = window.__thalorLastSaveDebug || [];
+      window.__thalorLastSaveDebug.push(entry);
+      window.__thalorLastSaveDebug = window.__thalorLastSaveDebug.slice(-80);
+      localStorage.setItem('thalor.lastSaveDebug', JSON.stringify(window.__thalorLastSaveDebug));
+    }catch(e){}
+    if(debugEnabled()) console.log('[Thalor save]', step, detail || '');
+    window.dispatchEvent(new CustomEvent('thalor-save-debug', { detail: entry }));
+  }
+
   function isLocalPreview(){
     const h = location.hostname;
     return location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h === '';
@@ -113,13 +130,36 @@
     const client = makeClient();
     if(!client) return null;
     const timeoutMs = options.timeoutMs || 12000;
-    let current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
-    if(current.error) throw current.error;
-    let session = current.data.session || null;
+    const allowCached = options.allowCached !== false;
+    saveDebug('session:get:start', { timeoutMs });
+    let session = null;
+    try{
+      const current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
+      if(current.error) throw current.error;
+      session = current.data.session || null;
+      saveDebug('session:get:ok', { hasSession: !!session, user: session?.user?.id || null, expires_at: session?.expires_at || null });
+    }catch(err){
+      saveDebug('session:get:error', { message: err.message || String(err), cached: !!state.session });
+      if(allowCached && state.session && !sessionExpiresSoon(state.session, -60)){
+        return state.session;
+      }
+      throw err;
+    }
     if(!session || sessionExpiresSoon(session, options.refreshWindowSeconds ?? 300)){
-      const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
-      if(refreshed.error) throw refreshed.error;
-      session = refreshed.data.session || session;
+      saveDebug('session:refresh:start', { hasSession: !!session });
+      try{
+        const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
+        if(refreshed.error) throw refreshed.error;
+        session = refreshed.data.session || session;
+        saveDebug('session:refresh:ok', { hasSession: !!session, user: session?.user?.id || null, expires_at: session?.expires_at || null });
+      }catch(err){
+        saveDebug('session:refresh:error', { message: err.message || String(err), cached: !!session || !!state.session });
+        if(allowCached && (session || state.session)){
+          session = session || state.session;
+        }else{
+          throw err;
+        }
+      }
     }
     setUserFromSession(session || null);
     return state.session;
@@ -370,35 +410,47 @@
   }
 
   async function saveCharacter(slug, data){
+    saveDebug('save:start', { slug });
     await init(false);
-    // File aperto offline/localhost: salva solo in locale senza richiedere sessione o permessi online.
-    if(isLocalPreview()) return { mode:'local-preview' };
-    if(state.localMaster) return { mode:'local-master' };
-    if(!state.configured || !state.client) return { mode:'local' };
+    if(isLocalPreview()) { saveDebug('save:local-preview'); return { mode:'local-preview' }; }
+    if(state.localMaster) { saveDebug('save:local-master'); return { mode:'local-master' }; }
+    if(!state.configured || !state.client) { saveDebug('save:local-no-config'); return { mode:'local' }; }
 
-    // Non lasciare mai il pulsante Salva appeso: ogni fase online ha un timeout esplicito.
-    await ensureFreshSession({ timeoutMs: 30000, refreshWindowSeconds: 180 });
+    await ensureFreshSession({ timeoutMs: 12000, refreshWindowSeconds: 120, allowCached: true });
     if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
+    saveDebug('save:session-ready', { user: state.user.id });
 
-    // Usa i permessi già in cache quando disponibili; rilegge Supabase solo se mancano.
-    await ensureAccessLoaded({ timeoutMs: 30000 });
+    await ensureAccessLoaded({ timeoutMs: 12000 });
+    saveDebug('save:access-ready', { access: (state.access || []).map(a => a.character_slug) });
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
-    const row = {
-      slug,
-      data,
-      updated_at: new Date().toISOString(),
-      updated_by: state.user.id
-    };
+    const row = { slug, data, updated_at: new Date().toISOString(), updated_by: state.user.id };
+    saveDebug('save:upsert:start', { slug, bytes: (()=>{try{return JSON.stringify(data).length}catch(e){return 0}})() });
 
-    const savePromise = state.client
+    let query = state.client
       .from('character_sheets')
       .upsert(row, { onConflict:'slug' })
       .select('slug, updated_at')
       .single();
 
-    const res = await withTimeout(savePromise, 60000, 'Salvataggio online');
-    if(res.error) throw res.error;
+    let aborter = null;
+    if(typeof AbortController !== 'undefined' && typeof query.abortSignal === 'function'){
+      aborter = new AbortController();
+      query = query.abortSignal(aborter.signal);
+    }
+    const timer = aborter ? setTimeout(() => aborter.abort(), 45000) : null;
+    let res;
+    try{
+      res = await withTimeout(query, 47000, 'Salvataggio online');
+    }finally{
+      if(timer) clearTimeout(timer);
+    }
+
+    if(res.error){
+      saveDebug('save:upsert:error', { message: res.error.message || String(res.error), code: res.error.code || null });
+      throw res.error;
+    }
+    saveDebug('save:upsert:ok', res.data || null);
     return { mode:'cloud', row: res.data };
   }
 
@@ -443,6 +495,8 @@
     canEdit,
     loadCharacter,
     saveCharacter,
+    debugLog: () => { try{return JSON.parse(localStorage.getItem('thalor.lastSaveDebug')||'[]')}catch(e){return []} },
+    enableDebug: () => { try{localStorage.setItem('thalor.debug.save','1')}catch(e){} },
     signIn,
     signUp,
     signOut,
