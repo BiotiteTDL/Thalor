@@ -20,6 +20,7 @@
     error: null,
     localMaster: localMasterEnabled(),
     saving: false,
+    savePromise: null,
     lastSessionCheck: 0,
     sessionPromise: null
   };
@@ -447,71 +448,86 @@
   }
 
   async function saveCharacter(slug, data){
-    saveDebug('save:start', { slug });
     const client = makeClient();
-    if(isLocalPreview()) { saveDebug('save:local-preview'); return { mode:'local-preview' }; }
-    if(state.localMaster) { saveDebug('save:local-master'); return { mode:'local-master' }; }
-    if(!state.configured || !client) { saveDebug('save:local-no-config'); return { mode:'local' }; }
+    if(isLocalPreview()) { saveDebug('save:local-preview', { slug }); return { mode:'local-preview' }; }
+    if(state.localMaster) { saveDebug('save:local-master', { slug }); return { mode:'local-master' }; }
+    if(!state.configured || !client) { saveDebug('save:local-no-config', { slug }); return { mode:'local' }; }
 
-    state.saving = true;
-    if(wakeTimer){ clearTimeout(wakeTimer); wakeTimer = null; }
-    try{
-      // Non richiamare init() durante il salvataggio: init può rilanciare getSession/profile/access
-      // e creare una coda che si morde la coda quando il browser ha appena risvegliato la tab.
-      // Usiamo la sessione già tenuta da supabase-js e facciamo un controllo auth solo se manca.
-      if(!state.user || !state.session){
-        await ensureFreshSession({ timeoutMs: 10000, refreshWindowSeconds: 60, preferCached: false, allowCached: true });
-      }else{
-        saveDebug('save:session-cached', { user: state.user.id, expires_at: state.session?.expires_at || null });
-      }
-
-      if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
-      saveDebug('save:session-ready', { user: state.user.id });
-
-      // Permessi: usa la cache già caricata. Rileggi da Supabase solo se non sappiamo nulla.
-      if(!isMaster() && !(state.accessUserId === state.user.id && Array.isArray(state.access) && state.access.length)){
-        const cached = readCachedAccess(state.user.id);
-        if(cached.length){
-          state.access = cached;
-          state.accessUserId = state.user.id;
-        }else{
-          await refreshAccess({ force: true, timeoutMs: 10000 });
-        }
-      }
-      saveDebug('save:access-ready', { access: (state.access || []).map(a => a.character_slug), master: isMaster() });
-      if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
-
-      const row = { slug, data, updated_at: new Date().toISOString(), updated_by: state.user.id };
-      saveDebug('save:upsert:start', { slug, bytes: (()=>{try{return JSON.stringify(data).length}catch(e){return 0}})() });
-
-      let query = client
-        .from('character_sheets')
-        .upsert(row, { onConflict:'slug' })
-        .select('slug, updated_at')
-        .single();
-
-      let aborter = null;
-      if(typeof AbortController !== 'undefined' && typeof query.abortSignal === 'function'){
-        aborter = new AbortController();
-        query = query.abortSignal(aborter.signal);
-      }
-      const timer = aborter ? setTimeout(() => aborter.abort(), 60000) : null;
-      let res;
-      try{
-        res = await withTimeout(query, 62000, 'Salvataggio online');
-      }finally{
-        if(timer) clearTimeout(timer);
-      }
-
-      if(res.error){
-        saveDebug('save:upsert:error', { message: res.error.message || String(res.error), code: res.error.code || null });
-        throw res.error;
-      }
-      saveDebug('save:upsert:ok', res.data || null);
-      return { mode:'cloud', row: res.data };
-    }finally{
-      state.saving = false;
+    // Anti-loop vero: se un salvataggio è già in corso, NON avviare un secondo upsert.
+    // Il debug dell'utente mostrava molti save:start/save:upsert:start consecutivi: erano
+    // richieste concorrenti generate da click/eventi ripetuti mentre la prima fetch era ancora pendente.
+    if(state.savePromise){
+      saveDebug('save:dedupe:reuse-pending', { slug });
+      return state.savePromise;
     }
+
+    state.savePromise = (async()=>{
+      saveDebug('save:start', { slug });
+      state.saving = true;
+      if(wakeTimer){ clearTimeout(wakeTimer); wakeTimer = null; }
+      try{
+        // Non richiamare init() durante il salvataggio: init può rilanciare getSession/profile/access.
+        // Usiamo la sessione in memoria quando è valida e chiediamo a Supabase Auth solo se manca.
+        if(!state.user || !state.session){
+          await ensureFreshSession({ timeoutMs: 10000, refreshWindowSeconds: 60, preferCached: false, allowCached: true });
+        }else{
+          saveDebug('save:session-cached', { user: state.user.id, expires_at: state.session?.expires_at || null });
+        }
+
+        if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
+        saveDebug('save:session-ready', { user: state.user.id });
+
+        if(!isMaster() && !(state.accessUserId === state.user.id && Array.isArray(state.access) && state.access.length)){
+          const cached = readCachedAccess(state.user.id);
+          if(cached.length){
+            state.access = cached;
+            state.accessUserId = state.user.id;
+          }else{
+            await refreshAccess({ force: true, timeoutMs: 10000 });
+          }
+        }
+        saveDebug('save:access-ready', { access: (state.access || []).map(a => a.character_slug), master: isMaster() });
+        if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
+
+        const row = { slug, data, updated_at: new Date().toISOString(), updated_by: state.user.id };
+        saveDebug('save:upsert:start', { slug, bytes: (()=>{try{return JSON.stringify(data).length}catch(e){return 0}})() });
+
+        // Più stabile: niente .select().single() dopo l'upsert. La conferma è l'assenza di errore HTTP.
+        // Con return=minimal evitiamo payload grandi e riduciamo il rischio di richieste appese.
+        let query = client
+          .from('character_sheets')
+          .upsert(row, { onConflict:'slug' });
+
+        let aborter = null;
+        if(typeof AbortController !== 'undefined' && typeof query.abortSignal === 'function'){
+          aborter = new AbortController();
+          query = query.abortSignal(aborter.signal);
+        }
+        const timer = aborter ? setTimeout(() => {
+          saveDebug('save:upsert:abort-timeout', { slug });
+          aborter.abort();
+        }, 45000) : null;
+        let res;
+        try{
+          res = await withTimeout(query, 47000, 'Salvataggio online');
+        }finally{
+          if(timer) clearTimeout(timer);
+        }
+
+        if(res.error){
+          saveDebug('save:upsert:error', { message: res.error.message || String(res.error), code: res.error.code || null });
+          throw res.error;
+        }
+        const savedAt = row.updated_at;
+        saveDebug('save:upsert:ok', { slug, updated_at: savedAt, status: res.status || null });
+        return { mode:'cloud', row: { slug, updated_at: savedAt } };
+      }finally{
+        state.saving = false;
+        state.savePromise = null;
+      }
+    })();
+
+    return state.savePromise;
   }
 
   async function signIn(email,password){
