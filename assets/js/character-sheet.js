@@ -15,8 +15,7 @@ async function refreshEditPermission(){
   if(!authAvailable()) return true;
   if(sheetCanEdit()) return true;
   try{
-    if(window.ThalorAuth.ensureFreshSession) await window.ThalorAuth.ensureFreshSession();
-    else await window.ThalorAuth.init(true);
+    if(!window.ThalorAuth.state?.ready && window.ThalorAuth.init) await window.ThalorAuth.init();
   }catch(e){
     console.warn('Auth recheck failed:', e);
   }
@@ -39,21 +38,20 @@ function withTimeout(promise, ms, label){
 }
 
 async function saveOnlineWithRetry(payload){
-  const attempts = 3;
+  const attempts = 2;
   let lastErr = null;
   for(let i=1;i<=attempts;i++){
     const ls=document.getElementById('localStatus');
-    if(ls) ls.textContent=`Salvataggio online in corso… tentativo ${i}/${attempts}`;
+    if(ls) ls.textContent=i===1?'Salvataggio online in corso…':`Salvataggio online in corso… tentativo ${i}/${attempts}`;
     try{
-      if(authAvailable() && window.ThalorAuth.ensureFreshSession){
-        await withTimeout(window.ThalorAuth.ensureFreshSession(), 25000, 'Refresh sessione Supabase non completato entro 25 secondi');
-      }
-      return await withTimeout(window.ThalorAuth.saveCharacter(slug, payload), 25000, 'Supabase non ha completato il salvataggio entro 25 secondi');
+      // ThalorAuth.saveCharacter controlla già sessione valida + permessi cache.
+      // Evitiamo un doppio refresh prima di ogni salvataggio.
+      return await withTimeout(window.ThalorAuth.saveCharacter(slug, payload), 18000, 'Supabase non ha completato il salvataggio entro 18 secondi');
     }catch(err){
       lastErr = err;
       console.warn('Tentativo salvataggio online fallito:', i, err);
       if(i < attempts){
-        await new Promise(resolve=>setTimeout(resolve, 1200 * i));
+        await new Promise(resolve=>setTimeout(resolve, 700));
       }
     }
   }
@@ -670,9 +668,6 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   // come aggiungi/rimuovi condizione o +/- slot, evitando che il vecchio DOM riaggiunga righe cancellate.
   let draft=normalize(fromDom?collect(data):data);
   saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
-  if(authAvailable() && window.ThalorAuth.ensureFreshSession){
-    try{ await window.ThalorAuth.ensureFreshSession(); }catch(e){ console.warn('Refresh sessione prima del salvataggio fallito:', e); }
-  }
   if(!await refreshEditPermission()){
     try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
     alert(editDeniedMessage());
@@ -841,7 +836,7 @@ function bind(data,xpData,compendium){
       btn.disabled=true;
       btn.textContent='Salvataggio…';
       try{
-        await withTimeout(saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false), 30000, 'Il salvataggio è rimasto bloccato nel browser');
+        await withTimeout(saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false), 22000, 'Il salvataggio è rimasto bloccato nel browser');
         if(lastSaveCompleted) keepViewportStable(()=>enable(false));
         else keepViewportStable(()=>enable(true));
       }catch(err){

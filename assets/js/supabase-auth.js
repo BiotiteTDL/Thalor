@@ -16,6 +16,8 @@
     access: [],
     accessLoaded: false,
     permissionsStale: false,
+    accessLoadedForUserId: null,
+    profileLoadedForUserId: null,
     lastUserId: null,
     ready: false,
     loading: false,
@@ -112,13 +114,21 @@
     return p;
   }
 
-  async function refreshAccess(){
+  async function refreshAccess(force=false){
     const client = makeClient();
     if(!client || !state.user){
       state.access = [];
       state.accessLoaded = false;
+      state.accessLoadedForUserId = null;
       state.permissionsStale = false;
       return [];
+    }
+
+    // I permessi cambiano raramente: li teniamo in cache per tutta la sessione
+    // dell'utente. Si svuotano solo a logout/cambio account. Questo evita
+    // una query a character_access ad ogni salvataggio.
+    if(!force && state.accessLoaded && state.accessLoadedForUserId === state.user.id){
+      return state.access || [];
     }
 
     const res = await withTimeout(client
@@ -129,34 +139,32 @@
 
     if(res.error){
       console.warn('character_access select error:', res.error);
-      // Non azzerare i permessi già caricati: un errore temporaneo di rete/RLS
-      // non deve far perdere la modifica al giocatore mentre sta lavorando.
       state.permissionsStale = true;
       return state.access || [];
     }
 
     state.access = res.data || [];
     state.accessLoaded = true;
+    state.accessLoadedForUserId = state.user.id;
     state.permissionsStale = false;
     return state.access;
   }
 
-  async function ensureFreshSession(){
+  async function ensureFreshSession(options={}){
     const client = makeClient();
     if(!client) return null;
 
-    // Dopo molti minuti di modifica o dopo aver cambiato scheda del browser,
-    // lo stato in memoria può essere vecchio anche se il refresh token è ancora valido.
-    // Prima di salvare rileggo sempre la sessione reale da Supabase e, se sta per
-    // scadere, forzo un refresh. Questo evita i "salvataggi fantasma" dopo 15/20 minuti.
-    let result = await withTimeout(client.auth.getSession(), 12000, 'Lettura sessione Supabase scaduta');
+    const forceRefresh = !!options.forceRefresh;
+    let result = await withTimeout(client.auth.getSession(), 8000, 'Lettura sessione Supabase scaduta');
     if(result.error) throw result.error;
 
     let session = result.data.session || null;
     const expiresAt = Number(session?.expires_at || 0);
     const secondsLeft = expiresAt ? expiresAt - Math.floor(Date.now()/1000) : 0;
 
-    if(session && secondsLeft < 120){
+    // Refresh solo se serve davvero. Prima lo facevamo troppo spesso e
+    // rallentava i salvataggi dopo qualche minuto di modifica.
+    if(session && (forceRefresh || secondsLeft < 90)){
       const refreshed = await withTimeout(client.auth.refreshSession(), 12000, 'Refresh sessione Supabase scaduto');
       if(refreshed.error) throw refreshed.error;
       session = refreshed.data.session || session;
@@ -172,6 +180,8 @@
       state.profile = null;
       state.access = [];
       state.accessLoaded = false;
+      state.accessLoadedForUserId = null;
+      state.profileLoadedForUserId = null;
       state.permissionsStale = false;
       return null;
     }
@@ -180,11 +190,17 @@
       state.profile = null;
       state.access = [];
       state.accessLoaded = false;
+      state.accessLoadedForUserId = null;
+      state.profileLoadedForUserId = null;
       state.permissionsStale = false;
     }
 
-    await ensureProfile(client);
-    await refreshAccess();
+    if(!state.profile || state.profileLoadedForUserId !== state.user.id){
+      await ensureProfile(client);
+      state.profileLoadedForUserId = state.user.id;
+    }
+    await refreshAccess(false);
+
     state.error = null;
     state.ready = true;
     return state.session;
@@ -224,10 +240,13 @@
           state.profile = null;
           state.access = [];
           state.accessLoaded = false;
+          state.accessLoadedForUserId = null;
+          state.profileLoadedForUserId = null;
           state.permissionsStale = false;
         }
         await ensureProfile(client);
-        await refreshAccess();
+        state.profileLoadedForUserId = state.user?.id || null;
+        await refreshAccess(false);
       }
 
       state.error = null;
@@ -256,7 +275,8 @@
             }
             try{
               await ensureProfile(client);
-              await refreshAccess();
+              state.profileLoadedForUserId = state.user?.id || null;
+              await refreshAccess(false);
             }catch(err){
               console.warn('Auth refresh error:', err);
               state.permissionsStale = true;
@@ -317,14 +337,13 @@
     if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !makeClient()) return { mode:'local' };
 
-    // Salvataggio = controllo fresco, non stato cache. Serve soprattutto dopo
-    // lunghe modifiche o dopo cambio tab, quando il token può essere stato rinnovato
-    // ma la variabile state.user/session è rimasta vecchia.
+    // Salvataggio rapido: verifica solo che la sessione esista/il token sia valido.
+    // Profilo e permessi restano in cache fino a logout o cambio utente.
     await ensureFreshSession();
 
     if(!state.user) throw new Error('Accesso richiesto: sessione non trovata. Rientra con login e riprova.');
     if(!canEdit(slug)){
-      await refreshAccess();
+      await refreshAccess(false);
       if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
     }
 
