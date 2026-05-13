@@ -18,7 +18,10 @@
     ready: false,
     loading: false,
     error: null,
-    localMaster: localMasterEnabled()
+    localMaster: localMasterEnabled(),
+    saving: false,
+    lastSessionCheck: 0,
+    sessionPromise: null
   };
 
 
@@ -126,52 +129,86 @@
     return exp - Math.floor(Date.now()/1000) < windowSeconds;
   }
 
+  function cachedSessionUsable(windowSeconds=60){
+    if(!state.session || !state.user) return false;
+    const exp = Number(state.session.expires_at || 0);
+    if(!exp) return true;
+    return exp - Math.floor(Date.now()/1000) > windowSeconds;
+  }
+
   async function ensureFreshSession(options={}){
     const client = makeClient();
     if(!client) return null;
+
     const timeoutMs = options.timeoutMs || 12000;
     const allowCached = options.allowCached !== false;
-    saveDebug('session:get:start', { timeoutMs });
-    let session = null;
-    try{
-      const current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
-      if(current.error) throw current.error;
-      session = current.data.session || null;
-      saveDebug('session:get:ok', { hasSession: !!session, user: session?.user?.id || null, expires_at: session?.expires_at || null });
-    }catch(err){
-      saveDebug('session:get:error', { message: err.message || String(err), cached: !!state.session });
-      if(allowCached && state.session && !sessionExpiresSoon(state.session, -60)){
-        return state.session;
-      }
-      throw err;
+    const preferCached = options.preferCached !== false;
+    const refreshWindowSeconds = options.refreshWindowSeconds ?? 300;
+
+    // Punto chiave: durante un salvataggio NON interrogare Supabase Auth se abbiamo già
+    // una sessione valida in memoria. Le chiamate auth.getSession/refreshSession possono
+    // restare appese quando il browser ha appena risvegliato la tab; l'upsert invece può
+    // usare direttamente il token gestito da supabase-js.
+    if(preferCached && allowCached && cachedSessionUsable(refreshWindowSeconds)){
+      saveDebug('session:cached:ok', { user: state.user?.id || null, expires_at: state.session?.expires_at || null });
+      return state.session;
     }
-    if(!session || sessionExpiresSoon(session, options.refreshWindowSeconds ?? 300)){
-      saveDebug('session:refresh:start', { hasSession: !!session });
+
+    if(state.sessionPromise) return state.sessionPromise;
+
+    state.sessionPromise = (async()=>{
+      saveDebug('session:get:start', { timeoutMs });
+      let session = null;
       try{
-        const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
-        if(refreshed.error) throw refreshed.error;
-        session = refreshed.data.session || session;
-        saveDebug('session:refresh:ok', { hasSession: !!session, user: session?.user?.id || null, expires_at: session?.expires_at || null });
+        const current = await withTimeout(client.auth.getSession(), timeoutMs, 'Controllo sessione');
+        if(current.error) throw current.error;
+        session = current.data.session || null;
+        state.lastSessionCheck = Date.now();
+        saveDebug('session:get:ok', { hasSession: !!session, user: session?.user?.id || null, expires_at: session?.expires_at || null });
       }catch(err){
-        saveDebug('session:refresh:error', { message: err.message || String(err), cached: !!session || !!state.session });
-        if(allowCached && (session || state.session)){
-          session = session || state.session;
-        }else{
-          throw err;
+        saveDebug('session:get:error', { message: err.message || String(err), cached: !!state.session });
+        if(allowCached && state.session && state.user){
+          return state.session;
+        }
+        throw err;
+      }
+
+      if(!session || sessionExpiresSoon(session, refreshWindowSeconds)){
+        saveDebug('session:refresh:start', { hasSession: !!session });
+        try{
+          const refreshed = await withTimeout(client.auth.refreshSession(), timeoutMs, 'Rinnovo sessione');
+          if(refreshed.error) throw refreshed.error;
+          session = refreshed.data.session || session;
+          state.lastSessionCheck = Date.now();
+          saveDebug('session:refresh:ok', { hasSession: !!session, user: session?.user?.id || null, expires_at: session?.expires_at || null });
+        }catch(err){
+          saveDebug('session:refresh:error', { message: err.message || String(err), cached: !!session || !!state.session });
+          if(allowCached && (session || state.session)){
+            session = session || state.session;
+          }else{
+            throw err;
+          }
         }
       }
+      setUserFromSession(session || null);
+      return state.session;
+    })();
+
+    try{
+      return await state.sessionPromise;
+    }finally{
+      state.sessionPromise = null;
     }
-    setUserFromSession(session || null);
-    return state.session;
   }
 
   let wakeTimer = null;
   let wakeRunning = false;
   async function warmSession(reason='focus'){
-    if(!state.configured || !state.client || wakeRunning) return state.session;
+    if(!state.configured || !state.client || wakeRunning || state.saving) return state.session;
+    if(Date.now() - (state.lastSessionCheck || 0) < 30000 && cachedSessionUsable(120)) return state.session;
     wakeRunning = true;
     try{
-      const session = await ensureFreshSession({ timeoutMs: 10000, refreshWindowSeconds: 600 });
+      const session = await ensureFreshSession({ timeoutMs: 8000, refreshWindowSeconds: 600, preferCached: true, allowCached: true });
       if(session && !state.profile){
         try{ await ensureProfile(state.client); }catch(e){ console.warn('warmSession profile:', e); }
       }
@@ -319,7 +356,7 @@
         return state;
       }
 
-      await ensureFreshSession({ timeoutMs: 12000, refreshWindowSeconds: 300 });
+      await ensureFreshSession({ timeoutMs: 10000, refreshWindowSeconds: 300, preferCached: true, allowCached: true });
 
       if(state.user){
         if(state.accessUserId !== state.user.id){
@@ -411,47 +448,70 @@
 
   async function saveCharacter(slug, data){
     saveDebug('save:start', { slug });
-    await init(false);
+    const client = makeClient();
     if(isLocalPreview()) { saveDebug('save:local-preview'); return { mode:'local-preview' }; }
     if(state.localMaster) { saveDebug('save:local-master'); return { mode:'local-master' }; }
-    if(!state.configured || !state.client) { saveDebug('save:local-no-config'); return { mode:'local' }; }
+    if(!state.configured || !client) { saveDebug('save:local-no-config'); return { mode:'local' }; }
 
-    await ensureFreshSession({ timeoutMs: 12000, refreshWindowSeconds: 120, allowCached: true });
-    if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
-    saveDebug('save:session-ready', { user: state.user.id });
-
-    await ensureAccessLoaded({ timeoutMs: 12000 });
-    saveDebug('save:access-ready', { access: (state.access || []).map(a => a.character_slug) });
-    if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
-
-    const row = { slug, data, updated_at: new Date().toISOString(), updated_by: state.user.id };
-    saveDebug('save:upsert:start', { slug, bytes: (()=>{try{return JSON.stringify(data).length}catch(e){return 0}})() });
-
-    let query = state.client
-      .from('character_sheets')
-      .upsert(row, { onConflict:'slug' })
-      .select('slug, updated_at')
-      .single();
-
-    let aborter = null;
-    if(typeof AbortController !== 'undefined' && typeof query.abortSignal === 'function'){
-      aborter = new AbortController();
-      query = query.abortSignal(aborter.signal);
-    }
-    const timer = aborter ? setTimeout(() => aborter.abort(), 45000) : null;
-    let res;
+    state.saving = true;
+    if(wakeTimer){ clearTimeout(wakeTimer); wakeTimer = null; }
     try{
-      res = await withTimeout(query, 47000, 'Salvataggio online');
-    }finally{
-      if(timer) clearTimeout(timer);
-    }
+      // Non richiamare init() durante il salvataggio: init può rilanciare getSession/profile/access
+      // e creare una coda che si morde la coda quando il browser ha appena risvegliato la tab.
+      // Usiamo la sessione già tenuta da supabase-js e facciamo un controllo auth solo se manca.
+      if(!state.user || !state.session){
+        await ensureFreshSession({ timeoutMs: 10000, refreshWindowSeconds: 60, preferCached: false, allowCached: true });
+      }else{
+        saveDebug('save:session-cached', { user: state.user.id, expires_at: state.session?.expires_at || null });
+      }
 
-    if(res.error){
-      saveDebug('save:upsert:error', { message: res.error.message || String(res.error), code: res.error.code || null });
-      throw res.error;
+      if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
+      saveDebug('save:session-ready', { user: state.user.id });
+
+      // Permessi: usa la cache già caricata. Rileggi da Supabase solo se non sappiamo nulla.
+      if(!isMaster() && !(state.accessUserId === state.user.id && Array.isArray(state.access) && state.access.length)){
+        const cached = readCachedAccess(state.user.id);
+        if(cached.length){
+          state.access = cached;
+          state.accessUserId = state.user.id;
+        }else{
+          await refreshAccess({ force: true, timeoutMs: 10000 });
+        }
+      }
+      saveDebug('save:access-ready', { access: (state.access || []).map(a => a.character_slug), master: isMaster() });
+      if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
+
+      const row = { slug, data, updated_at: new Date().toISOString(), updated_by: state.user.id };
+      saveDebug('save:upsert:start', { slug, bytes: (()=>{try{return JSON.stringify(data).length}catch(e){return 0}})() });
+
+      let query = client
+        .from('character_sheets')
+        .upsert(row, { onConflict:'slug' })
+        .select('slug, updated_at')
+        .single();
+
+      let aborter = null;
+      if(typeof AbortController !== 'undefined' && typeof query.abortSignal === 'function'){
+        aborter = new AbortController();
+        query = query.abortSignal(aborter.signal);
+      }
+      const timer = aborter ? setTimeout(() => aborter.abort(), 60000) : null;
+      let res;
+      try{
+        res = await withTimeout(query, 62000, 'Salvataggio online');
+      }finally{
+        if(timer) clearTimeout(timer);
+      }
+
+      if(res.error){
+        saveDebug('save:upsert:error', { message: res.error.message || String(res.error), code: res.error.code || null });
+        throw res.error;
+      }
+      saveDebug('save:upsert:ok', res.data || null);
+      return { mode:'cloud', row: res.data };
+    }finally{
+      state.saving = false;
     }
-    saveDebug('save:upsert:ok', res.data || null);
-    return { mode:'cloud', row: res.data };
   }
 
   async function signIn(email,password){
