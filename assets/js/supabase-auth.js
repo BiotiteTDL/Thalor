@@ -14,9 +14,11 @@
     user: null,
     profile: null,
     access: [],
+    accessLoaded: false,
+    permissionsStale: false,
+    lastUserId: null,
     ready: false,
     loading: false,
-    initPromise: null,
     error: null,
     localMaster: localMasterEnabled()
   };
@@ -57,14 +59,7 @@
   function makeClient(){
     if(!configured || !window.supabase || state.client) return state.client;
     const url = String(cfg.url).replace(/\/rest\/v1\/?$/,'').replace(/\/$/,'');
-    state.client = window.supabase.createClient(url, cfg.anonKey, {
-      auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-        storageKey: 'thalor.supabase.auth'
-      }
-    });
+    state.client = window.supabase.createClient(url, cfg.anonKey);
     return state.client;
   }
 
@@ -77,7 +72,10 @@
       .eq('user_id', state.user.id)
       .maybeSingle();
 
-    if(found.error) console.warn('profiles select error:', found.error);
+    if(found.error){
+      console.warn('profiles select error:', found.error);
+      return state.profile || null;
+    }
 
     let p = found.data || null;
 
@@ -101,6 +99,8 @@
     const client = makeClient();
     if(!client || !state.user){
       state.access = [];
+      state.accessLoaded = false;
+      state.permissionsStale = false;
       return [];
     }
 
@@ -112,83 +112,102 @@
 
     if(res.error){
       console.warn('character_access select error:', res.error);
-      state.access = [];
-      return [];
+      // Non azzerare i permessi già caricati: un errore temporaneo di rete/RLS
+      // non deve far perdere la modifica al giocatore mentre sta lavorando.
+      state.permissionsStale = true;
+      return state.access || [];
     }
 
     state.access = res.data || [];
+    state.accessLoaded = true;
+    state.permissionsStale = false;
     return state.access;
   }
 
   async function init(force=false){
     state.localMaster = localMasterEnabled();
     if(state.ready && !force) return state;
-    if(state.loading && state.initPromise) return state.initPromise;
+    if(state.loading) return state;
 
     state.loading = true;
-    state.initPromise = (async()=>{
-      try{
-        const client = makeClient();
-        if(!client){
-          state.ready = true;
-          return state;
-        }
-
-        const s = await client.auth.getSession();
-        if(s.error) throw s.error;
-
-        state.session = s.data.session || null;
-        state.user = state.session?.user || null;
-        state.profile = null;
-        state.access = [];
-
-        if(state.user){
-          await ensureProfile(client);
-          await refreshAccess();
-        }
-
-        state.error = null;
+    try{
+      const client = makeClient();
+      if(!client){
         state.ready = true;
-
-        if(!state._listenerAttached){
-          state._listenerAttached = true;
-          client.auth.onAuthStateChange(async (_event, session) => {
-            const previousAccess = state.access || [];
-            const previousProfile = state.profile || null;
-            state.session = session || null;
-            state.user = session?.user || null;
-
-            if(!state.user){
-              state.profile = null;
-              state.access = [];
-            }else{
-              try{
-                await ensureProfile(client);
-                await refreshAccess();
-              }catch(err){
-                // Durante il refresh token Supabase può rispondere in ritardo: non svuotare
-                // subito i permessi, altrimenti la scheda sembra perdere l'accesso mentre si salva.
-                console.warn('Auth refresh error:', err);
-                state.profile = previousProfile;
-                state.access = previousAccess;
-              }
-            }
-
-            window.dispatchEvent(new CustomEvent('thalor-auth-changed', { detail: state }));
-          });
-        }
-      }catch(err){
-        state.error = err.message || String(err);
-        state.ready = true;
-      }finally{
-        state.loading = false;
-        state.initPromise = null;
+        return state;
       }
 
-      return state;
-    })();
+      const s = await client.auth.getSession();
+      if(s.error) throw s.error;
 
-    return state.initPromise;
+      state.session = s.data.session || null;
+      const nextUser = state.session?.user || null;
+      const userChanged = (nextUser?.id || null) !== state.lastUserId;
+      state.user = nextUser;
+      state.lastUserId = nextUser?.id || null;
+
+      if(!state.user){
+        state.profile = null;
+        state.access = [];
+        state.accessLoaded = false;
+        state.permissionsStale = false;
+      }else{
+        // Se è lo stesso utente, conserva profilo e accessi finché il refresh non riesce.
+        // Così un controllo temporaneamente fallito non blocca il salvataggio in corso.
+        if(userChanged){
+          state.profile = null;
+          state.access = [];
+          state.accessLoaded = false;
+          state.permissionsStale = false;
+        }
+        await ensureProfile(client);
+        await refreshAccess();
+      }
+
+      state.error = null;
+      state.ready = true;
+
+      if(!state._listenerAttached){
+        state._listenerAttached = true;
+        client.auth.onAuthStateChange(async (_event, session) => {
+          state.session = session || null;
+          const nextUser = session?.user || null;
+          const userChanged = (nextUser?.id || null) !== state.lastUserId;
+          state.user = nextUser;
+          state.lastUserId = nextUser?.id || null;
+
+          if(!state.user){
+            state.profile = null;
+            state.access = [];
+            state.accessLoaded = false;
+            state.permissionsStale = false;
+          }else{
+            if(userChanged){
+              state.profile = null;
+              state.access = [];
+              state.accessLoaded = false;
+              state.permissionsStale = false;
+            }
+            try{
+              await ensureProfile(client);
+              await refreshAccess();
+            }catch(err){
+              console.warn('Auth refresh error:', err);
+              state.permissionsStale = true;
+            }
+          }
+
+          window.dispatchEvent(new CustomEvent('thalor-auth-changed', { detail: state }));
+        });
+      }
+    }catch(err){
+      state.error = err.message || String(err);
+      state.ready = true;
+    }finally{
+      state.loading = false;
+    }
+
+    return state;
   }
 
   function isMaster(){
@@ -231,21 +250,11 @@
     await init(false);
     if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !state.client) return { mode:'local' };
-
-    // Non forzare un refresh completo a ogni salvataggio: è proprio lì che, dopo
-    // qualche minuto di modifica, la sessione poteva risultare temporaneamente vuota.
-    if(!state.user){
-      const s = await state.client.auth.getSession();
-      if(s.error) throw s.error;
-      state.session = s.data.session || null;
-      state.user = state.session?.user || null;
-      if(state.user){
-        await ensureProfile(state.client);
-        await refreshAccess();
-      }
+    if(!state.user) throw new Error('Accesso richiesto: sessione non trovata. Rientra con login e riprova.');
+    if(!canEdit(slug)){
+      await refreshAccess();
+      if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
     }
-
-    if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
       slug,
