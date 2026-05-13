@@ -5843,3 +5843,44 @@ body.spell-desc-modal-open .spell-description-backdrop{
   .spell-desc-modal-editor{min-height: 300px !important; font-size: .98rem !important;}
   .spell-desc-modal-footer{padding: 14px 18px 18px !important;}
 }
+
+/* v123 — overlay formule calcoli automatici schede */
+.dynamic-sheet-page .formula-value,
+.dynamic-sheet-page .formula-readonly{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  cursor:help;
+  border-bottom:1px dotted rgba(240,216,157,.75);
+}
+.dynamic-sheet-page .formula-value::before,
+.dynamic-sheet-page .formula-readonly::before,
+.dynamic-sheet-page .formula-field > span::after{
+  content:'ⓘ';
+  font-size:.72rem;
+  line-height:1;
+  opacity:.72;
+  margin-right:2px;
+}
+.dynamic-sheet-page .formula-field > span::after{
+  margin-left:6px;
+  margin-right:0;
+}
+.dynamic-sheet-page .ability-formula-value{
+  min-width:44px;
+}
+.dynamic-sheet-page .formula-row strong.formula-value{
+  padding:2px 8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.06);
+}
+.dynamic-sheet-page .spell-summary .info-card,
+.dynamic-sheet-page .combat-summary-grid .info-card{
+  cursor:help;
+}
+.dynamic-sheet-page.editing .formula-value:after,
+.dynamic-sheet-page.editing .formula-readonly:after,
+.dynamic-sheet-page.editing .formula-field:after{
+  display:none!important;
+}
