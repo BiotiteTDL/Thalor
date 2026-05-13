@@ -67,61 +67,6 @@
     }
   }
 
-  function cloudSaveQueueKey(slug){
-    return 'thalor.pendingCloudSave.' + norm(slug || 'sheet');
-  }
-
-  function queueCloudSave(slug, data, reason){
-    try{
-      localStorage.setItem(cloudSaveQueueKey(slug), JSON.stringify({
-        slug,
-        data,
-        reason: reason || '',
-        queued_at: new Date().toISOString()
-      }));
-    }catch(e){
-      console.warn('pending cloud save queue error:', e);
-    }
-    scheduleFlushQueuedSaves(reason || 'queued');
-    return { mode:'queued', reason: reason || 'pending' };
-  }
-
-  let flushingQueuedSaves = false;
-  let flushQueuedTimer = null;
-
-  function scheduleFlushQueuedSaves(reason){
-    if(flushQueuedTimer) clearTimeout(flushQueuedTimer);
-    flushQueuedTimer = setTimeout(() => flushQueuedSaves(reason).catch(err => console.warn('flush queued saves:', err)), 400);
-  }
-
-  async function flushQueuedSaves(reason='manual'){
-    if(flushingQueuedSaves || typeof localStorage === 'undefined') return;
-    if(typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-    if(!state.configured || !state.client) return;
-    flushingQueuedSaves = true;
-    try{
-      const keys=[];
-      for(let i=0;i<localStorage.length;i++){
-        const k=localStorage.key(i);
-        if(k && k.indexOf('thalor.pendingCloudSave.')===0) keys.push(k);
-      }
-      for(const key of keys){
-        let item=null;
-        try{ item=JSON.parse(localStorage.getItem(key)||'null'); }catch(e){}
-        if(!item || !item.slug || !item.data){ localStorage.removeItem(key); continue; }
-        try{
-          await saveCharacter(item.slug, item.data, { fromQueue:true, noQueue:true });
-          localStorage.removeItem(key);
-          window.dispatchEvent(new CustomEvent('thalor-cloud-save-flushed', { detail:{ slug:item.slug, reason } }));
-        }catch(err){
-          console.warn('queued cloud save still pending:', err);
-        }
-      }
-    }finally{
-      flushingQueuedSaves = false;
-    }
-  }
-
   function clearRuntimeAccess(){
     state.access = [];
     state.accessUserId = null;
@@ -210,14 +155,11 @@
   function attachWakeHandlers(){
     if(state._wakeHandlersAttached || typeof window === 'undefined') return;
     state._wakeHandlersAttached = true;
-    window.addEventListener('focus', () => { scheduleWarmSession('focus'); scheduleFlushQueuedSaves('focus'); });
+    window.addEventListener('focus', () => scheduleWarmSession('focus'));
     document.addEventListener('visibilitychange', () => {
-      if(document.visibilityState === 'visible'){
-        scheduleWarmSession('visible');
-        scheduleFlushQueuedSaves('visible');
-      }
+      if(document.visibilityState === 'visible') scheduleWarmSession('visible');
     });
-    window.addEventListener('pageshow', () => { scheduleWarmSession('pageshow'); scheduleFlushQueuedSaves('pageshow'); });
+    window.addEventListener('pageshow', () => scheduleWarmSession('pageshow'));
   }
 
   function statusText(){
@@ -427,33 +369,19 @@
     return res.data?.data || fallback;
   }
 
-  async function saveCharacter(slug, data, options={}){
+  async function saveCharacter(slug, data){
     await init(false);
-
     // File aperto offline/localhost: salva solo in locale senza richiedere sessione o permessi online.
     if(isLocalPreview()) return { mode:'local-preview' };
     if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !state.client) return { mode:'local' };
 
-    // Se il tab non è visibile, Chrome/Safari possono congelare o rallentare la fetch:
-    // non mostrare errore al giocatore, accoda il save cloud e lo riprova al ritorno sul tab.
-    if(!options.fromQueue && typeof document !== 'undefined' && document.visibilityState === 'hidden'){
-      return queueCloudSave(slug, data, 'tab non visibile');
-    }
-
-    // Non rifare sempre il refresh sessione: con Supabase/GitHub Pages può restare pending
-    // e bloccare il salvataggio online anche quando la sessione è ancora valida.
-    if(!state.session || sessionExpiresSoon(state.session, 90)){
-      await ensureFreshSession({ timeoutMs: 8000, refreshWindowSeconds: 90 });
-    }
-
+    // Versione stabile stile "sitoora": niente coda visibility e niente timeout corto sull'upsert.
+    // Quando il browser cambia tab, Chrome/Safari possono rallentare le fetch: un timeout manuale
+    // può fallire anche se Supabase completerebbe correttamente appena il tab torna attivo.
+    await ensureFreshSession({ timeoutMs: 15000, refreshWindowSeconds: 180 });
     if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
-
-    // I permessi sono già caricati/cachati durante init/login. Ricaricali solo se mancano davvero.
-    if(!isMaster() && !(state.access || []).length){
-      await ensureAccessLoaded({ timeoutMs: 8000 });
-    }
-
+    await ensureAccessLoaded({ timeoutMs: 15000 });
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
@@ -463,33 +391,14 @@
       updated_by: state.user.id
     };
 
-    let res;
-    try{
-      res = await withTimeout(
-        state.client
-          .from('character_sheets')
-          .upsert(row, { onConflict:'slug' })
-          .select('slug, updated_at')
-          .single(),
-        30000,
-        'Salvataggio online'
-      );
-    }catch(err){
-      const msg = err?.message || String(err);
-      const looksTimeout = /non completat|timeout|timed out/i.test(msg);
-      if(!options.noQueue && looksTimeout){
-        return queueCloudSave(slug, data, msg);
-      }
-      throw err;
-    }
+    // NON usare withTimeout qui: il salvataggio deve poter completare anche dopo cambio tab.
+    const res = await state.client
+      .from('character_sheets')
+      .upsert(row, { onConflict:'slug' })
+      .select('slug, updated_at')
+      .single();
 
-    if(res.error){
-      if(!options.noQueue && /timeout|network|fetch|Failed to fetch/i.test(res.error.message || String(res.error))){
-        return queueCloudSave(slug, data, res.error.message || 'errore rete temporaneo');
-      }
-      throw res.error;
-    }
-    try{ localStorage.removeItem(cloudSaveQueueKey(slug)); }catch(e){}
+    if(res.error) throw res.error;
     return { mode:'cloud', row: res.data };
   }
 
@@ -530,7 +439,6 @@
     ensureAccessLoaded,
     warmSession,
     ensureFreshSession,
-    flushQueuedSaves,
     isMaster,
     canEdit,
     loadCharacter,

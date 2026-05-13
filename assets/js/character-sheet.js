@@ -31,19 +31,14 @@ function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il 
   const s=document.createElement('style');
   s.id='thalor-permission-ui-style';
   s.textContent=`
-    /* In sola lettura non usare display:none sugli elementi strutturali:
-       altrimenti le griglie perdono colonne e alcuni testi tornano verticali/schiacciati. */
     #characterSheetApp.no-edit-permission button,
     #characterSheetApp.no-edit-permission .button:not(.profile-return),
     #characterSheetApp.no-edit-permission .section-controls,
     #characterSheetApp.no-edit-permission .mini-add,
     #characterSheetApp.no-edit-permission .mini-del,
     #characterSheetApp.no-edit-permission .portrait-edit-tools,
+    #characterSheetApp.no-edit-permission input[type="file"],
     #characterSheetApp.no-edit-permission .sheet-tools {
-      visibility: hidden !important;
-      pointer-events: none !important;
-    }
-    #characterSheetApp.no-edit-permission input[type="file"] {
       display: none !important;
     }
     #characterSheetApp.no-edit-permission input,
@@ -53,14 +48,6 @@ function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il 
     }
   `;
   document.head.appendChild(s);
-
-window.addEventListener('thalor-cloud-save-flushed', e=>{
-  try{
-    if(e?.detail?.slug && e.detail.slug !== slug) return;
-    const ls=document.getElementById('localStatus');
-    if(ls) ls.textContent='Salvataggio online completato dopo il ritorno sulla scheda.';
-  }catch(err){}
-});
 })();
 
 
@@ -783,12 +770,8 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   }
   try{
     if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
-      const cloudResult = await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
-      const ls=document.getElementById('localStatus');
-      if(ls){
-        if(cloudResult && cloudResult.mode === 'queued') ls.textContent='Modifiche salvate in locale. Il salvataggio online verrà ritentato appena torni su questa scheda.';
-        else ls.textContent='Modifiche salvate online.';
-      }
+      await window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u);
+      const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Modifiche salvate online.';
     }else{
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
@@ -1076,14 +1059,6 @@ function loadJson(url){return fetch(url).then(r=>r.ok?r.json():null).catch(()=>n
   const setMobileFlag=()=>document.documentElement.classList.toggle('sheet-mobile-view', window.matchMedia('(max-width: 760px)').matches);
   setMobileFlag();
   window.addEventListener('resize', setMobileFlag, {passive:true});
-
-window.addEventListener('thalor-cloud-save-flushed', e=>{
-  try{
-    if(e?.detail?.slug && e.detail.slug !== slug) return;
-    const ls=document.getElementById('localStatus');
-    if(ls) ls.textContent='Salvataggio online completato dopo il ritorno sulla scheda.';
-  }catch(err){}
-});
 })();
 
 (async function startSheet(){
@@ -1102,13 +1077,5 @@ window.addEventListener('thalor-cloud-save-flushed', e=>{
     }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}
-
-window.addEventListener('thalor-cloud-save-flushed', e=>{
-  try{
-    if(e?.detail?.slug && e.detail.slug !== slug) return;
-    const ls=document.getElementById('localStatus');
-    if(ls) ls.textContent='Salvataggio online completato dopo il ritorno sulla scheda.';
-  }catch(err){}
-});
 })();
 })()
