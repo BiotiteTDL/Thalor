@@ -371,14 +371,25 @@
 
   async function saveCharacter(slug, data){
     await init(false);
+
     // File aperto offline/localhost: salva solo in locale senza richiedere sessione o permessi online.
     if(isLocalPreview()) return { mode:'local-preview' };
     if(state.localMaster) return { mode:'local-master' };
     if(!state.configured || !state.client) return { mode:'local' };
 
-    await ensureFreshSession({ timeoutMs: 15000, refreshWindowSeconds: 180 });
+    // Non rifare sempre il refresh sessione: con Supabase/GitHub Pages può restare pending
+    // e bloccare il salvataggio online anche quando la sessione è ancora valida.
+    if(!state.session || sessionExpiresSoon(state.session, 90)){
+      await ensureFreshSession({ timeoutMs: 8000, refreshWindowSeconds: 90 });
+    }
+
     if(!state.user) throw new Error('Sessione non attiva: rifai login e riprova.');
-    await ensureAccessLoaded({ timeoutMs: 15000 });
+
+    // I permessi sono già caricati/cachati durante init/login. Ricaricali solo se mancano davvero.
+    if(!isMaster() && !(state.access || []).length){
+      await ensureAccessLoaded({ timeoutMs: 8000 });
+    }
+
     if(!canEdit(slug)) throw new Error('Non hai i permessi per modificare questa scheda.');
 
     const row = {
@@ -394,7 +405,7 @@
         .upsert(row, { onConflict:'slug' })
         .select('slug, updated_at')
         .single(),
-      60000,
+      30000,
       'Salvataggio online'
     );
 

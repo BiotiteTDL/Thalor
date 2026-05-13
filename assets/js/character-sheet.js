@@ -31,14 +31,19 @@ function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il 
   const s=document.createElement('style');
   s.id='thalor-permission-ui-style';
   s.textContent=`
+    /* In sola lettura non usare display:none sugli elementi strutturali:
+       altrimenti le griglie perdono colonne e alcuni testi tornano verticali/schiacciati. */
     #characterSheetApp.no-edit-permission button,
     #characterSheetApp.no-edit-permission .button:not(.profile-return),
     #characterSheetApp.no-edit-permission .section-controls,
     #characterSheetApp.no-edit-permission .mini-add,
     #characterSheetApp.no-edit-permission .mini-del,
     #characterSheetApp.no-edit-permission .portrait-edit-tools,
-    #characterSheetApp.no-edit-permission input[type="file"],
     #characterSheetApp.no-edit-permission .sheet-tools {
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+    #characterSheetApp.no-edit-permission input[type="file"] {
       display: none !important;
     }
     #characterSheetApp.no-edit-permission input,
