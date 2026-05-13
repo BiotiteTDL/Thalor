@@ -1,12 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 9,
   "meta": {
     "slug": "igor",
     "theme": "crucis",
     "crest": "✚",
     "profileUrl": "igor.html",
     "sourcePdf": "",
-    "status": "Scheda dinamica Step 1: formule automatiche, righe aggiungibili, salvataggio locale. Supabase sarà collegato nello step successivo.",
+    "status": "Scheda dinamica aggiornata: dati online Supabase, calcoli automatici, bonus avanzati e JSON alleggerito.",
     "subtitle": "Crucimigrazione, catene, oro e argento.",
     "accent": "#c9b27c"
   },
@@ -14,10 +14,10 @@
     "name": "Igor",
     "player": "Da assegnare",
     "race": "Da compilare",
-    "classLevel": "Vittima della Crucimigrazione",
+    "classLevel": "Vittima della Crucimigrazione 3",
     "alignment": "Da compilare",
     "deity": "Da compilare",
-    "xp": "3875",
+    "xp": 3875,
     "level": 3
   },
   "portrait": {
@@ -41,37 +41,43 @@
       "label": "Forza",
       "score": 0,
       "temp": 0,
-      "standard": "FOR"
+      "standard": "FOR",
+      "bonuses": []
     },
     "DES": {
       "label": "Destrezza",
       "score": 0,
       "temp": 0,
-      "standard": "DES"
+      "standard": "DES",
+      "bonuses": []
     },
     "COS": {
       "label": "Costituzione",
       "score": 0,
       "temp": 0,
-      "standard": "COS"
+      "standard": "COS",
+      "bonuses": []
     },
     "INT": {
       "label": "Intelligenza",
       "score": 0,
       "temp": 0,
-      "standard": "INT"
+      "standard": "INT",
+      "bonuses": []
     },
     "SAG": {
       "label": "Saggezza",
       "score": 0,
       "temp": 0,
-      "standard": "SAG"
+      "standard": "SAG",
+      "bonuses": []
     },
     "CAR": {
       "label": "Carisma",
       "score": 0,
       "temp": 0,
-      "standard": "CAR"
+      "standard": "CAR",
+      "bonuses": []
     }
   },
   "combat": {
@@ -80,9 +86,12 @@
     "nonlethal": 0,
     "initiativeMisc": 0,
     "speed": "9 m",
-    "bab": "Da compilare",
+    "bab": 0,
     "grappleMisc": 0,
-    "resistances": "Da compilare"
+    "resistances": "Da compilare",
+    "hpTemp": 0,
+    "stable": "No",
+    "tempBonuses": []
   },
   "armorClass": {
     "base": 10,
@@ -98,22 +107,19 @@
     "maxDex": ""
   },
   "saves": {
-    "tempra": {
-      "label": "Tempra",
+    "fortitude": {
       "ability": "COS",
       "base": 0,
       "magic": 0,
       "misc": 0
     },
-    "riflessi": {
-      "label": "Riflessi",
+    "reflex": {
       "ability": "DES",
       "base": 0,
       "magic": 0,
       "misc": 0
     },
-    "volonta": {
-      "label": "Volontà",
+    "will": {
       "ability": "SAG",
       "base": 0,
       "magic": 0,
@@ -122,462 +128,20 @@
   },
   "attacks": [
     {
-      "name": "Arma principale",
-      "bonus": "Da compilare",
-      "damage": "Da compilare",
-      "critical": "Da compilare",
-      "range": "—",
-      "type": "Da compilare",
-      "notes": ""
+      "name": "Arma principale"
     }
   ],
-  "defenses": [
-    {
-      "name": "Armatura / protezione",
-      "bonus": "Da compilare",
-      "type": "",
-      "maxDex": "",
-      "checkPenalty": "",
-      "spellFailure": "",
-      "weight": ""
-    }
-  ],
+  "defenses": [],
   "skills": [
     {
-      "name": "Acrobazia",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Addestrare Animali",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Artigianato",
+      "name": "Conoscenze Nobiltà",
       "ability": "INT",
       "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Artista della Fuga",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Ascoltare",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Cavalcare",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Cercare",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Concentrazione",
-      "ability": "COS",
-      "standardAbility": "COS",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Arcane",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Architettura e Ingegneria",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Dungeon",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Geografia",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Locali",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Natura",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Nobiltà e Regalità",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Piani",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Religioni",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Decifrare Scritture",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Diplomazia",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Disattivare Congegni",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Equilibrio",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Falsificare",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Guarire",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Intimidire",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Intrattenere",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Muoversi Silenziosamente",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Nascondersi",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Nuotare",
-      "ability": "FOR",
-      "standardAbility": "FOR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Osservare",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Percepire Intenzioni",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Professione",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Raccogliere Informazioni",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Rapidità di Mano",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Raggirare",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Saltare",
-      "ability": "FOR",
-      "standardAbility": "FOR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Sapienza Magica",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Scalare",
-      "ability": "FOR",
-      "standardAbility": "FOR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Scassinare Serrature",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Sopravvivenza",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Utilizzare Corde",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Utilizzare Oggetti Magici",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Valutare",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "armorApplies": "No"
     }
   ],
-  "feats": [
-    {
-      "name": "Da compilare",
-      "description": "",
-      "source": ""
-    }
-  ],
-  "features": [
-    {
-      "name": "Da compilare",
-      "description": "",
-      "source": ""
-    }
-  ],
+  "feats": [],
+  "features": [],
   "languages": [
     {
       "name": "Comune",
@@ -589,32 +153,30 @@
       {
         "name": "Da compilare",
         "school": "",
+        "castingTime": "",
         "time": "",
         "target": "",
+        "duration": "",
         "description": ""
       }
-    ],
-    "1": [],
-    "2": [],
-    "3": [],
-    "4": [],
-    "5": [],
-    "6": [],
-    "7": [],
-    "8": [],
-    "9": []
+    ]
   },
-  "inventory": [
+  "inventorySections": [
     {
-      "name": "Oggetto importante di trama",
-      "qty": "1",
-      "weight": "",
-      "notes": "Da compilare"
+      "name": "Inventario",
+      "items": [
+        {
+          "name": "Oggetto importante di trama",
+          "qty": 1,
+          "equipped": "No",
+          "notes": "Da compilare"
+        }
+      ]
     }
   ],
   "money": {
     "MP": 0,
-    "MO": 0.0,
+    "MO": 0,
     "MA": 0,
     "MR": 0
   },
@@ -629,7 +191,9 @@
     "visions": [
       "Ricordi spezzati, eco di catene, croce rituale e soglia oltre la vita."
     ],
-    "privateNotes": "Area libera per appunti del giocatore."
+    "privateNotes": "Area libera per appunti del giocatore.",
+    "bondsText": "Crucimigrazione\nLa grotta\nSimboli d’oro e argento\nIl rito che mantiene la forma",
+    "visionsText": "Ricordi spezzati, eco di catene, croce rituale e soglia oltre la vita."
   },
   "classLevels": [
     {
@@ -638,6 +202,34 @@
       "notes": ""
     }
   ],
-  "conditions": [],
-  "changeLog": []
+  "secrets": {
+    "playerVisible": "",
+    "dmNotes": "",
+    "loginRequired": true
+  },
+  "spellcasting": {
+    "casterLevel": 3,
+    "groups": [
+      {
+        "level": 0,
+        "className": "",
+        "ability": "",
+        "misc": 0,
+        "slots": 0,
+        "prepared": 0,
+        "used": 0,
+        "spells": [
+          {
+            "name": "Da compilare",
+            "school": "",
+            "castingTime": "",
+            "time": "",
+            "target": "",
+            "duration": "",
+            "description": ""
+          }
+        ]
+      }
+    ]
+  }
 }

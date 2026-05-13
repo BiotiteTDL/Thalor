@@ -1,119 +1,125 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 9,
   "meta": {
     "slug": "abraxas",
-    "theme": "infernal",
     "crest": "✦",
-    "profileUrl": "abraxas.html",
-    "sourcePdf": "../assets/files/Abraxas.pdf",
-    "status": "Scheda dinamica Step 1: formule automatiche, righe aggiungibili, salvataggio locale. Supabase sarà collegato nello step successivo.",
+    "theme": "infernal",
+    "accent": "#d14735",
+    "status": "Scheda dinamica aggiornata: dati online Supabase, calcoli automatici, bonus avanzati e JSON alleggerito.",
     "subtitle": "Ombre, catene e promesse infernali.",
-    "accent": "#d14735"
+    "sourcePdf": "../assets/files/Abraxas.pdf",
+    "profileUrl": "abraxas.html"
   },
   "identity": {
+    "xp": 4075,
     "name": "Abraxas",
-    "player": "Carlo Bevilacqua",
     "race": "Lesser Tiefiling",
-    "classLevel": "Ladro 3",
-    "alignment": "NM",
     "deity": "Belzebù",
-    "xp": "4075",
-    "level": 3
+    "level": 3,
+    "player": "Carlo Bevilacqua",
+    "alignment": "NM",
+    "classLevel": "Ladro 3"
   },
   "portrait": {
-    "image": "../assets/img/Abraxas.jpeg",
     "alt": "Abraxas",
+    "image": "../assets/img/Abraxas.jpeg",
     "quote": "Le catene non spariscono: cambiano padrone."
   },
   "appearance": {
-    "size": "m",
     "age": "20",
     "sex": "M",
-    "height": "1,79",
-    "weight": "66",
     "eyes": "gialli",
     "hair": "cenere",
+    "size": "m",
     "skin": "lillà",
-    "marks": "Retaggio infernale, odore di cenere e tracce dell’Underdark."
+    "marks": "Retaggio infernale, odore di cenere e tracce dell’Underdark.",
+    "height": "1,79",
+    "weight": "66"
   },
   "abilities": {
-    "FOR": {
-      "label": "Forza",
-      "score": 10,
+    "CAR": {
       "temp": 0,
-      "standard": "FOR"
-    },
-    "DES": {
-      "label": "Destrezza",
-      "score": 20,
-      "temp": 0,
-      "standard": "DES"
+      "label": "Carisma",
+      "score": 13,
+      "bonuses": [],
+      "standard": "CAR"
     },
     "COS": {
+      "temp": 0,
       "label": "Costituzione",
       "score": 14,
-      "temp": 0,
+      "bonuses": [],
       "standard": "COS"
     },
+    "DES": {
+      "temp": 0,
+      "label": "Destrezza",
+      "score": 20,
+      "bonuses": [],
+      "standard": "DES"
+    },
+    "FOR": {
+      "temp": 0,
+      "label": "Forza",
+      "score": 10,
+      "bonuses": [],
+      "standard": "FOR"
+    },
     "INT": {
+      "temp": 0,
       "label": "Intelligenza",
       "score": 18,
-      "temp": 0,
+      "bonuses": [],
       "standard": "INT"
     },
     "SAG": {
+      "temp": 0,
       "label": "Saggezza",
       "score": 10,
-      "temp": 0,
+      "bonuses": [],
       "standard": "SAG"
-    },
-    "CAR": {
-      "label": "Carisma",
-      "score": 13,
-      "temp": 0,
-      "standard": "CAR"
     }
   },
   "combat": {
-    "hpMax": 20.0,
-    "hpCurrent": 20.0,
-    "nonlethal": 0,
-    "initiativeMisc": 0,
+    "bab": 0,
+    "hpMax": 20,
     "speed": "9m",
-    "bab": "+2",
+    "hpTemp": 0,
+    "stable": "No",
+    "hpCurrent": 20,
+    "nonlethal": 0,
     "grappleMisc": 0,
-    "resistances": "res 5 freddo fuoco fulmine"
+    "resistances": "res 5 freddo fuoco fulmine",
+    "tempBonuses": [],
+    "initiativeMisc": 0
   },
   "armorClass": {
     "base": 10,
-    "armor": 1.0,
+    "misc": 0,
+    "size": 0,
+    "armor": 1,
+    "dodge": 0,
+    "maxDex": "",
     "shield": 0,
     "natural": 0,
-    "deflection": 0,
-    "dodge": 0,
-    "size": 0,
-    "misc": 0,
     "touchMisc": 0,
-    "flatFootedMisc": 0,
-    "maxDex": ""
+    "deflection": 0,
+    "flatFootedMisc": 0
   },
   "saves": {
-    "tempra": {
-      "label": "Tempra",
+    "fortitude": {
       "ability": "COS",
       "base": 0,
       "magic": 0,
       "misc": 0
     },
-    "riflessi": {
-      "label": "Riflessi",
+    "reflex": {
       "ability": "DES",
       "base": 0,
       "magic": 0,
       "misc": 0
     },
-    "volonta": {
-      "label": "Volontà",
+    "will": {
       "ability": "SAG",
       "base": 0,
       "magic": 0,
@@ -123,508 +129,181 @@
   "attacks": [
     {
       "name": "Pugnale",
-      "bonus": "+8-2",
-      "damage": "1d4+0",
-      "critical": "x3",
-      "range": "",
-      "type": "",
-      "notes": "x9"
+      "attackAbility": "DES",
+      "damageDice": "1d4",
+      "critical": "20x3"
     },
     {
       "name": "Furtivo",
-      "bonus": "",
-      "damage": "2d6",
-      "critical": "",
-      "range": "",
-      "type": "",
-      "notes": ""
+      "damageDice": "2d6"
     }
   ],
   "defenses": [
     {
       "name": "Imbottita",
-      "bonus": "+1",
+      "bonus": 1,
       "type": "leggera",
       "maxDex": "+8",
-      "checkPenalty": "0",
-      "spellFailure": "5%",
-      "weight": ""
+      "spellFailure": 5
     }
   ],
   "skills": [
     {
       "name": "Acrobazia",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Addestrare Animali",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "ranks": 6,
+      "classSkill": "Sì"
     },
     {
       "name": "Artigianato",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Artista della Fuga",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "ranks": 6,
+      "classSkill": "Sì"
     },
     {
       "name": "Ascoltare",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Cavalcare",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Cercare",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Concentrazione",
-      "ability": "COS",
-      "standardAbility": "COS",
-      "ranks": 2.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Arcane",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Architettura e Ingegneria",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Conoscenze Dungeon",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Geografia",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Conoscenze Locali",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "ranks": 6,
+      "classSkill": "Sì"
     },
     {
       "name": "Conoscenze Natura",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Nobiltà e Regalità",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Conoscenze Piani",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Conoscenze Religioni",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 2.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Decifrare Scritture",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Diplomazia",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Disattivare Congegni",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "ranks": 2,
+      "misc": -1
     },
     {
       "name": "Equilibrio",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Falsificare",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Guarire",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Intimidire",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Intrattenere",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Muoversi Silenziosamente",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 3.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Nascondersi",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
-    },
-    {
-      "name": "Nuotare",
-      "ability": "FOR",
-      "standardAbility": "FOR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Osservare",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 2.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Percepire Intenzioni",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Professione",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Raccogliere Informazioni",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Rapidità di Mano",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Raggirare",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Saltare",
-      "ability": "FOR",
-      "standardAbility": "FOR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Sapienza Magica",
-      "ability": "INT",
-      "standardAbility": "INT",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
-    },
-    {
-      "name": "Scalare",
-      "ability": "FOR",
-      "standardAbility": "FOR",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Scassinare Serrature",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Sopravvivenza",
-      "ability": "SAG",
-      "standardAbility": "SAG",
-      "ranks": 6.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Utilizzare Corde",
-      "ability": "DES",
-      "standardAbility": "DES",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
       "name": "Utilizzare Oggetti Magici",
-      "ability": "CAR",
-      "standardAbility": "CAR",
-      "ranks": 0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "Sì",
-      "notes": ""
+      "classSkill": "Sì"
     },
     {
-      "name": "Valutare",
+      "name": "Camuffare",
+      "ranks": 2,
+      "misc": 2
+    },
+    {
+      "name": "Conoscenze Nobiltà",
       "ability": "INT",
       "standardAbility": "INT",
-      "ranks": 0.0,
-      "misc": 0,
-      "armorPenalty": 0,
-      "classSkill": "",
-      "notes": ""
+      "armorApplies": "No"
     }
   ],
   "feats": [
     {
-      "name": "Arma Accurata",
-      "description": "",
-      "source": ""
+      "name": "Arma Accurata"
     },
     {
-      "name": "combattere con due armi*",
-      "description": "",
-      "source": ""
+      "name": "combattere con due armi*"
     },
     {
-      "name": "Arma focalizzata: pugnale",
-      "description": "",
-      "source": ""
+      "name": "Arma focalizzata: pugnale"
     }
   ],
   "features": [
     {
-      "name": "res freddo elettricita fuoco 5",
-      "description": "",
-      "source": ""
+      "name": "res freddo elettricita fuoco 5"
     },
     {
-      "name": "scurovisione 18m",
-      "description": "",
-      "source": ""
+      "name": "scurovisione 18m"
     },
     {
-      "name": "oscurità 1 al giorno",
-      "description": "",
-      "source": ""
+      "name": "oscurità 1 al giorno"
     },
     {
-      "name": "attacco furtivo",
-      "description": "",
-      "source": ""
+      "name": "attacco furtivo"
     },
     {
-      "name": "scoprire trappole",
-      "description": "",
-      "source": ""
+      "name": "scoprire trappole"
     },
     {
-      "name": "eludere",
-      "description": "",
-      "source": ""
+      "name": "eludere"
     },
     {
-      "name": "death's ruin",
-      "description": "",
-      "source": ""
+      "name": "death's ruin"
     }
   ],
   "languages": [
@@ -653,96 +332,82 @@
       "notes": ""
     }
   ],
-  "spells": {
-    "0": [],
-    "1": [],
-    "2": [],
-    "3": [],
-    "4": [],
-    "5": [],
-    "6": [],
-    "7": [],
-    "8": [],
-    "9": []
-  },
-  "inventory": [
+  "inventorySections": [
     {
-      "name": "guanti della mano bilanciata",
-      "qty": "",
-      "weight": "0",
-      "notes": ""
-    },
-    {
-      "name": "pugnali x4",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "corda 10m",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "manette",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "borsa conservante",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "arnesi da scasso",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "pugnale strano",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "corda di canapa 15m",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "rampino",
-      "qty": "",
-      "weight": "",
-      "notes": ""
-    },
-    {
-      "name": "razioni x10",
-      "qty": "",
-      "weight": "",
-      "notes": ""
+      "name": "Inventario",
+      "items": [
+        {
+          "name": "guanti della mano bilanciata",
+          "qty": 0,
+          "weight": "0",
+          "equipped": "No"
+        },
+        {
+          "name": "pugnali x4",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "corda 10m",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "manette",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "borsa conservante",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "arnesi da scasso",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "pugnale strano",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "corda di canapa 15m",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "rampino",
+          "qty": 0,
+          "equipped": "No"
+        },
+        {
+          "name": "razioni x10",
+          "qty": 0,
+          "equipped": "No"
+        }
+      ]
     }
   ],
   "money": {
-    "MP": 0,
-    "MO": 0.0,
     "MA": 0,
+    "MO": 0,
+    "MP": 0,
     "MR": 0
   },
   "narrative": {
-    "summary": "Ex schiavo tiefling legato all’Underdark e al culto di Belzebù tramite il Signore delle Mosche. Nasconde ferite, patti e una feroce fame di libertà.",
     "bonds": [
       "Belzebù / Signore delle Mosche",
       "Underdark",
       "Varek Thorm e la lettera dopo il funerale"
     ],
+    "summary": "Ex schiavo tiefling legato all’Underdark e al culto di Belzebù tramite il Signore delle Mosche. Nasconde ferite, patti e una feroce fame di libertà.",
     "visions": [
       "Anime rosse che cercano un’entità oscura capace di offrire assenza del dolore."
     ],
+    "bondsText": "Belzebù / Signore delle Mosche\nUnderdark\nVarek Thorm e la lettera dopo il funerale",
+    "visionsText": "Anime rosse che cercano un’entità oscura capace di offrire assenza del dolore.",
     "privateNotes": "Può contenere patti, segreti, debiti o scelte non ancora rivelate al gruppo."
   },
   "classLevels": [
@@ -752,6 +417,89 @@
       "notes": ""
     }
   ],
-  "conditions": [],
-  "changeLog": []
+  "secrets": {
+    "dmNotes": "",
+    "loginRequired": true,
+    "playerVisible": ""
+  },
+  "spellcasting": {
+    "casterLevel": 3
+  },
+  "changeLog": [
+    {
+      "when": "13/05/2026, 11:42:38",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Attacchi e tecniche."
+    },
+    {
+      "when": "13/05/2026, 11:42:50",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Attacchi e tecniche."
+    },
+    {
+      "when": "13/05/2026, 11:42:57",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Attacchi e tecniche."
+    },
+    {
+      "when": "13/05/2026, 11:43:09",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Attacchi e tecniche."
+    },
+    {
+      "when": "13/05/2026, 11:43:39",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Difese / Protezioni."
+    },
+    {
+      "when": "13/05/2026, 11:45:05",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Abilità."
+    },
+    {
+      "when": "13/05/2026, 11:49:21",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Abilità."
+    },
+    {
+      "when": "13/05/2026, 11:50:13",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Abilità."
+    },
+    {
+      "when": "13/05/2026, 11:51:18",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Abilità."
+    },
+    {
+      "when": "13/05/2026, 11:53:50",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio completo dalla barra superiore."
+    },
+    {
+      "when": "13/05/2026, 12:25:46",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Abilità."
+    },
+    {
+      "when": "13/05/2026, 12:55:22",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Caratteristiche."
+    },
+    {
+      "when": "13/05/2026, 12:55:24",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio sezione: Identità."
+    },
+    {
+      "when": "13/05/2026, 12:55:27",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio completo dalla barra superiore."
+    },
+    {
+      "when": "13/05/2026, 18:24:11",
+      "action": "Salvataggio scheda",
+      "detail": "Salvataggio completo dal menu flottante."
+    }
+  ]
 }
