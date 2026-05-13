@@ -13,7 +13,12 @@ function sheetCanEdit(){return !authAvailable() || window.ThalorAuth.canEdit(slu
 async function refreshEditPermission(){
   if(!authAvailable()) return true;
   if(sheetCanEdit()) return true;
-  try{ await window.ThalorAuth.init(true); }catch(e){ console.warn('Auth recheck failed:', e); }
+  try{
+    if(window.ThalorAuth.ensureFreshSession) await window.ThalorAuth.ensureFreshSession();
+    else await window.ThalorAuth.init(true);
+  }catch(e){
+    console.warn('Auth recheck failed:', e);
+  }
   return sheetCanEdit();
 }
 function emergencyDraftKey(){return `thalor.unsaved.${slug}${isCompanion?'.companion.'+companionIndex:''}.v1`;}
@@ -23,7 +28,7 @@ function saveEmergencyDraft(data,reason){
   }catch(e){ console.warn('Emergency draft failed:', e); }
 }
 function authStatusText(){return authAvailable()?window.ThalorAuth.statusText():'Modalità locale.';}
-function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il personaggio assegnato, oppure tutto se sei Master. Ho creato una copia di emergenza locale per non perdere i dati.';}
+function editDeniedMessage(){return 'Accesso richiesto: puoi modificare solo il personaggio assegnato, oppure tutto se sei Master. Il salvataggio online non è stato eseguito.';}
 function withTimeout(promise, ms, label){
   let timer;
   return Promise.race([
@@ -641,6 +646,9 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   // come aggiungi/rimuovi condizione o +/- slot, evitando che il vecchio DOM riaggiunga righe cancellate.
   let draft=normalize(fromDom?collect(data):data);
   saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
+  if(authAvailable() && window.ThalorAuth.ensureFreshSession){
+    try{ await window.ThalorAuth.ensureFreshSession(); }catch(e){ console.warn('Refresh sessione prima del salvataggio fallito:', e); }
+  }
   if(!await refreshEditPermission()){
     try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
     alert(editDeniedMessage());
@@ -681,14 +689,14 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
   try{
     if(authAvailable() && window.ThalorAuth.state.configured && !window.ThalorAuth.state.localMaster){
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvato nel browser. Pubblicazione online in corso…';
-      await withTimeout(window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u), 8000, 'Supabase non ha risposto entro 8 secondi');
+      await withTimeout(window.ThalorAuth.saveCharacter(slug, isCompanion ? parentForCloud : u), 30000, 'Supabase non ha risposto entro 30 secondi');
       const ls2=document.getElementById('localStatus'); if(ls2)ls2.textContent='Modifiche salvate online.';
     }else{
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent=authAvailable()&&window.ThalorAuth.state.localMaster?'Modifiche salvate in locale come Master offline.':'Modifiche salvate nel browser.';
     }
   }catch(err){
     saveEmergencyDraft(u,'Salvataggio online fallito');
-    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Modifiche salvate nel browser. Online non completato: '+(err.message||err);
+    const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Salvataggio online NON completato: '+(err.message||err);
     console.warn('Salvataggio online non completato:', err);
   }
   return u;

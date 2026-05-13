@@ -124,6 +124,55 @@
     return state.access;
   }
 
+  async function ensureFreshSession(){
+    const client = makeClient();
+    if(!client) return null;
+
+    // Dopo molti minuti di modifica o dopo aver cambiato scheda del browser,
+    // lo stato in memoria può essere vecchio anche se il refresh token è ancora valido.
+    // Prima di salvare rileggo sempre la sessione reale da Supabase e, se sta per
+    // scadere, forzo un refresh. Questo evita i "salvataggi fantasma" dopo 15/20 minuti.
+    let result = await client.auth.getSession();
+    if(result.error) throw result.error;
+
+    let session = result.data.session || null;
+    const expiresAt = Number(session?.expires_at || 0);
+    const secondsLeft = expiresAt ? expiresAt - Math.floor(Date.now()/1000) : 0;
+
+    if(session && secondsLeft < 120){
+      const refreshed = await client.auth.refreshSession();
+      if(refreshed.error) throw refreshed.error;
+      session = refreshed.data.session || session;
+    }
+
+    state.session = session;
+    const nextUser = session?.user || null;
+    const userChanged = (nextUser?.id || null) !== state.lastUserId;
+    state.user = nextUser;
+    state.lastUserId = nextUser?.id || null;
+
+    if(!state.user){
+      state.profile = null;
+      state.access = [];
+      state.accessLoaded = false;
+      state.permissionsStale = false;
+      return null;
+    }
+
+    if(userChanged){
+      state.profile = null;
+      state.access = [];
+      state.accessLoaded = false;
+      state.permissionsStale = false;
+    }
+
+    await ensureProfile(client);
+    await refreshAccess();
+    state.error = null;
+    state.ready = true;
+    return state.session;
+  }
+
   async function init(force=false){
     state.localMaster = localMasterEnabled();
     if(state.ready && !force) return state;
@@ -247,9 +296,15 @@
   }
 
   async function saveCharacter(slug, data){
-    await init(false);
+    state.localMaster = localMasterEnabled();
     if(state.localMaster) return { mode:'local-master' };
-    if(!state.configured || !state.client) return { mode:'local' };
+    if(!state.configured || !makeClient()) return { mode:'local' };
+
+    // Salvataggio = controllo fresco, non stato cache. Serve soprattutto dopo
+    // lunghe modifiche o dopo cambio tab, quando il token può essere stato rinnovato
+    // ma la variabile state.user/session è rimasta vecchia.
+    await ensureFreshSession();
+
     if(!state.user) throw new Error('Accesso richiesto: sessione non trovata. Rientra con login e riprova.');
     if(!canEdit(slug)){
       await refreshAccess();
@@ -299,6 +354,7 @@
     state,
     init,
     refreshAccess,
+    ensureFreshSession,
     isMaster,
     canEdit,
     loadCharacter,
