@@ -263,7 +263,7 @@ function ordinalCircle(lv){lv=num(lv);return lv===0?'0ª cerchia / Trucchetti':l
 function spellGroupTitle(g){const cls=String(g.className||'').trim();return `${ordinalCircle(g.level)}${cls?' — '+cls:''}`}
 function spellCircleOptions(selected){let out='';for(let lv=0;lv<=9;lv++)out+=`<option value="${lv}" ${num(selected)===lv?'selected':''}>${ordinalCircle(lv)}</option>`;return out}
 function spellDC(d,g){const lv=num(g?.level),ab=g?.ability||'',abm=ab?abilityMod(d,ab):0,misc=num(g?.misc),total=10+lv+abm+misc;return{total,ab,abm,misc,short:`CD: ${total}`,text:`CD: ${total} = 10${ab?' + '+ab+' ('+sign(abm)+')':' + nessuna caratteristica'} + cerchia ${lv} + mod vari ${sign(misc)}`}}
-function spells(d){let c=calc(d),sc=d.spellcasting||{},sr=num(sc.casterLevel)+num(sc.srMisc),groups=sc.groups||[];let body=`<div class="spell-summary"><div><span>Fallimento inc. arcani</span><strong>${c.spellFailure}%</strong></div><div><span>Prova contro RI</span><strong>${sign(sr)}</strong></div><div><span>Livello incantatore</span><div class="spell-summary-field">${inp('spellcasting.casterLevel',sc.casterLevel,'number')}</div></div><div><span>Mod RI vari</span><div class="spell-summary-field">${inp('spellcasting.srMisc',sc.srMisc,'number')}</div></div></div><p class="section-mini-note">Le cerchie sono dinamiche: aggiungi solo quelle che servono, scegliendo numero e classe di appartenenza. Gli slot usati si possono aumentare o togliere anche senza entrare in modifica.</p><div class="spell-circle-adder edit-only"><label>Cerchia ${`<select id="newSpellCircleLevel">${spellCircleOptions(1)}</select>`}</label><label>Classe ${`<input id="newSpellCircleClass" type="text" placeholder="Es. Mago, Chierico, CdP...">`}</label><label>Inserisci ${`<select id="newSpellCirclePos"><option value="end">In fondo</option>${groups.map((g,i)=>`<option value="${i}">Prima di ${esc(spellGroupTitle(g))}</option>`).join('')}</select>`}</label><button class="mini-add" id="addSpellCircle" type="button">+ Aggiungi cerchia</button></div><div class="spell-circles">${groups.map((g,gi)=>{let dc=spellDC(d,g), used=num(g.used), slots=num(g.slots);return `<details class="spell-circle" data-spell-group="${gi}"${dragDropAttrs(`spellcasting.groups.${gi}`)}><summary>${dragHandle(`spellcasting.groups.${gi}`)}<span class="spell-circle-title">${esc(spellGroupTitle(g))}</span><span class="spell-dc-badge">${esc(dc.short)}</span><span class="spell-dc-edit edit-only" onclick="event.stopPropagation()"><span class="spell-dc-formula">${esc(dc.text)}</span><label class="spell-edit-field">Cerchia <select data-path="spellcasting.groups.${gi}.level" disabled>${spellCircleOptions(g.level)}</select></label><label class="spell-edit-field">Classe ${inp(`spellcasting.groups.${gi}.className`,g.className||'')}</label><label class="spell-edit-field">Car. ${sel(`spellcasting.groups.${gi}.ability`,dc.ab,'',true)}</label><label class="spell-edit-field">Mod CD ${inp(`spellcasting.groups.${gi}.misc`,dc.misc,'number')}</label><label class="spell-edit-field">Slot ${inp(`spellcasting.groups.${gi}.slots`,g.slots||0,'number')}</label><label class="spell-edit-field">Prep. ${inp(`spellcasting.groups.${gi}.prepared`,g.prepared||0,'number')}</label><label class="spell-edit-field">Usati ${inp(`spellcasting.groups.${gi}.used`,g.used||0,'number')}</label><button class="row-del spell-circle-delete" data-del="spellcasting.groups.${gi}" title="Elimina cerchia">×</button></span><button class="mini-add" data-add="spellcasting.groups.${gi}.spells" data-kind="spell" hidden>+ Spell</button></summary><div class="spell-slots-read"><span>${esc(g.className||'Classe non indicata')}</span><span>Slot ${slots}</span><span>Preparati ${g.prepared||0}</span><span class="slot-used-control" onclick="event.stopPropagation()"><button type="button" class="slot-step" data-slot-step="spellcasting.groups.${gi}.used" data-step="-1" aria-label="Togli slot usato">−</button><strong>Usati ${used}</strong><button type="button" class="slot-step" data-slot-step="spellcasting.groups.${gi}.used" data-step="1" aria-label="Aggiungi slot usato">+</button></span></div><table class="sheet-table spell-table"><thead><tr>${dragTh()}<th>Nome</th><th>Scuola</th><th>Tempo di lancio</th><th>Bersaglio</th><th class="spell-duration-head">Durata</th><th class="edit-only spell-description-head">Descrizione</th><th class="edit-only">Azioni</th></tr></thead><tbody>${((g.spells||[]).length?g.spells:[]).map((x,i)=>`<tr class="spell-row info-row" tabindex="0" data-tip="${esc(tipText(x))}"${dragDropAttrs(`spellcasting.groups.${gi}.spells.${i}`)}>${dragTd(`spellcasting.groups.${gi}.spells.${i}`)}<td>${inp(`spellcasting.groups.${gi}.spells.${i}.name`,x.name||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.school`,x.school||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.castingTime`,x.castingTime||x.time||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.target`,x.target||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.duration`,x.duration||'')}</td><td class="edit-only spell-desc-cell"><details class="spell-description-popover" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()"><summary type="button">Descrizione</summary><div class="spell-description-panel" onclick="event.stopPropagation()" onpointerdown="event.stopPropagation()" onmousedown="event.stopPropagation()">${area(`spellcasting.groups.${gi}.spells.${i}.description`,x.description||'','edit-description spell-description-editor')}</div></details></td><td class="edit-only"><button class="row-del" data-del="spellcasting.groups.${gi}.spells.${i}">×</button></td></tr>`).join('')||`<tr><td colspan="7" class="empty-row">Nessun incantesimo inserito.</td></tr>`}</tbody></table></details>`}).join('')||`<div class="empty-row spell-empty">Nessuna cerchia inserita. Entra in modifica e aggiungi la prima cerchia utile al personaggio.</div>`}</div>`;return section('Incantesimi / Poteri',body,{wide:true})}
+function spells(d){let c=calc(d),sc=d.spellcasting||{},sr=num(sc.casterLevel)+num(sc.srMisc),groups=sc.groups||[];let body=`<div class="spell-summary"><div><span>Fallimento inc. arcani</span><strong>${c.spellFailure}%</strong></div><div><span>Prova contro RI</span><strong>${sign(sr)}</strong></div><div><span>Livello incantatore</span><div class="spell-summary-field">${inp('spellcasting.casterLevel',sc.casterLevel,'number')}</div></div><div><span>Mod RI vari</span><div class="spell-summary-field">${inp('spellcasting.srMisc',sc.srMisc,'number')}</div></div></div><p class="section-mini-note">Le cerchie sono dinamiche: aggiungi solo quelle che servono, scegliendo numero e classe di appartenenza. Gli slot usati si possono aumentare o togliere anche senza entrare in modifica.</p><div class="spell-circle-adder edit-only"><label>Cerchia ${`<select id="newSpellCircleLevel">${spellCircleOptions(1)}</select>`}</label><label>Classe ${`<input id="newSpellCircleClass" type="text" placeholder="Es. Mago, Chierico, CdP...">`}</label><label>Inserisci ${`<select id="newSpellCirclePos"><option value="end">In fondo</option>${groups.map((g,i)=>`<option value="${i}">Prima di ${esc(spellGroupTitle(g))}</option>`).join('')}</select>`}</label><button class="mini-add" id="addSpellCircle" type="button">+ Aggiungi cerchia</button></div><div class="spell-circles">${groups.map((g,gi)=>{let dc=spellDC(d,g), used=num(g.used), slots=num(g.slots);return `<details class="spell-circle" data-spell-group="${gi}"${dragDropAttrs(`spellcasting.groups.${gi}`)}><summary>${dragHandle(`spellcasting.groups.${gi}`)}<span class="spell-circle-title">${esc(spellGroupTitle(g))}</span><span class="spell-dc-badge">${esc(dc.short)}</span><span class="spell-dc-edit edit-only" onclick="event.stopPropagation()"><span class="spell-dc-formula">${esc(dc.text)}</span><label class="spell-edit-field">Cerchia <select data-path="spellcasting.groups.${gi}.level" disabled>${spellCircleOptions(g.level)}</select></label><label class="spell-edit-field">Classe ${inp(`spellcasting.groups.${gi}.className`,g.className||'')}</label><label class="spell-edit-field">Car. ${sel(`spellcasting.groups.${gi}.ability`,dc.ab,'',true)}</label><label class="spell-edit-field">Mod CD ${inp(`spellcasting.groups.${gi}.misc`,dc.misc,'number')}</label><label class="spell-edit-field">Slot ${inp(`spellcasting.groups.${gi}.slots`,g.slots||0,'number')}</label><label class="spell-edit-field">Prep. ${inp(`spellcasting.groups.${gi}.prepared`,g.prepared||0,'number')}</label><label class="spell-edit-field">Usati ${inp(`spellcasting.groups.${gi}.used`,g.used||0,'number')}</label><button class="row-del spell-circle-delete" data-del="spellcasting.groups.${gi}" title="Elimina cerchia">×</button></span><button class="mini-add" data-add="spellcasting.groups.${gi}.spells" data-kind="spell" hidden>+ Spell</button></summary><div class="spell-slots-read"><span>${esc(g.className||'Classe non indicata')}</span><span>Slot ${slots}</span><span>Preparati ${g.prepared||0}</span><span class="slot-used-control" onclick="event.stopPropagation()"><button type="button" class="slot-step" data-slot-step="spellcasting.groups.${gi}.used" data-step="-1" aria-label="Togli slot usato">−</button><strong>Usati ${used}</strong><button type="button" class="slot-step" data-slot-step="spellcasting.groups.${gi}.used" data-step="1" aria-label="Aggiungi slot usato">+</button></span></div><table class="sheet-table spell-table"><thead><tr>${dragTh()}<th>Nome</th><th>Scuola</th><th>Tempo di lancio</th><th>Bersaglio</th><th class="spell-duration-head">Durata</th><th class="edit-only spell-description-head">Descrizione</th><th class="edit-only">Azioni</th></tr></thead><tbody>${((g.spells||[]).length?g.spells:[]).map((x,i)=>`<tr class="spell-row info-row" tabindex="0" data-tip="${esc(tipText(x))}"${dragDropAttrs(`spellcasting.groups.${gi}.spells.${i}`)}>${dragTd(`spellcasting.groups.${gi}.spells.${i}`)}<td>${inp(`spellcasting.groups.${gi}.spells.${i}.name`,x.name||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.school`,x.school||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.castingTime`,x.castingTime||x.time||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.target`,x.target||'')}</td><td>${inp(`spellcasting.groups.${gi}.spells.${i}.duration`,x.duration||'')}</td><td class="edit-only spell-desc-cell"><button type="button" class="spell-desc-open" data-spell-desc-path="spellcasting.groups.${gi}.spells.${i}.description" data-spell-name-path="spellcasting.groups.${gi}.spells.${i}.name">Descrizione</button><textarea class="spell-description-store" data-path="spellcasting.groups.${gi}.spells.${i}.description" hidden disabled>${esc(x.description||'')}</textarea></td><td class="edit-only"><button class="row-del" data-del="spellcasting.groups.${gi}.spells.${i}">×</button></td></tr>`).join('')||`<tr><td colspan="7" class="empty-row">Nessun incantesimo inserito.</td></tr>`}</tbody></table></details>`}).join('')||`<div class="empty-row spell-empty">Nessuna cerchia inserita. Entra in modifica e aggiungi la prima cerchia utile al personaggio.</div>`}</div>`;return section('Incantesimi / Poteri',body,{wide:true})}
 
 function companionsPanel(d){
   if(isCompanion)return '';
@@ -543,38 +543,87 @@ function placeFloatingTip(source){if(!floatingTip)return;const r=source.getBound
 function showFloatingTip(source){if(app.classList.contains('editing'))return;const text=source.dataset.tip||'';if(!text.trim())return;hideFloatingTip();floatingTip=document.createElement('div');floatingTip.className='thalor-floating-tip';floatingTip.textContent=text;document.body.appendChild(floatingTip);floatingTipSource=source;placeFloatingTip(source)}
 function bindTooltips(){hideFloatingTip();document.querySelectorAll('.info-row,.info-card').forEach(el=>{el.addEventListener('mouseenter',()=>showFloatingTip(el));el.addEventListener('mouseleave',hideFloatingTip);el.addEventListener('focus',()=>showFloatingTip(el));el.addEventListener('blur',hideFloatingTip);el.addEventListener('click',ev=>{if(app.classList.contains('editing'))return;ev.stopPropagation();if(floatingTipSource===el)hideFloatingTip();else showFloatingTip(el);});});document.addEventListener('click',hideFloatingTip,{once:true});window.addEventListener('scroll',hideFloatingTip,{passive:true,once:true});window.addEventListener('resize',hideFloatingTip,{passive:true,once:true});}
 
-let spellDescBackdrop=null;
-function closeSpellDescriptionPopovers(except){
-  document.querySelectorAll('.spell-description-popover[open]').forEach(d=>{if(d!==except)d.open=false;});
-  if(!except && spellDescBackdrop){spellDescBackdrop.remove();spellDescBackdrop=null;}
+
+let spellDescModal=null;
+let spellDescActiveStore=null;
+function closeSpellDescriptionPopovers(){
+  if(spellDescModal){
+    const editor=spellDescModal.querySelector('.spell-desc-modal-editor');
+    if(editor && spellDescActiveStore){
+      spellDescActiveStore.value=editor.value;
+      spellDescActiveStore.dispatchEvent(new Event('input',{bubbles:true}));
+      spellDescActiveStore.dispatchEvent(new Event('change',{bubbles:true}));
+    }
+    if(spellDescModal.__escHandler){
+      document.removeEventListener('keydown', spellDescModal.__escHandler);
+    }
+    spellDescModal.remove();
+    spellDescModal=null;
+    spellDescActiveStore=null;
+    document.body.classList.remove('spell-desc-modal-open');
+  }
 }
-function ensureSpellDescriptionBackdrop(){
-  if(spellDescBackdrop)return spellDescBackdrop;
-  spellDescBackdrop=document.createElement('div');
-  spellDescBackdrop.className='spell-description-backdrop';
-  spellDescBackdrop.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();closeSpellDescriptionPopovers();});
-  document.body.appendChild(spellDescBackdrop);
-  return spellDescBackdrop;
+function openSpellDescriptionModal(btn){
+  closeSpellDescriptionPopovers();
+  const path=btn.dataset.spellDescPath||'';
+  const store=document.querySelector(`textarea.spell-description-store[data-path="${path}"]`);
+  if(!store)return;
+  spellDescActiveStore=store;
+  const namePath=btn.dataset.spellNamePath||'';
+  const nameField=document.querySelector(`[data-path="${namePath}"]`);
+  const spellName=(nameField&&('value' in nameField)?nameField.value:nameField?.textContent)||'Incantesimo';
+  spellDescModal=document.createElement('div');
+  spellDescModal.className='spell-desc-modal-root';
+  spellDescModal.innerHTML=`
+    <div class="spell-desc-modal-backdrop" data-close-spell-desc="1"></div>
+    <section class="spell-desc-modal" role="dialog" aria-modal="true" aria-label="Descrizione incantesimo">
+      <header class="spell-desc-modal-header">
+        <div>
+          <span class="spell-desc-modal-kicker">Descrizione incantesimo</span>
+          <h3>${esc(spellName||'Incantesimo')}</h3>
+        </div>
+        <button type="button" class="spell-desc-modal-close" data-close-spell-desc="1" aria-label="Chiudi descrizione">×</button>
+      </header>
+      <div class="spell-desc-modal-body">
+        <label class="spell-desc-modal-label" for="spellDescModalEditor">Testo descrizione</label>
+        <textarea id="spellDescModalEditor" class="spell-desc-modal-editor" spellcheck="true" maxlength="5000">${esc(store.value||'')}</textarea>
+        <div class="spell-desc-modal-help"><span>Il testo viene mantenuto nella scheda e salvato con il pulsante Salva.</span><span class="spell-desc-modal-count">${String(store.value||'').length} caratteri</span></div>
+      </div>
+      <footer class="spell-desc-modal-footer">
+        <button type="button" class="spell-desc-modal-secondary" data-close-spell-desc="1">Chiudi</button>
+        <button type="button" class="spell-desc-modal-primary" data-close-spell-desc="1">Conferma</button>
+      </footer>
+    </section>`;
+  document.body.appendChild(spellDescModal);
+  document.body.classList.add('spell-desc-modal-open');
+  spellDescModal.__escHandler=(ev)=>{
+    if(ev.key==='Escape'){
+      ev.preventDefault();
+      closeSpellDescriptionPopovers();
+    }
+  };
+  document.addEventListener('keydown', spellDescModal.__escHandler);
+  const editor=spellDescModal.querySelector('.spell-desc-modal-editor');
+  const count=spellDescModal.querySelector('.spell-desc-modal-count');
+  editor.addEventListener('input',()=>{store.value=editor.value;if(count)count.textContent=editor.value.length+' caratteri';});
+  // Chiusura reale del modal: uso la fase di capture così i click su X/Chiudi/Conferma
+  // vengono intercettati prima dello stopPropagation del pannello interno.
+  spellDescModal.addEventListener('click',e=>{
+    const closeBtn=e.target.closest('[data-close-spell-desc], .spell-desc-modal-close');
+    if(closeBtn){
+      e.preventDefault();
+      e.stopPropagation();
+      closeSpellDescriptionPopovers();
+    }
+  }, true);
+  spellDescModal.querySelector('.spell-desc-modal').addEventListener('click',e=>e.stopPropagation());
+  setTimeout(()=>{editor.focus();editor.setSelectionRange(editor.value.length,editor.value.length);},30);
 }
 function bindSpellDescriptionEditors(){
   closeSpellDescriptionPopovers();
-  document.querySelectorAll('.spell-description-popover').forEach(d=>{
-    const summary=d.querySelector('summary');
-    const panel=d.querySelector('.spell-description-panel');
-    const editor=d.querySelector('.spell-description-editor');
-    if(summary){summary.addEventListener('click',e=>{
-      e.preventDefault();e.stopPropagation();
-      const willOpen=!d.open;
-      closeSpellDescriptionPopovers(willOpen?d:null);
-      d.open=willOpen;
-      if(willOpen){ensureSpellDescriptionBackdrop();setTimeout(()=>{editor?.focus();editor?.setSelectionRange?.(editor.value.length,editor.value.length);},30);}
-      else closeSpellDescriptionPopovers();
-    });}
-    ['click','mousedown','pointerdown','touchstart'].forEach(evt=>{
-      panel?.addEventListener(evt,e=>e.stopPropagation());
-      editor?.addEventListener(evt,e=>e.stopPropagation());
-    });
-    editor?.addEventListener('keydown',e=>e.stopPropagation());
+  document.querySelectorAll('.spell-description-popover[open]').forEach(el=>{try{el.open=false;}catch(e){}});
+  document.querySelectorAll('.spell-desc-open').forEach(btn=>{
+    btn.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();openSpellDescriptionModal(btn);});
   });
 }
 
