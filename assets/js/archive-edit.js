@@ -80,8 +80,26 @@ function bind(data){
   const addCat=document.getElementById('archiveAddCategory'); if(addCat)addCat.onclick=()=>{const d=collect(data); d.categories.push({title:'Nuova categoria',items:[]}); render(d,true);};
   app.querySelectorAll('[data-add-item]').forEach(btn=>btn.onclick=()=>{const d=collect(data); const ci=Number(btn.dataset.addItem)||0; d.categories[ci]=d.categories[ci]||{title:'Nuova categoria',items:[]}; d.categories[ci].items.push(type==='documents'?{title:'Nuovo documento',subtitle:'Descrizione breve',image:'',href:'#',badge:''}:{tag:'Categoria',title:'Nuovo simbolo',description:'Descrizione del simbolo.',image:'',href:'#'}); render(d,true);});
   app.querySelectorAll('[data-delete-item]').forEach(btn=>btn.onclick=()=>{const d=collect(data); const [ci,ii]=btn.dataset.deleteItem.split('.').map(Number); d.categories[ci]?.items.splice(ii,1); render(d,true);});
-  app.querySelectorAll('[data-delete-category]').forEach(btn=>btn.onclick=()=>{const d=collect(data); d.categories.splice(Number(btn.dataset.deleteCategory)||0,1); render(d,true);});
+  app.querySelectorAll('[data-delete-category]').forEach(btn=>btn.onclick=()=>{const ci=Number(btn.dataset.deleteCategory)||0; const name=(collect(data).categories[ci]?.title||'questa categoria'); if(!confirm('Eliminare la categoria "'+name+'" e tutti i suoi elementi?'))return; const d=collect(data); d.categories.splice(ci,1); render(d,true);});
   app.querySelectorAll('[data-image-input]').forEach(input=>input.onchange=async()=>{const d=collect(data); const [ci,ii]=input.dataset.imageInput.split('.').map(Number); const src=await readFile(input); if(src&&d.categories[ci]?.items[ii]){d.categories[ci].items[ii].image=src; if(type==='documents')d.categories[ci].items[ii].href=src;} render(d,true);});
+  app.querySelectorAll('.doc-row-link').forEach(link=>link.addEventListener('click',ev=>{
+    const href=link.getAttribute('href')||'';
+    if(!href||href==='#')return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const isDataImage=href.startsWith('data:image/');
+    if(isDataImage){
+      const title=(link.querySelector('strong')?.textContent||'Documento').trim();
+      const tab=window.open('', '_blank');
+      if(!tab)return;
+      tab.opener=null;
+      tab.document.open();
+      tab.document.write('<!doctype html><html><head><title>'+esc(title)+'</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;min-height:100%;background:#120d0b;color:#f3e7cf}body{display:grid;place-items:center;padding:24px;box-sizing:border-box}img{max-width:100%;max-height:96vh;object-fit:contain;box-shadow:0 18px 60px rgba(0,0,0,.55);border-radius:12px}</style></head><body><img alt="'+esc(title)+'" src="'+href+'"></body></html>');
+      tab.document.close();
+      return;
+    }
+    window.open(href, '_blank', 'noopener');
+  }));
   app.querySelectorAll('[contenteditable="true"]').forEach(el=>el.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();el.blur();}}));
 }
 (async function start(){let data=type==='documents'?baseDocuments():baseSymbols(); try{const local=localStorage.getItem(storageKey); if(local)data=normalize(JSON.parse(local));}catch(e){} try{if(authAvailable())await window.ThalorAuth.init(); if(authAvailable()&&window.ThalorAuth.state.configured){const online=await window.ThalorAuth.loadCharacter(slug,normalize(data)); if(online&&typeof online==='object')data=normalize(online); localStorage.setItem(storageKey,JSON.stringify(data));}}catch(e){console.warn('Archivio load:',e);} render(data,false);})();
