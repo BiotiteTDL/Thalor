@@ -7890,3 +7890,45 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
   .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
   .dynamic-sheet-page .spell-dc-extra-badge span{max-width:38vw;}
 }
+
+/* Diario master edit — solo UI, senza alterare auth/save globali */
+.diary-page .diary-hero{min-height:auto;display:block;text-align:center;padding:56px 0 34px;}
+.diary-page .hero-title{margin-bottom:18px;}
+.diary-top-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:26px auto 24px;max-width:980px;text-align:left;}
+.diary-date-card,.diary-calendar-card{min-height:0;}
+.diary-date-card p,.diary-calendar-card p{margin-bottom:8px;}
+.diary-status{margin-top:16px;}
+.diary-edit-grid .diary-session-card{position:relative;min-height:210px;padding:24px;text-decoration:none;color:inherit;border:1px solid var(--line);background:linear-gradient(155deg,var(--panel),var(--panel2));box-shadow:0 18px 48px rgba(0,0,0,.42);overflow:hidden;}
+.diary-card-link{position:absolute;inset:0;z-index:1;}
+.diary-session-card > *:not(.diary-card-link){position:relative;z-index:2;}
+.diary-session-card h3{color:var(--gold2);margin:0 0 10px;font-size:1.38rem;}
+.diary-session-card p{color:var(--muted);line-height:1.58;margin:0;}
+.diary-lore-list{display:grid;gap:18px;max-width:1050px;margin:0 auto;}
+.diary-lore-panel{padding:0;margin:0;overflow:hidden;}
+.diary-lore-panel summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;color:var(--gold2);}
+.diary-lore-panel summary::-webkit-details-marker{display:none;}
+.diary-lore-panel summary:after{content:'+';font-size:1.7rem;color:var(--muted);flex:0 0 auto;}
+.diary-lore-panel[open] summary:after{content:'–';}
+.diary-lore-panel summary span{font-size:1.35rem;font-weight:bold;}
+.diary-lore-panel summary small{display:block;color:var(--muted);font-size:.86rem;font-weight:normal;text-align:right;}
+.diary-lore-body{border-top:1px solid rgba(200,164,93,.18);padding:clamp(22px,4vw,38px);}
+.diary-lore-body p{margin:0 0 1rem;line-height:1.75;color:var(--muted);}
+.diary-page.diary-editing [contenteditable="true"]{outline:1px dashed rgba(234,213,154,.45);background:rgba(0,0,0,.22);border-radius:8px;padding:4px 7px;}
+.diary-edit-label{display:grid;gap:6px;margin-top:14px;color:var(--gold2);font-size:.85rem;letter-spacing:.04em;}
+.diary-edit-label input,.diary-edit-label textarea{width:100%;border:1px solid rgba(200,164,93,.28);background:rgba(0,0,0,.35);color:var(--text);padding:10px 12px;border-radius:10px;font-family:inherit;}
+.diary-edit-label textarea{min-height:260px;line-height:1.6;resize:vertical;}
+.diary-delete{margin-top:14px;min-width:auto;}
+.diary-floating-actions{z-index:90;}
+@media(max-width:760px){.diary-top-info{grid-template-columns:1fr}.diary-lore-panel summary{display:block}.diary-lore-panel summary small{text-align:left;margin-top:6px}.diary-lore-panel summary:after{float:right;margin-top:-1.6rem}}
+
+/* Diario — Sogni e Visioni collassabili */
+.diary-dreams-shell{max-width:1050px;margin:0 auto;padding:0;overflow:hidden;}
+.diary-dreams-shell > summary{background:linear-gradient(155deg,rgba(46,31,25,.88),rgba(16,12,11,.94));}
+.diary-dreams-body{background:rgba(0,0,0,.08);}
+.diary-dream-list{max-width:none;}
+.diary-dream-panel{background:linear-gradient(155deg,var(--panel),var(--panel2));}
+.diary-dream-panel summary a{color:var(--gold2);text-decoration:none;}
+.diary-dream-panel summary a:hover{text-decoration:underline;}
+.diary-dream-panel .dream-box{white-space:pre-line;color:var(--muted);line-height:1.75;}
+.diary-page.diary-editing .diary-dream-panel .dream-box{white-space:normal;}
+@media(max-width:760px){.diary-dreams-shell > summary{display:block}.diary-dreams-shell > summary small{text-align:left;margin-top:6px}.diary-dreams-shell > summary:after{float:right;margin-top:-1.6rem}}

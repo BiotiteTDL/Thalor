@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Diario — Thalor</title>
-<link rel="stylesheet" href="assets/css/style.css"/>
+<link rel="stylesheet" href="assets/css/style.css?v=diario-master-3"/>
 </head>
 <body>
 <div class="topbar">
@@ -20,40 +20,13 @@
 </nav>
 </div>
 
-<main class="page">
-<section class="hero">
-<span class="tag">Cronache della campagna</span>
-<h1 class="hero-title">Diario</h1>
-<p class="hero-subtitle">Le sessioni giocate, raccolte come cronache consultabili dai personaggi.</p>
-</section>
-
-<section>
-<h2 class="section-title">Sessioni</h2>
-<div class="session-grid">
-
-<a class="session-card" href="diario/sessione1.html">
-<span class="tag">Sessione I</span>
-<h3>La Veglia del Mercante</h3>
-<p>Il funerale di Varek Thorm, il furto del Libro Mastro, la cappella abbandonata e il segreto del Mausoleo dei Thorm.</p>
-</a>
-
-<a class="session-card" href="diario/sessione2.html">
-<span class="tag">Sessione II</span>
-<h3>Il Mare della Pioggia Nera</h3>
-<p>La trattativa con Lyria, il sacrificio dell’alchimista, il viaggio in mare e l’arrivo a Portogrigio.</p>
-</a>
-
-<a class="session-card" href="diario/sessione3.html">
-<span class="tag">Sessione III</span>
-<h3>Il Laboratorio dell’Innesto</h3>
-<p>L’Accademia di Medicina, i laboratori di Otmar, la Crucimigrazione e l’incontro con Abdul Alhazred.</p>
-</a>
-
-</div>
-</section>
-
-<footer>Thalor</footer>
+<main class="page diary-page" id="diaryApp">
+<section class="panel"><h1>Caricamento diario…</h1><p class="section-note">Se questa scritta rimane visibile, controlla la console del browser.</p></section>
 </main>
 <script src="assets/js/main.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase-config.js?v=110"></script>
+<script src="assets/js/supabase-auth.js?v=162"></script>
+<script src="assets/js/diary.js?v=diario-master-3"></script>
 </body>
 </html>
