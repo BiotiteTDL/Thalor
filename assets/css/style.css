@@ -7769,3 +7769,124 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
 #characterSheetApp.no-edit-permission .drag-handle-spacer{
   display:inline-block!important;
 }
+
+/* Patch UX scheda/personaggio — CD extra, ritratto e accesso header */
+.links{align-items:center;}
+.nav .auth-nav-link{margin-left:10px;padding:.48rem 1.05rem;min-height:38px;position:relative;isolation:isolate;background:linear-gradient(135deg,rgba(126,21,28,.72),rgba(218,184,93,.20));border-color:rgba(246,215,145,.55);color:#fff4d9!important;box-shadow:0 10px 26px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,240,200,.14);}
+.nav .auth-nav-link::before{content:"";position:absolute;left:-15px;top:7px;bottom:7px;width:1px;background:rgba(218,184,93,.28);}
+.nav .auth-nav-link:hover,.nav .auth-nav-link:focus-visible{transform:translateY(-1px);background:linear-gradient(135deg,rgba(154,26,35,.86),rgba(218,184,93,.28));box-shadow:0 14px 30px rgba(0,0,0,.34),0 0 0 2px rgba(246,215,145,.10);}
+.pro-portrait-frame{min-height:260px;background:radial-gradient(circle at 65% 35%,#392819,#090706 70%);}
+.pro-portrait-frame img{max-height:none!important;object-fit:cover!important;object-position:center center!important;filter:contrast(1.04) saturate(1.04);}
+.pro-portrait-frame.portrait-abraxas img{object-position:right center!important;}
+.portrait-edit-tools small{display:block;}
+.spell-dc-extra-box{margin:10px 0 12px;padding:12px;border:1px solid rgba(207,166,101,.22);border-radius:16px;background:rgba(9,7,6,.36);}
+.spell-dc-extra-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;color:#f5dfac;}
+.spell-dc-extra-list{display:grid;gap:8px;}
+.spell-dc-extra-row{display:grid;grid-template-columns:minmax(150px,1fr) 92px minmax(190px,1.4fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.035);}
+.spell-dc-extra-row label{font-size:.72rem;color:#cdbb9b;text-transform:uppercase;letter-spacing:.04em;}
+.spell-dc-extra-row input{width:100%;margin-top:4px;}
+.spell-dc-extra-empty{margin:0!important;color:#bda982!important;font-size:.9rem;}
+@media(max-width:860px){.nav .auth-nav-link{margin-left:0;width:100%;}.nav .auth-nav-link::before{display:none}.pro-portrait-frame{min-height:300px}.pro-portrait-frame img{min-height:300px}.spell-dc-extra-row{grid-template-columns:1fr 90px}.spell-dc-extra-row label:nth-child(3){grid-column:1/-1}.spell-dc-extra-row .row-del{grid-column:2;justify-self:end}}
+
+/* v78 — CD aggiuntive visibili accanto alla CD base, senza sovrascriverla */
+.dynamic-sheet-page .spell-dc-extra-badges{
+  display:inline-flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-left:6px;
+}
+.dynamic-sheet-page .spell-dc-extra-badge{
+  display:inline-grid;
+  grid-template-columns:auto auto auto;
+  align-items:center;
+  gap:5px;
+  padding:5px 9px;
+  border:1px solid rgba(207,166,101,.34);
+  border-radius:999px;
+  background:linear-gradient(135deg,rgba(207,166,101,.16),rgba(0,0,0,.24));
+  color:#f3e7d0;
+  font-size:.78rem;
+  line-height:1;
+  white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+}
+.dynamic-sheet-page .spell-dc-extra-badge span{
+  max-width:150px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.dynamic-sheet-page .spell-dc-extra-badge strong{
+  color:var(--sheet-accent);
+  font-weight:900;
+}
+.dynamic-sheet-page .spell-dc-extra-badge em{
+  font-style:normal;
+  color:#cdbb9b;
+  font-size:.72rem;
+}
+@media(max-width:720px){
+  .dynamic-sheet-page .spell-dc-extra-badges{width:100%;justify-content:center;margin:6px 0 0;}
+  .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
+  .dynamic-sheet-page .spell-dc-extra-badge span{max-width:42vw;}
+}
+
+/* v79 — uniforma stile CD aggiuntive al badge CD base, mantenendole distinguibili */
+.dynamic-sheet-page .spell-circle > summary{
+  gap:8px;
+}
+.dynamic-sheet-page .spell-dc-extra-badges{
+  margin-left:0;
+  gap:7px;
+}
+.dynamic-sheet-page .spell-dc-extra-badge{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  min-height:31px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(207,166,101,.26);
+  background:rgba(127,35,31,.34);
+  color:#ffe4c4;
+  font-size:.78rem;
+  line-height:1;
+  font-weight:800;
+  white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,240,200,.08),0 8px 18px rgba(0,0,0,.16);
+}
+/* v80 — rimosso prefisso visivo duplicato: il badge mostra solo Nome + CD valore */
+.dynamic-sheet-page .spell-dc-extra-badge span{
+  max-width:145px;
+  color:#f7e8cb;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.dynamic-sheet-page .spell-dc-extra-badge strong{
+  color:#fff2d2;
+  font-size:.82rem;
+  font-weight:900;
+}
+.dynamic-sheet-page .spell-dc-extra-badge em{
+  margin-left:-2px;
+  padding-left:6px;
+  border-left:1px solid rgba(246,215,145,.18);
+  color:#d6bd8f;
+  font-size:.72rem;
+  font-style:normal;
+  font-weight:800;
+}
+.dynamic-sheet-page.editing .spell-dc-extra-box{
+  border-color:rgba(207,166,101,.26);
+  background:rgba(18,13,10,.58);
+  box-shadow:inset 0 1px 0 rgba(255,240,200,.05);
+}
+.dynamic-sheet-page.editing .spell-dc-extra-row{
+  border-color:rgba(207,166,101,.18);
+  background:rgba(127,35,31,.13);
+}
+@media(max-width:720px){
+  .dynamic-sheet-page .spell-dc-extra-badges{width:100%;justify-content:center;margin:6px 0 0;}
+  .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
+  .dynamic-sheet-page .spell-dc-extra-badge span{max-width:38vw;}
+}
