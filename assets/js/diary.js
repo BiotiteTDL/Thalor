@@ -332,15 +332,18 @@ function bind(data){
   app.querySelectorAll('[contenteditable="true"]').forEach(el=>{el.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey&&el.tagName!=='P'){ev.preventDefault();el.blur();}});});
 }
 (async function start(){
-  let data=fallbackData();
-  try{const local=localStorage.getItem(storageKey);if(local)data=normalize(JSON.parse(local));}catch(e){}
+  let data=fallbackData();let freshLoaded=false;
   try{
     if(authAvailable())await window.ThalorAuth.init();
-    if(authAvailable()&&window.ThalorAuth.state.configured){
-      data=normalize(await window.ThalorAuth.loadCharacter(slug,data));
-      try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){}
+    if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+      const online=await window.ThalorAuth.loadCharacter(slug,null);
+      if(online&&typeof online==='object'){
+        data=normalize(online);freshLoaded=true;
+        try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){}
+      }
     }
-  }catch(e){console.warn('Diario load:',e);}
+  }catch(e){console.warn('Diario load online:',e);}
+  if(!freshLoaded){try{const local=localStorage.getItem(storageKey);if(local)data=normalize(JSON.parse(local));}catch(e){}}
   render(data,false);
 })();
 })();

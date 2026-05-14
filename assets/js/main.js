@@ -90,3 +90,20 @@ document.addEventListener('DOMContentLoaded', function(){
     btn.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' '){ go(e); } });
   });
 });
+
+// v69: su mobile/back-forward cache ricarica i dati dinamici; le immagini restano cacheabili dal browser.
+window.addEventListener('pageshow', function(event){
+  try{
+    if(!event.persisted || navigator.onLine === false) return;
+    var key = 'thalor.bfcache.reload.' + location.pathname + location.search;
+    if(sessionStorage.getItem(key) === '1') return;
+    sessionStorage.setItem(key, '1');
+    location.reload();
+  }catch(e){}
+});
+window.addEventListener('beforeunload', function(){
+  try{
+    var prefix = 'thalor.bfcache.reload.';
+    Object.keys(sessionStorage).forEach(function(k){ if(k.indexOf(prefix)===0) sessionStorage.removeItem(k); });
+  }catch(e){}
+});

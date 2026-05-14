@@ -37,8 +37,16 @@
     body.innerHTML=(data.tabella_xp||[]).map(row=>`<tr><td>${fmt(row.livello)}</td><td class="num">${fmt(row.xp_minimi)}</td><td class="num">${fmt(row.xp_per_arrivarci)}</td></tr>`).join('');
   }
 
-  fetch('../assets/data/xp.json',{cache:'no-store'})
-    .then(r=>r.ok?r.json():Promise.reject(new Error('XP JSON non raggiungibile')))
-    .then(data=>{renderCurrent(data);renderRegister(data);renderLevels(data);})
-    .catch(err=>console.warn('Registro XP non aggiornato dal JSON:',err));
+  (async()=>{
+    let data=null;
+    try{data=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);}catch(e){}
+    try{
+      if(window.ThalorAuth?.init) await window.ThalorAuth.init();
+      if(window.ThalorAuth?.state?.configured && navigator.onLine!==false){
+        const online=await window.ThalorAuth.loadCharacter('xp',null);
+        if(online&&typeof online==='object') data=online;
+      }
+    }catch(err){console.warn('Registro XP online non aggiornato:',err);}
+    if(data){renderCurrent(data);renderRegister(data);renderLevels(data);}
+  })();
 })();

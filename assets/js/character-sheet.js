@@ -1100,7 +1100,7 @@ function showBonusModal(path,baseData,xpData,compendium){
   };
 }
 
-function loadJson(url){return fetch(url).then(r=>r.ok?r.json():null).catch(()=>null)}
+function loadJson(url){return fetch(url,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null)}
 const XP_STORAGE_KEY='thalor.xp.v1';
 const XP_DEFAULT_NAMES=[['ralph','Ralph','Alessandro'],['abraxas','Abraxas','Carlo'],['igor','Igor','Gerry'],['arolf','Arolf','Ivan'],['irven','Irven','Ettore']];
 function xpRoster(data){
@@ -1165,15 +1165,18 @@ function chooseBestXpData(current,candidate,label){
   return cand;
 }
 async function loadUnifiedXpData(fallback){
-  let data=normalizeXpSource(fallback||{});
-  try{const local=safeJsonParse(localStorage.getItem(XP_STORAGE_KEY)); data=chooseBestXpData(data,local,'localStorage');}catch(e){}
+  let data=normalizeXpSource(fallback||{});let freshLoaded=false;
   try{
-    if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured){
-      const online=await window.ThalorAuth.loadCharacter('xp', data);
-      data=chooseBestXpData(data,online,'Supabase');
-      localStorage.setItem(XP_STORAGE_KEY,JSON.stringify(data));
+    if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+      const online=await window.ThalorAuth.loadCharacter('xp', null);
+      if(xpMeaningful(online)){
+        data=chooseBestXpData(data,online,'Supabase');
+        freshLoaded=true;
+        localStorage.setItem(XP_STORAGE_KEY,JSON.stringify(data));
+      }
     }
-  }catch(e){console.warn('Caricamento EXP unificato non riuscito:',e);}
+  }catch(e){console.warn('Caricamento EXP online non riuscito:',e);}
+  if(!freshLoaded){try{const local=safeJsonParse(localStorage.getItem(XP_STORAGE_KEY)); data=chooseBestXpData(data,local,'localStorage fallback');}catch(e){}}
   return data;
 }
 

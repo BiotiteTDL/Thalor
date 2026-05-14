@@ -520,20 +520,34 @@
 
   async function loadCharacter(slug, fallback){
     await init();
-    if(!state.configured || !state.client) return fallback;
+    if(!state.configured) return fallback;
 
-    const res = await state.client
-      .from('character_sheets')
-      .select('data')
-      .eq('slug', slug)
-      .maybeSingle();
-
-    if(res.error){
-      console.warn('Supabase loadCharacter:', res.error);
+    // Lettura sempre fresca: la cache del browser/localStorage deve essere solo un fallback offline.
+    // Usiamo PostgREST diretto con cache:no-store, così anche da mobile un refresh rilegge Supabase.
+    try{
+      const base = restBaseUrl();
+      const token = state.session?.access_token || cfg.anonKey;
+      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1';
+      const { response, body } = await timeoutFetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': cfg.anonKey,
+          'Authorization': 'Bearer ' + token,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        cache: 'no-store'
+      }, 12000, 'Lettura Supabase');
+      if(!response.ok){
+        console.warn('Supabase loadCharacter HTTP:', response.status, body);
+        return fallback;
+      }
+      const rows = body ? JSON.parse(body) : [];
+      return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
+    }catch(err){
+      console.warn('Supabase loadCharacter:', err);
       return fallback;
     }
-
-    return res.data?.data || fallback;
   }
 
   async function saveCharacter(slug, data){

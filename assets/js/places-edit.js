@@ -2,6 +2,8 @@
 'use strict';
 
 const STORAGE_KEY = 'thalor.places.v1';
+const PLACES_SLUG = '__places__';
+let CURRENT_DATA = null;
 const FALLBACK = {
   version: 2,
   places: [
@@ -112,14 +114,30 @@ function enrichData(data){
   copy.version = Math.max(Number(copy.version||1), Number(FALLBACK.version||1));
   return copy;
 }
-function load(){
+function load(){ return CURRENT_DATA || JSON.parse(JSON.stringify(FALLBACK)); }
+async function loadFresh(){
+  let data = JSON.parse(JSON.stringify(FALLBACK));
+  let freshLoaded = false;
   try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(raw){ const parsed = JSON.parse(raw); if(parsed && Array.isArray(parsed.places)) return enrichData(parsed); }
-  }catch(e){}
-  return JSON.parse(JSON.stringify(FALLBACK));
+    if(window.ThalorAuth?.init) await window.ThalorAuth.init();
+    if(window.ThalorAuth?.state?.configured && navigator.onLine !== false){
+      const online = await window.ThalorAuth.loadCharacter(PLACES_SLUG, null);
+      if(online && Array.isArray(online.places)){
+        data = enrichData(online); freshLoaded = true;
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}
+      }
+    }
+  }catch(e){ console.warn('Luoghi online non disponibili, uso fallback locale:', e); }
+  if(!freshLoaded){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){ const parsed = JSON.parse(raw); if(parsed && Array.isArray(parsed.places)) data = enrichData(parsed); }
+    }catch(e){}
+  }
+  CURRENT_DATA = data;
+  return CURRENT_DATA;
 }
-function save(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+function save(data){ CURRENT_DATA = enrichData(data); localStorage.setItem(STORAGE_KEY, JSON.stringify(CURRENT_DATA)); if(window.ThalorAuth?.state?.configured && !window.ThalorAuth.state.localMaster && navigator.onLine !== false){ window.ThalorAuth.saveCharacter(PLACES_SLUG, CURRENT_DATA).catch(e=>console.warn('Salvataggio luoghi online non riuscito:', e)); } }
 function findPlace(slug){ return load().places.find(p=>p.slug===slug) || FALLBACK.places.find(p=>p.slug===slug); }
 function isLocalPreview(){
   try{
@@ -330,6 +348,7 @@ async function ensureFloatingEditor(place){
 }
 async function init(){
   document.body.classList.add('places-edit-ready');
+  await loadFresh();
   if(document.querySelector('[data-places-index]')) renderIndex();
   const slug=currentSlug();
   let place=slug?findPlace(slug):null;
