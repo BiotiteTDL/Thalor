@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Thalor — Accesso</title>
-  <link href="assets/css/style.css?v=154" rel="stylesheet"/>
+  <link href="assets/css/style.css?v=160" rel="stylesheet"/>
 
 <style>
 .auth-actions-clean .button{
@@ -76,25 +76,32 @@
   <script src="assets/js/supabase-auth.js?v=162"></script>
   <script>
   (async()=>{
-    await window.ThalorAuth.init();
     const st=document.getElementById('authStatus');
     const form=document.getElementById('authForm');
     const localTools=document.getElementById('localMasterTools');
     const localNote=document.getElementById('localMasterNote');
-    const shouldShowOfflineMasterTools=()=>{
-      const isLocal=window.ThalorAuth.isLocalPreview && window.ThalorAuth.isLocalPreview();
-      const isFile=location.protocol==='file:';
-      const browserOffline=navigator.onLine===false;
-      return !!isLocal && (isFile || browserOffline);
-    };
-    const refresh=()=>{
-      st.textContent=window.ThalorAuth.statusText();
+    const shouldShowOfflineMasterTools=()=>navigator.onLine===false;
+    const applyOfflineMasterVisibility=()=>{
       const showOfflineTools=shouldShowOfflineMasterTools();
+      document.documentElement.classList.toggle('offline-master-available', showOfflineTools);
+      document.body.classList.toggle('offline-master-available', showOfflineTools);
       if(localTools)localTools.hidden=!showOfflineTools;
       if(localNote)localNote.hidden=!showOfflineTools;
     };
+    const refresh=()=>{
+      applyOfflineMasterVisibility();
+      if(st && window.ThalorAuth && typeof window.ThalorAuth.statusText==='function'){
+        st.textContent=window.ThalorAuth.statusText();
+      }
+    };
     window.addEventListener('online', refresh);
     window.addEventListener('offline', refresh);
+    applyOfflineMasterVisibility();
+    try{
+      await window.ThalorAuth.init();
+    }catch(e){
+      if(st)st.textContent='Modalità offline disponibile.';
+    }
     refresh();
     async function doLogin(){
       try{

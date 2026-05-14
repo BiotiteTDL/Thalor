@@ -9,9 +9,27 @@ const storageKey=isCompanion?`thalor.sheet.${slug}.companion.${companionIndex}.v
 const oldKeys=isCompanion?[]:[`thalor.sheet.${slug}.v4`,`thalor.sheet.${slug}.v3`,`thalor.sheet.${slug}.v2`];
 let authState={configured:false,ready:false};
 function authAvailable(){return !!window.ThalorAuth;}
-function sheetCanEdit(){return !authAvailable() || window.ThalorAuth.canEdit(slug);}
+function authNorm(v){return String(v||'').trim().toLowerCase();}
+function authLocalPreview(){const h=location.hostname;return location.protocol==='file:'||h==='localhost'||h==='127.0.0.1'||h==='';}
+function sheetHasDirectAccess(auth){
+  const st=auth?.state||{};
+  const wanted=authNorm(slug);
+  return !!(st.access||[]).find(a=>authNorm(a.character_slug)===wanted&&a.can_edit===true);
+}
+function sheetCanEdit(){
+  const auth=window.ThalorAuth;
+  if(!auth) return false;
+  const st=auth.state||{};
+  if(st.localMaster) return true;
+  if(authNorm(st.profile?.role)==='master') return true;
+  if(sheetHasDirectAccess(auth)) return true;
+  // In locale/preview NON rendere tutto modificabile automaticamente: serve Master offline o ruolo della scheda.
+  // Non modifica ThalorAuth.canEdit né la logica Supabase, limita solo la UI della scheda.
+  if(authLocalPreview()) return false;
+  return !!auth.canEdit(slug);
+}
 async function refreshEditPermission(){
-  if(!authAvailable()) return true;
+  if(!authAvailable()) return false;
   if(sheetCanEdit()) return true;
   try{ await window.ThalorAuth.init(true); }catch(e){ console.warn('Auth recheck failed:', e); }
   return sheetCanEdit();
@@ -116,6 +134,8 @@ const CONDITION_LIBRARY={
 };
 const conditionOptions=()=>Object.keys(CONDITION_LIBRARY).map(k=>`<option value="${esc(k)}"></option>`).join('');
 function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));}
+function internalHref(href){const raw=String(href||'').trim();if(!raw)return '#';if(/^(javascript:|data:|vbscript:|https?:|mailto:|tel:|\/\/)/i.test(raw))return '#';return raw.replace(/["'<>\s]/g,'');}
+function richText(v){return esc(v).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g,(_,label,href)=>`<a class="lore-link" href="${esc(internalHref(href))}">${esc(label)}</a>`);}
 function num(v){const n=parseFloat(String(v??0).replace('+','').replace(',','.').replace(/[^0-9+\-.]/g,''));return isNaN(n)?0:n}
 function sign(n){n=Math.trunc(Number(n)||0);return n>=0?'+'+n:String(n)}
 function mod(score,temp=0){return Math.floor((num(score)+num(temp)-10)/2)}
@@ -202,20 +222,10 @@ function levelFrom(d){return Math.max(totalLevel(d),num(d.xpInfo?.xpLevel)||0)}
 function defaultXpThreshold(level){level=Math.max(1,num(level)||1);return Math.floor((level*(level-1)/2)*1000)}
 function xpThreshold(table,level){level=Math.max(1,num(level)||1);const row=(table||[]).find(r=>num(r.livello)===level);const val=num(row?.xp_minimi);if(row && (level===1 || val>0))return val;return defaultXpThreshold(level)}
 function xpLevelFromXp(table,xp){xp=Math.max(0,num(xp));let lvl=1;const max=Math.max(20,...(table||[]).map(r=>num(r.livello)||0));for(let l=1;l<=max+1;l++){if(xp>=xpThreshold(table,l))lvl=l;else break;}return Math.max(1,lvl)}
-function xpRegistryMeaningful(data){return !!(data&&Array.isArray(data.registro_xp)&&data.registro_xp.length&&Array.isArray(data.tabella_xp)&&data.tabella_xp.length)}
-function loadLocalXpRegistry(fallback){
-  try{
-    const raw=localStorage.getItem('thalor.xp.v1');
-    if(!raw)return fallback;
-    const parsed=JSON.parse(raw);
-    return xpRegistryMeaningful(parsed)?parsed:fallback;
-  }catch(e){return fallback;}
-}
 function xpCalc(d,xpData){
-  const pdata=(!isCompanion && xpData?.personaggi)?(xpData.personaggi[slug]||{}):{};
+  const pdata=xpData?.personaggi?.[slug]||{};
   const rawXp=String(d.identity?.xp??'').trim();
-  const centralXp=Number.isFinite(Number(pdata.xp_totali))?num(pdata.xp_totali):null;
-  const xp=centralXp!==null?centralXp:(/[0-9]/.test(rawXp)?num(rawXp):0);
+  const xp=/[0-9]/.test(rawXp)?num(rawXp):num(pdata.xp_totali);
   const table=(xpData?.tabella_xp||[]).slice().sort((a,b)=>num(a.livello)-num(b.livello));
   const classLevel=Math.max(1,totalLevel(d));
   const xpLevel=xpLevelFromXp(table,xp);
@@ -235,11 +245,11 @@ function xpCalc(d,xpData){
     canLevel:xpLevel>classLevel, mismatch:xpLevel!==classLevel
   };
 }
-function inp(path,v,type='text',cls=''){return `<input class="${cls}" data-path="${esc(path)}" type="${type}" value="${esc(v??'')}" disabled><span class="display-value ${cls}">${esc(v??'')}</span>`}
-function area(path,v,cls=''){return `<textarea class="${cls}" data-path="${esc(path)}" disabled>${esc(v??'')}</textarea><span class="display-value display-area ${cls}">${esc(v??'')}</span>`}
+function inp(path,v,type='text',cls=''){return `<input class="${cls}" data-path="${esc(path)}" type="${type}" value="${esc(v??'')}" disabled><span class="display-value ${cls}">${richText(v??'')}</span>`}
+function area(path,v,cls=''){return `<textarea class="${cls}" data-path="${esc(path)}" disabled>${esc(v??'')}</textarea><span class="display-value display-area ${cls}">${richText(v??'')}</span>`}
 function sel(path,val,std,allowBlank=false){val=val||'';const label=AB.map(([k,l])=>`${k} - ${l}${k===std?' ★ standard':''} (${sign(window.__thalorCurrentData?abilityMod(window.__thalorCurrentData,k):0)})`);const blankOpt=allowBlank?`<option value="" ${!val?'selected':''}>— Nessuna caratteristica —</option>`:'';const shown=val?((AB.find(([k])=>k===val)?.[0]||val)+' '+(val===std&&std?'★ ':'')+'('+sign(window.__thalorCurrentData?abilityMod(window.__thalorCurrentData,val):0)+')'):'—';return `<select data-path="${esc(path)}" disabled>${blankOpt}${AB.map(([k,l],i)=>`<option value="${k}" ${k===val?'selected':''}>${label[i]}</option>`).join('')}</select><span class="display-value select-display">${esc(shown)}</span>`}
 function yesNo(path,val){const v=String(val||'No'); const yes=(v==='Sì'||v==='true'||v===true); return `<select class="yes-no-select" data-path="${esc(path)}" disabled><option value="Sì" ${yes?'selected':''}>Sì</option><option value="No" ${!yes?'selected':''}>No</option></select><span class="display-value select-display yes-no-display ${yes?'is-yes':'is-no'}">${esc(yes?'Sì':'No')}</span>`}
-function readonly(v){return `<output>${esc(v)}</output>`}
+function readonly(v){return `<output>${richText(v)}</output>`}
 function tipText(x,f='Descrizione da aggiungere.'){const p=[];const desc=String(x?.description||x?.notes||'').trim();const source=String(x?.source||'').trim();if(desc)p.push(desc);if(source)p.push(`Fonte / note:\n${source}`);return p.length?p.join('\n\n'):f}
 function setPath(obj,path,value){let p=path.split('.'),o=obj;for(let i=0;i<p.length-1;i++){let k=p[i],n=p[i+1];if(!(k in o)||o[k]==null)o[k]=/^\d+$/.test(n)?[]:{};o=o[k];}o[p.at(-1)]=value}
 function collect(data){let c=JSON.parse(JSON.stringify(data));document.querySelectorAll('[data-path]').forEach(el=>{let val=(el.type==='number')?num(el.value):el.value;setPath(c,el.dataset.path,val)});return c}
@@ -295,7 +305,7 @@ function section(title,inner,opts={}){const sid=String(title||'sezione').toLower
 function hero(d){let can=sheetCanEdit();const returnLink=`<a class="button primary-action profile-return" href="${esc(isCompanion?`scheda-${slug}.html`:(d.meta?.profileUrl||'../personaggi.html'))}">${isCompanion?'Torna alla scheda principale':'Torna al profilo'}</a>`;const ownerTools=can?`<a class="button ghost-button primary-action" href="../auth.html">Accesso</a>`:'';return `<section class="dynamic-hero sheet-theme-panel"><div class="dynamic-crest">${esc(d.meta?.crest||'✦')}</div><div class="hero-main"><span class="tag">${isCompanion?'Scheda secondaria collegata':'Scheda personaggio — WorldAnvil style'}</span><h1 class="section-title">${inp('identity.name',d.identity?.name||'')}</h1><p class="section-note">${esc(d.meta?.subtitle||d.meta?.status||'')}</p><div class="actions sheet-actions">${returnLink}${ownerTools}</div><p class="sheet-status auth-status-line">${esc(authStatusText())}</p><p class="sheet-status" id="localStatus">${can?'Pronto.':'Solo lettura: accedi con il proprietario o Master.'}</p></div></section>`}
 function statBlock(obj,prefix,keys){return `<div class="sheet-stat-grid">${keys.map(([k,l])=>`<div class="sheet-stat"><span>${l}</span>${inp(prefix+'.'+k,obj?.[k]||'')}</div>`).join('')}</div>`}
 function xpPanel(d){const x=d.xpInfo;if(!x)return '';const pct=Math.max(0,Math.min(100,Number(x.progress)||0));return `<article class="panel sheet-theme-panel xp-panel"><h2>Esperienza e livello</h2><div class="computed-row"><div><span>Livello</span><strong>${x.level}</strong></div><div><span>PX totali</span><strong>${x.xp}</strong></div><div><span>Soglia liv. ${x.currentLevel}</span><strong>${x.currentXp}</strong></div><div><span>Soglia liv. ${x.nextLevel}</span><strong>${x.nextXp}</strong></div><div><span>Mancano</span><strong>${x.missing}</strong></div></div><div class="xpbar" title="${esc(x.progressLabel)} verso il prossimo livello" style="--xp:${pct}%"><i style="width:${pct}%"></i><span>${esc(x.progressLabel)}</span></div>${x.canLevel?`<p class="levelup-warning">Puoi salire di livello: i PX corrispondono almeno al livello ${x.xpLevel}.</p>`:''}<p class="section-mini-note">Barra calcolata dalla soglia del livello attuale alla soglia del prossimo livello, usando la somma di Classi/CdP come livello corrente.</p></article>`}
-function identityProgressPanel(d){const x=d.xpInfo;if(!x)return '';const pct=Math.max(0,Math.min(100,Number(x.progress)||0));return `<div class="identity-progress-card"><div class="identity-progress-top"><div class="sheet-stat identity-xp-edit is-readonly"><span>Esperienza</span><strong>${esc(x.xp||0)}</strong><small>Gestita dal registro EXP</small></div><div class="identity-level-badge"><span>Livello</span><strong>${x.level}</strong></div></div><div class="xpbar compact" title="${esc(x.progressLabel)} verso il prossimo livello" style="--xp:${pct}%"><i style="width:${pct}%"></i><span>${esc(x.progressLabel)}</span></div><div class="identity-progress-meta"><span>Mancano ${esc(x.missing)}</span><span>Prossimo livello ${esc(x.nextLevel)}</span></div>${x.canLevel?`<p class="levelup-warning compact-warning">PX sufficienti per il livello ${x.xpLevel}.</p>`:''}</div>`}
+function identityProgressPanel(d){const x=d.xpInfo;if(!x)return '';const pct=Math.max(0,Math.min(100,Number(x.progress)||0));return `<div class="identity-progress-card"><div class="identity-progress-top"><div class="sheet-stat identity-xp-edit is-readonly"><span>Esperienza</span><strong>${esc(d.identity?.xp||0)}</strong><small>Gestita dal file sorgente</small></div><div class="identity-level-badge"><span>Livello</span><strong>${x.level}</strong></div></div><div class="xpbar compact" title="${esc(x.progressLabel)} verso il prossimo livello" style="--xp:${pct}%"><i style="width:${pct}%"></i><span>${esc(x.progressLabel)}</span></div><div class="identity-progress-meta"><span>Mancano ${esc(x.missing)}</span><span>Prossimo livello ${esc(x.nextLevel)}</span></div>${x.canLevel?`<p class="levelup-warning compact-warning">PX sufficienti per il livello ${x.xpLevel}.</p>`:''}</div>`}
 
 function proIdentityLine(d){
   const parts=[classSummary(d), d.identity?.race, d.identity?.alignment].map(x=>String(x||'').trim()).filter(Boolean);
@@ -309,7 +319,7 @@ function proTopStats(d){
     ['BAB', sign(num(cb.bab)), 'Base attacco', 'Lotta '+sign(c.grapple)],
     ['Iniziativa', sign(c.init), 'Round', 'DES '+sign(c.dex)],
     ['Velocità', cb.speed||'—', 'Movimento', c.ct.speedHalf?'Dimezzata da condizione':'Normale'],
-    ['Livello', totalLevel(d), 'Personaggio', `${esc((d.xpInfo?.xp??d.identity?.xp)||0)} PX`]
+    ['Livello', totalLevel(d), 'Personaggio', `${esc(d.identity?.xp||0)} PX`]
   ];
   return `<section class="pro-stat-ribbon" aria-label="Statistiche principali">${stats.map(([label,value,sub,meta])=>`<article class="pro-stat-card"><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(sub)}</small><em>${esc(meta)}</em></article>`).join('')}</section>`;
 }
@@ -1098,25 +1108,16 @@ function loadJson(url){return fetch(url).then(r=>r.ok?r.json():null).catch(()=>n
   try{
     if(authAvailable()) await window.ThalorAuth.init();
     let [base,xp,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
-    xp=loadLocalXpRegistry(xp);
     base=base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
+    let local=localStorage.getItem(parentStorageKey)||oldKeys.map(k=>localStorage.getItem(k)).find(Boolean);
+    if(!base && local) base=JSON.parse(local);
     if(!base)throw new Error('Dati scheda non trovati.');
     window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
-    let local=localStorage.getItem(parentStorageKey)||oldKeys.map(k=>localStorage.getItem(k)).find(Boolean);
     let sheetData=local?JSON.parse(local):base;
     if(authAvailable() && window.ThalorAuth.state.configured){
       sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData);
       localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData)));
-      try{
-        const onlineXp=await window.ThalorAuth.loadCharacter('xp', xp);
-        if(xpRegistryMeaningful(onlineXp)){
-          xp=onlineXp;
-          localStorage.setItem('thalor.xp.v1',JSON.stringify(onlineXp));
-        }else{
-          xp=loadLocalXpRegistry(xp);
-        }
-      }catch(xpErr){console.warn('XP centrale non disponibile:', xpErr);}
     }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}

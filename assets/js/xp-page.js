@@ -10,6 +10,8 @@
     return n.toLocaleString('it-IT');
   };
   const esc=(s)=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const internalHref=(href)=>{const raw=String(href||'').trim();if(!raw)return '#';if(/^(javascript:|data:|vbscript:|https?:|mailto:|tel:|\/\/)/i.test(raw))return '#';return raw.replace(/["'<>\s]/g,'');};
+  const richText=(v)=>esc(v).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g,(_,label,href)=>`<a class="lore-link" href="${esc(internalHref(href))}">${esc(label)}</a>`);
   const slugs=['ralph','abraxas','igor','arolf','irven'];
   const names={ralph:'Ralph',abraxas:'Abraxas',igor:'Igor',arolf:'Arolf',irven:'Irven'};
 
@@ -19,14 +21,14 @@
     const people=data.personaggi||{};
     body.innerHTML=slugs.map(slug=>{
       const p=people[slug]||{};
-      return `<tr><td>${esc(p.giocatore||'')}</td><td><a class="lore-link" href="../personaggi/${slug}.html">${esc(p.personaggio||names[slug]||slug)}</a></td><td class="num">${fmt(p.xp_totali)}</td><td class="num">${fmt(p.livello)}</td><td class="num">${fmt(p.xp_mancanti)}</td></tr>`;
+      return `<tr><td>${richText(p.giocatore||'')}</td><td><a class="lore-link" href="../personaggi/${slug}.html">${richText(p.personaggio||names[slug]||slug)}</a></td><td class="num">${fmt(p.xp_totali)}</td><td class="num">${fmt(p.livello)}</td><td class="num">${fmt(p.xp_mancanti)}</td></tr>`;
     }).join('');
   }
 
   function renderRegister(data){
     const body=document.getElementById('xpRegisterBody');
     if(!body) return;
-    body.innerHTML=(data.registro_xp||[]).map(row=>`<tr><td>${esc(row.evento||'')}</td>${slugs.map(slug=>`<td class="num ${row[slug]==null?'muted':''}">${fmt(row[slug])}</td>`).join('')}</tr>`).join('');
+    body.innerHTML=(data.registro_xp||[]).map(row=>`<tr><td>${richText(row.evento||'')}</td>${slugs.map(slug=>`<td class="num ${row[slug]==null?'muted':''}">${fmt(row[slug])}</td>`).join('')}</tr>`).join('');
   }
 
   function renderLevels(data){

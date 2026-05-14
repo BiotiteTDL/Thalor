@@ -4,6 +4,8 @@ const app=document.getElementById('diaryApp');
 const slug='diario';
 const storageKey='thalor.diary.v1';
 const esc=(v)=>String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const internalHref=(href)=>{const raw=String(href||'').trim();if(!raw)return '#';if(/^(javascript:|data:|vbscript:|https?:|mailto:|tel:|\/\/)/i.test(raw))return '#';return raw.replace(/["'<>\s]/g,'');};
+const richText=(v)=>esc(v).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g,(_,label,href)=>`<a class="lore-link" href="${esc(internalHref(href))}">${esc(label)}</a>`);
 const nl=(v)=>String(v??'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
 const makeSessionId=(value)=>String(value||'sessione').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,56)||('sessione-'+Date.now());
 const sessionDetailHref=(id)=>`diario/sessione-dettaglio.html?id=${encodeURIComponent(String(id||''))}`;
@@ -221,23 +223,23 @@ function render(data,editing=false){
     <span class="tag">Cronache della campagna</span>
     <h1 class="hero-title">Diario</h1>
     <div class="diary-top-info">
-      <article class="card diary-date-card"><div class="icon">☉</div><h3>Data attuale</h3><p${eattr} data-diary-field="currentDate">${esc(data.currentDate)}</p><p class="muted"${eattr} data-diary-field="dateNote">${esc(data.dateNote)}</p></article>
-      <article class="card diary-calendar-card"><div class="icon">☽</div><h3>Calendario</h3><p${eattr} data-diary-field="months">${esc(data.months.join(', '))}</p><div class="meta" data-weekdays>${data.weekdays.map((d,i)=>`<span class="pill"${eattr} ${fieldAttrs('weekday',i,'weekday')}>${esc(d)}</span>`).join('')}</div></article>
+      <article class="card diary-date-card"><div class="icon">☉</div><h3>Data attuale</h3><p${eattr} data-diary-field="currentDate">${edit?esc(data.currentDate):richText(data.currentDate)}</p><p class="muted"${eattr} data-diary-field="dateNote">${edit?esc(data.dateNote):richText(data.dateNote)}</p></article>
+      <article class="card diary-calendar-card"><div class="icon">☽</div><h3>Calendario</h3><p${eattr} data-diary-field="months">${edit?esc(data.months.join(', ')):richText(data.months.join(', '))}</p><div class="meta" data-weekdays>${data.weekdays.map((d,i)=>`<span class="pill"${eattr} ${fieldAttrs('weekday',i,'weekday')}>${edit?esc(d):richText(d)}</span>`).join('')}</div></article>
     </div>
     <p class="hero-subtitle">Le sessioni giocate, raccolte come cronache consultabili dai personaggi.</p>
   </section>
   <section class="diary-section" data-diary-sessions>
     <h2 class="section-title">Sessioni</h2>
     <div class="session-grid diary-edit-grid">
-      ${data.sessions.map((s,i)=>{const href=s.href&&s.href!=='#'?s.href:sessionDetailHref(s.id);return `<article class="session-card diary-session-card" data-session-index="${i}"><span class="tag"${eattr} ${fieldAttrs('tag',i,'session')}>${esc(s.tag)}</span><h3${eattr} ${fieldAttrs('title',i,'session')}>${esc(s.title)}</h3><p${eattr} ${fieldAttrs('description',i,'session')}>${esc(s.description)}</p>${edit?`<label class="diary-edit-label">Link pagina <input value="${esc(href)}" ${fieldAttrs('href',i,'session')}></label><label class="diary-edit-label wide diary-session-detail-edit">Testo pagina dettaglio <textarea ${fieldAttrs('detailBody',i,'session')}>${esc(s.detailBody||s.description||'')}</textarea></label><a class="button ghost-button diary-open-detail" href="${esc(href)}">Apri pagina</a><button type="button" class="row-del diary-delete" data-delete-session="${i}">×</button>`:`<a class="diary-card-link" href="${esc(href)}" aria-label="Apri ${esc(s.title)}"></a>`}</article>`}).join('')}
+      ${data.sessions.map((s,i)=>{const href=s.href&&s.href!=='#'?s.href:sessionDetailHref(s.id);return `<article class="session-card diary-session-card" data-session-index="${i}"><span class="tag"${eattr} ${fieldAttrs('tag',i,'session')}>${edit?esc(s.tag):richText(s.tag)}</span><h3${eattr} ${fieldAttrs('title',i,'session')}>${edit?esc(s.title):richText(s.title)}</h3><p${eattr} ${fieldAttrs('description',i,'session')}>${edit?esc(s.description):richText(s.description)}</p>${edit?`<label class="diary-edit-label">Link pagina <input value="${esc(href)}" ${fieldAttrs('href',i,'session')}></label><label class="diary-edit-label wide diary-session-detail-edit">Testo pagina dettaglio <textarea ${fieldAttrs('detailBody',i,'session')}>${esc(s.detailBody||s.description||'')}</textarea></label><a class="button ghost-button diary-open-detail" href="${esc(href)}">Apri pagina</a><button type="button" class="row-del diary-delete" data-delete-session="${i}">×</button>`:`<a class="diary-card-link" href="${esc(href)}" aria-label="Apri ${esc(s.title)}"></a>`}</article>`}).join('')}
     </div>
   </section>
   <section class="diary-section" data-diary-dreams>
     <details class="panel diary-lore-panel diary-dreams-shell">
-      <summary><span>Sogni e Visioni</span><small>Visioni ricevute dai protagonisti e presagi emersi durante la campagna.</small></summary>
+      <summary><span>Sogni e visioni</span><small>Presagi, sogni e visioni ricevuti dai protagonisti durante la campagna.</small></summary>
       <div class="diary-lore-body diary-dreams-body">
         <div class="diary-lore-list diary-dream-list">
-          ${data.dreamSections.map((d,i)=>`<details class="panel lore-panel diary-lore-panel diary-dream-panel" data-dream-index="${i}"><summary><span>${edit?`<span${eattr} ${fieldAttrs('character',i,'dream')}>${esc(d.character)}</span>`:`<a class="lore-link" href="${esc(d.characterUrl)}">${esc(d.character)}</a>`}</span><small${eattr} ${fieldAttrs('title',i,'dream')}>${esc(d.title)}</small></summary><div class="diary-lore-body dream-box">${edit?`<label class="diary-edit-label">Link personaggio <input value="${esc(d.characterUrl)}" ${fieldAttrs('characterUrl',i,'dream')}></label><label class="diary-edit-label wide">Testo visione <textarea ${fieldAttrs('body',i,'dream')}>${esc(d.body)}</textarea></label><button type="button" class="row-del diary-delete" data-delete-dream="${i}">×</button>`:esc(d.body)}</div></details>`).join('')}
+          ${data.dreamSections.map((d,i)=>`<details class="panel lore-panel diary-lore-panel diary-dream-panel" data-dream-index="${i}"><summary><span>${edit?`<span${eattr} ${fieldAttrs('character',i,'dream')}>${esc(d.character)}</span>`:`<a class="lore-link" href="${esc(internalHref(d.characterUrl))}">${richText(d.character)}</a>`}</span><small${eattr} ${fieldAttrs('title',i,'dream')}>${edit?esc(d.title):richText(d.title)}</small></summary><div class="diary-lore-body dream-box">${edit?`<label class="diary-edit-label">Link personaggio <input value="${esc(d.characterUrl)}" ${fieldAttrs('characterUrl',i,'dream')}></label><label class="diary-edit-label wide">Testo visione <textarea ${fieldAttrs('body',i,'dream')}>${esc(d.body)}</textarea></label><button type="button" class="row-del diary-delete" data-delete-dream="${i}">×</button>`:richText(d.body)}</div></details>`).join('')}
         </div>
       </div>
     </details>
@@ -246,7 +248,7 @@ function render(data,editing=false){
     <h2 class="section-title">Lore</h2>
     <p class="section-note">Cronache pubbliche e riferimenti noti della campagna.</p>
     <div class="diary-lore-list">
-      ${data.loreSections.map((l,i)=>`<details class="panel lore-panel diary-lore-panel" ${i===0?'open':''} data-lore-index="${i}"><summary><span${eattr} ${fieldAttrs('title',i,'lore')}>${esc(l.title)}</span><small${eattr} ${fieldAttrs('subtitle',i,'lore')}>${esc(l.subtitle||'')}</small></summary><div class="diary-lore-body">${edit?`<label class="diary-edit-label wide">Testo sezione <textarea ${fieldAttrs('paragraphs',i,'lore')}>${esc(paragraphText(l.paragraphs))}</textarea></label><button type="button" class="row-del diary-delete" data-delete-lore="${i}">Elimina sezione</button>`:(l.paragraphs||[]).map(p=>`<p>${esc(p)}</p>`).join('')}</div></details>`).join('')}
+      ${data.loreSections.map((l,i)=>`<details class="panel lore-panel diary-lore-panel" ${i===0?'open':''} data-lore-index="${i}"><summary><span${eattr} ${fieldAttrs('title',i,'lore')}>${edit?esc(l.title):richText(l.title)}</span><small${eattr} ${fieldAttrs('subtitle',i,'lore')}>${edit?esc(l.subtitle||''):richText(l.subtitle||'')}</small></summary><div class="diary-lore-body">${edit?`<label class="diary-edit-label wide">Testo sezione <textarea ${fieldAttrs('paragraphs',i,'lore')}>${esc(paragraphText(l.paragraphs))}</textarea></label><button type="button" class="row-del diary-delete" data-delete-lore="${i}">Elimina sezione</button>`:(l.paragraphs||[]).map(p=>`<p>${richText(p)}</p>`).join('')}</div></details>`).join('')}
     </div>
   </section>
   <footer>Thalor</footer>
@@ -297,6 +299,20 @@ async function saveDiary(data){
   try{return await saveInFlight;}finally{saveInFlight=null;}
 }
 function bind(data){
+  // In visualizzazione normale l'intero riquadro sessione apre la pagina dettaglio.
+  // Non interviene in modalità modifica e non tocca salvataggi/auth/Supabase.
+  if(!app.classList.contains('diary-editing')){
+    app.querySelectorAll('.diary-session-card').forEach(card=>{
+      const link=card.querySelector('.diary-card-link, .diary-open-detail');
+      const href=link&&link.getAttribute('href');
+      if(!href||href==='#')return;
+      card.style.cursor='pointer';
+      card.addEventListener('click',ev=>{
+        if(ev.target.closest('a,button,input,textarea,select,label,[contenteditable="true"]'))return;
+        window.location.href=href;
+      });
+    });
+  }
   const nav=document.querySelector('.diary-floating-actions');
   const toggle=document.getElementById('sheetFloatingToggle');
   if(toggle)toggle.onclick=()=>{const open=nav.classList.toggle('open');toggle.setAttribute('aria-expanded',String(open));};

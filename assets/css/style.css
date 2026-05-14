@@ -7770,361 +7770,791 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
   display:inline-block!important;
 }
 
-/* Patch UX scheda/personaggio — CD extra, ritratto e accesso header */
-.links{align-items:center;}
-.nav .auth-nav-link{margin-left:10px;padding:.48rem 1.05rem;min-height:38px;position:relative;isolation:isolate;background:linear-gradient(135deg,rgba(126,21,28,.72),rgba(218,184,93,.20));border-color:rgba(246,215,145,.55);color:#fff4d9!important;box-shadow:0 10px 26px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,240,200,.14);}
-.nav .auth-nav-link::before{content:"";position:absolute;left:-15px;top:7px;bottom:7px;width:1px;background:rgba(218,184,93,.28);}
-.nav .auth-nav-link:hover,.nav .auth-nav-link:focus-visible{transform:translateY(-1px);background:linear-gradient(135deg,rgba(154,26,35,.86),rgba(218,184,93,.28));box-shadow:0 14px 30px rgba(0,0,0,.34),0 0 0 2px rgba(246,215,145,.10);}
-.pro-portrait-frame{min-height:260px;background:radial-gradient(circle at 65% 35%,#392819,#090706 70%);}
-.pro-portrait-frame img{max-height:none!important;object-fit:cover!important;object-position:center center!important;filter:contrast(1.04) saturate(1.04);}
-.pro-portrait-frame.portrait-abraxas img{object-position:right center!important;}
-.portrait-edit-tools small{display:block;}
-.spell-dc-extra-box{margin:10px 0 12px;padding:12px;border:1px solid rgba(207,166,101,.22);border-radius:16px;background:rgba(9,7,6,.36);}
-.spell-dc-extra-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;color:#f5dfac;}
-.spell-dc-extra-list{display:grid;gap:8px;}
-.spell-dc-extra-row{display:grid;grid-template-columns:minmax(150px,1fr) 92px minmax(190px,1.4fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.035);}
-.spell-dc-extra-row label{font-size:.72rem;color:#cdbb9b;text-transform:uppercase;letter-spacing:.04em;}
-.spell-dc-extra-row input{width:100%;margin-top:4px;}
-.spell-dc-extra-empty{margin:0!important;color:#bda982!important;font-size:.9rem;}
-@media(max-width:860px){.nav .auth-nav-link{margin-left:0;width:100%;}.nav .auth-nav-link::before{display:none}.pro-portrait-frame{min-height:300px}.pro-portrait-frame img{min-height:300px}.spell-dc-extra-row{grid-template-columns:1fr 90px}.spell-dc-extra-row label:nth-child(3){grid-column:1/-1}.spell-dc-extra-row .row-del{grid-column:2;justify-self:end}}
+/* =========================================
+   LUOGHI — EDITOR MASTER / PAGINE DINAMICHE
+   Solo UI: non tocca auth, Supabase o salvataggi schede
+========================================= */
 
-/* v78 — CD aggiuntive visibili accanto alla CD base, senza sovrascriverla */
-.dynamic-sheet-page .spell-dc-extra-badges{
-  display:inline-flex;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-left:6px;
-}
-.dynamic-sheet-page .spell-dc-extra-badge{
-  display:inline-grid;
-  grid-template-columns:auto auto auto;
-  align-items:center;
-  gap:5px;
-  padding:5px 9px;
-  border:1px solid rgba(207,166,101,.34);
-  border-radius:999px;
-  background:linear-gradient(135deg,rgba(207,166,101,.16),rgba(0,0,0,.24));
-  color:#f3e7d0;
-  font-size:.78rem;
-  line-height:1;
-  white-space:nowrap;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
-}
-.dynamic-sheet-page .spell-dc-extra-badge span{
-  max-width:150px;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.dynamic-sheet-page .spell-dc-extra-badge strong{
-  color:var(--sheet-accent);
-  font-weight:900;
-}
-.dynamic-sheet-page .spell-dc-extra-badge em{
-  font-style:normal;
-  color:#cdbb9b;
-  font-size:.72rem;
-}
-@media(max-width:720px){
-  .dynamic-sheet-page .spell-dc-extra-badges{width:100%;justify-content:center;margin:6px 0 0;}
-  .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
-  .dynamic-sheet-page .spell-dc-extra-badge span{max-width:42vw;}
+.places-index-page .places-category-card,
+.place-detail-page .panel {
+  position: relative;
 }
 
-/* v79 — uniforma stile CD aggiuntive al badge CD base, mantenendole distinguibili */
-.dynamic-sheet-page .spell-circle > summary{
-  gap:8px;
-}
-.dynamic-sheet-page .spell-dc-extra-badges{
-  margin-left:0;
-  gap:7px;
-}
-.dynamic-sheet-page .spell-dc-extra-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  min-height:31px;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid rgba(207,166,101,.26);
-  background:rgba(127,35,31,.34);
-  color:#ffe4c4;
-  font-size:.78rem;
-  line-height:1;
-  font-weight:800;
-  white-space:nowrap;
-  box-shadow:inset 0 1px 0 rgba(255,240,200,.08),0 8px 18px rgba(0,0,0,.16);
-}
-/* v80 — rimosso prefisso visivo duplicato: il badge mostra solo Nome + CD valore */
-.dynamic-sheet-page .spell-dc-extra-badge span{
-  max-width:145px;
-  color:#f7e8cb;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.dynamic-sheet-page .spell-dc-extra-badge strong{
-  color:#fff2d2;
-  font-size:.82rem;
-  font-weight:900;
-}
-.dynamic-sheet-page .spell-dc-extra-badge em{
-  margin-left:-2px;
-  padding-left:6px;
-  border-left:1px solid rgba(246,215,145,.18);
-  color:#d6bd8f;
-  font-size:.72rem;
-  font-style:normal;
-  font-weight:800;
-}
-.dynamic-sheet-page.editing .spell-dc-extra-box{
-  border-color:rgba(207,166,101,.26);
-  background:rgba(18,13,10,.58);
-  box-shadow:inset 0 1px 0 rgba(255,240,200,.05);
-}
-.dynamic-sheet-page.editing .spell-dc-extra-row{
-  border-color:rgba(207,166,101,.18);
-  background:rgba(127,35,31,.13);
-}
-@media(max-width:720px){
-  .dynamic-sheet-page .spell-dc-extra-badges{width:100%;justify-content:center;margin:6px 0 0;}
-  .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
-  .dynamic-sheet-page .spell-dc-extra-badge span{max-width:38vw;}
+.place-card-editable {
+  display: block;
+  transition: transform .18s ease, border-color .18s ease, background .18s ease;
 }
 
-/* Diario master edit — solo UI, senza alterare auth/save globali */
-.diary-page .diary-hero{min-height:auto;display:block;text-align:center;padding:56px 0 34px;}
-.diary-page .hero-title{margin-bottom:18px;}
-.diary-top-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:26px auto 24px;max-width:980px;text-align:left;}
-.diary-date-card,.diary-calendar-card{min-height:0;}
-.diary-date-card p,.diary-calendar-card p{margin-bottom:8px;}
-.diary-status{margin-top:16px;}
-.diary-edit-grid .diary-session-card{position:relative;min-height:210px;padding:24px;text-decoration:none;color:inherit;border:1px solid var(--line);background:linear-gradient(155deg,var(--panel),var(--panel2));box-shadow:0 18px 48px rgba(0,0,0,.42);overflow:hidden;}
-.diary-card-link{position:absolute;inset:0;z-index:1;}
-.diary-session-card > *:not(.diary-card-link){position:relative;z-index:2;}
-.diary-session-card h3{color:var(--gold2);margin:0 0 10px;font-size:1.38rem;}
-.diary-session-card p{color:var(--muted);line-height:1.58;margin:0;}
-.diary-lore-list{display:grid;gap:18px;max-width:1050px;margin:0 auto;}
-.diary-lore-panel{padding:0;margin:0;overflow:hidden;}
-.diary-lore-panel summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;color:var(--gold2);}
-.diary-lore-panel summary::-webkit-details-marker{display:none;}
-.diary-lore-panel summary:after{content:'+';font-size:1.7rem;color:var(--muted);flex:0 0 auto;}
-.diary-lore-panel[open] summary:after{content:'–';}
-.diary-lore-panel summary span{font-size:1.35rem;font-weight:bold;}
-.diary-lore-panel summary small{display:block;color:var(--muted);font-size:.86rem;font-weight:normal;text-align:right;}
-.diary-lore-body{border-top:1px solid rgba(200,164,93,.18);padding:clamp(22px,4vw,38px);}
-.diary-lore-body p{margin:0 0 1rem;line-height:1.75;color:var(--muted);}
-.diary-page.diary-editing [contenteditable="true"]{outline:1px dashed rgba(234,213,154,.45);background:rgba(0,0,0,.22);border-radius:8px;padding:4px 7px;}
-.diary-edit-label{display:grid;gap:6px;margin-top:14px;color:var(--gold2);font-size:.85rem;letter-spacing:.04em;}
-.diary-edit-label input,.diary-edit-label textarea{width:100%;border:1px solid rgba(200,164,93,.28);background:rgba(0,0,0,.35);color:var(--text);padding:10px 12px;border-radius:10px;font-family:inherit;}
-.diary-edit-label textarea{min-height:260px;line-height:1.6;resize:vertical;}
-.diary-delete{margin-top:14px;min-width:auto;}
-.diary-floating-actions{z-index:90;}
-@media(max-width:760px){.diary-top-info{grid-template-columns:1fr}.diary-lore-panel summary{display:block}.diary-lore-panel summary small{text-align:left;margin-top:6px}.diary-lore-panel summary:after{float:right;margin-top:-1.6rem}}
-
-/* Diario — Sogni e Visioni collassabili */
-.diary-dreams-shell{max-width:1050px;margin:0 auto;padding:0;overflow:hidden;}
-.diary-dreams-shell > summary{background:linear-gradient(155deg,rgba(46,31,25,.88),rgba(16,12,11,.94));}
-.diary-dreams-body{background:rgba(0,0,0,.08);}
-.diary-dream-list{max-width:none;}
-.diary-dream-panel{background:linear-gradient(155deg,var(--panel),var(--panel2));}
-.diary-dream-panel summary a{color:var(--gold2);text-decoration:none;}
-.diary-dream-panel summary a:hover{text-decoration:underline;}
-.diary-dream-panel .dream-box{white-space:pre-line;color:var(--muted);line-height:1.75;}
-.diary-page.diary-editing .diary-dream-panel .dream-box{white-space:normal;}
-@media(max-width:760px){.diary-dreams-shell > summary{display:block}.diary-dreams-shell > summary small{text-align:left;margin-top:6px}.diary-dreams-shell > summary:after{float:right;margin-top:-1.6rem}}
-
-/* vXP restore — editor tabella EXP conservativo: contenuti storici preservati */
-.xp-page .xp-main-details,
-.xp-page .xp-levels-panel,
-.xp-page .xp-registry-section{
-  border:1px solid rgba(207,166,101,.22);
-  border-radius:24px;
-  background:linear-gradient(180deg,rgba(24,18,13,.94),rgba(14,10,8,.9));
-  box-shadow:0 18px 45px rgba(0,0,0,.24);
-  margin:18px 0;
-  overflow:hidden;
-}
-.xp-page .xp-main-details > summary,
-.xp-page .xp-levels-panel > summary,
-.xp-page .xp-registry-section > summary{
-  cursor:pointer;
-  list-style:none;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:16px;
-  padding:18px 22px;
-  color:#f3dfb8;
-  font-weight:900;
-}
-.xp-page .xp-main-details > summary::-webkit-details-marker,
-.xp-page .xp-levels-panel > summary::-webkit-details-marker,
-.xp-page .xp-registry-section > summary::-webkit-details-marker{display:none;}
-.xp-page .xp-main-details > summary::after,
-.xp-page .xp-levels-panel > summary::after,
-.xp-page .xp-registry-section > summary::after{content:'▾';opacity:.8;transition:transform .18s ease;}
-.xp-page .xp-main-details:not([open]) > summary::after,
-.xp-page .xp-levels-panel:not([open]) > summary::after,
-.xp-page .xp-registry-section:not([open]) > summary::after{transform:rotate(-90deg);}
-.xp-page summary small{display:block;color:rgba(232,214,178,.62);font-size:.78rem;font-weight:600;margin-top:4px;}
-.xp-page .xp-registry-list{padding:0 18px 18px;}
-.xp-page .xp-registry-section{background:rgba(255,255,255,.035);box-shadow:none;margin:12px 0;}
-.xp-page .xp-table-wrap{overflow:auto;}
-.xp-page .editable-field{outline:1px dashed rgba(207,166,101,.45);outline-offset:3px;border-radius:8px;min-width:36px;background:rgba(207,166,101,.08);}
-.xp-page .xp-inline-actions{display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px 18px;}
-.xp-page .xp-delete-row,.xp-page .row-del{width:32px;height:32px;border-radius:999px;border:1px solid rgba(190,86,69,.45);color:#ffd8cf;background:rgba(190,86,69,.16);cursor:pointer;font-weight:900;}
-.xp-page.xp-editing .archive-table td[contenteditable="true"]{min-width:78px;}
-.xp-page.xp-editing .archive-table td:first-child[contenteditable="true"]{min-width:180px;text-align:left;}
-.xp-floating-actions .sheet-floating-menu{min-width:210px;}
-@media(max-width:720px){
-  .xp-page .xp-main-details > summary,
-  .xp-page .xp-levels-panel > summary,
-  .xp-page .xp-registry-section > summary{align-items:flex-start;padding:16px;}
-  .xp-page .xp-registry-list{padding:0 10px 12px;}
-  .xp-page .archive-table{min-width:720px;}
+.place-card-editable:hover {
+  transform: translateY(-2px);
+  border-color: rgba(218, 184, 112, .52);
+  background: rgba(255,255,255,.045);
 }
 
-/* Diario — pagine sessione dinamiche */
-.diary-session-detail-edit textarea,
-.session-detail-body-label textarea{
-  min-height:220px;
-  line-height:1.65;
-  resize:vertical;
-}
-.diary-open-detail{
-  position:relative;
-  z-index:3;
-  align-self:flex-start;
-  margin-top:8px;
-}
-.dynamic-session-page .dynamic-session-text{
-  max-width:980px;
-  margin-inline:auto;
-}
-.dynamic-session-page.diary-editing .dynamic-session-hero [contenteditable="true"]{
-  outline:1px solid rgba(201,166,107,.45);
-  border-radius:14px;
-  padding:4px 8px;
-  background:rgba(255,255,255,.05);
-}
-.dynamic-session-back{
-  max-width:980px;
-  margin:24px auto 0;
-}
-@media (max-width:720px){
-  .diary-session-detail-edit textarea,
-  .session-detail-body-label textarea{min-height:180px;}
+.place-hero-compact {
+  padding-top: clamp(28px, 5vw, 62px);
+  padding-bottom: clamp(22px, 4vw, 48px);
 }
 
-/* Archivio documenti — fix apertura immagini e leggibilità editor */
-.archive-editing .archive-inline-actions .button,
-.archive-editing .archive-inline-actions .ghost-button,
-.archive-editing .archive-upload-button,
-.archive-editing .danger-action,
-.archive-editing .row-del,
-.archive-editing [data-add-item],
-.archive-editing [data-delete-category],
-.archive-editing [data-delete-item]{
-  color:#fff!important;
-}
-.archive-editing .archive-inline-actions .button:hover,
-.archive-editing .archive-upload-button:hover,
-.archive-editing .danger-action:hover{
-  color:#fff!important;
-}
-.archive-editing .doc-row.has-preview,
-.archive-editing .archive-edit-item{
-  align-items:stretch;
-}
-.archive-editing .archive-edit-text{
-  display:grid!important;
-  grid-template-columns:minmax(180px,.42fr) minmax(260px,1fr) auto;
-  align-items:center;
-  gap:10px 18px;
-  width:100%;
-}
-.archive-editing .archive-edit-text strong,
-.archive-editing .archive-edit-text span{
-  min-height:34px;
-  display:flex;
-  align-items:center;
-  padding:8px 10px;
-  border-radius:10px;
-}
-.archive-editing .archive-badge-edit{
-  min-width:64px;
-  justify-content:center;
-}
-@media(max-width:760px){
-  .archive-editing .archive-edit-text{grid-template-columns:1fr;gap:8px;}
+.place-map-panel .map-frame img,
+.place-interest-card img {
+  width: 100%;
+  display: block;
+  border-radius: 18px;
+  border: 1px solid rgba(200,164,93,.24);
+  margin-bottom: 14px;
+  object-fit: cover;
 }
 
-/* Archivio documenti — layout titolo/descrizione coerente anche in visualizzazione */
-.doc-list .doc-row.has-preview{
-  display:block!important;
-  padding:0!important;
+.place-interest-card img {
+  aspect-ratio: 16 / 9;
+  max-height: 260px;
 }
-.doc-list .doc-row.has-preview .doc-row-link{
-  display:grid!important;
-  grid-template-columns:86px minmax(170px,240px) minmax(260px,1fr);
-  gap:14px 18px;
-  align-items:center;
-  width:100%;
-  min-height:142px;
-  padding:12px 14px;
-  color:inherit;
-  text-decoration:none;
+
+.place-interest-card h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
 }
-.doc-list .doc-row.has-preview .doc-row-link img,
-.doc-list .doc-row.has-preview .doc-row-link .doc-thumb{
-  grid-column:1;
-  grid-row:1 / span 2;
-  width:86px;
-  height:118px;
-  object-fit:cover;
-  object-position:top center;
+
+.place-interest-card p,
+.place-description-panel p,
+.place-conclusion-panel p {
+  line-height: 1.72;
 }
-.doc-list .doc-row.has-preview .doc-row-link strong{
-  grid-column:2;
-  grid-row:1;
+
+.place-top-actions {
+  margin-top: 30px;
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.places-floating-actions {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 9998;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.places-float-toggle {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  border: 1px solid rgba(218,184,112,.55);
+  background: linear-gradient(135deg, rgba(92,24,24,.96), rgba(34,18,18,.96));
+  color: #fff !important;
+  font-size: 1.45rem;
+  box-shadow: 0 16px 36px rgba(0,0,0,.45);
+  cursor: pointer;
+}
+
+.places-float-menu {
+  display: none;
+  min-width: 220px;
+  padding: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(218,184,112,.36);
+  background: rgba(26,18,18,.98);
+  box-shadow: 0 18px 40px rgba(0,0,0,.5);
+}
+
+.places-floating-actions.open .places-float-menu {
+  display: grid;
+  gap: 8px;
+}
+
+.places-float-menu button {
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(120, 32, 32, .88);
+  color: #fff !important;
+  cursor: pointer;
+}
+
+.places-float-menu button:hover {
+  background: rgba(150, 42, 42, .95);
+}
+
+.place-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0,0,0,.72);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.place-modal {
+  width: min(1120px, 96vw);
+  max-height: 92vh;
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  border-radius: 24px;
+  border: 1px solid rgba(218,184,112,.38);
+  background: rgba(25,18,18,.99);
+  box-shadow: 0 24px 70px rgba(0,0,0,.62);
+}
+
+.place-modal header,
+.place-modal footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.place-modal footer {
+  justify-content: flex-end;
+  border-bottom: 0;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+
+.place-modal h2,
+.place-modal h3,
+.place-modal strong,
+.place-modal label {
+  color: #fff4e8;
+}
+
+.place-modal-body {
+  overflow: auto;
+  padding: 18px;
+}
+
+.place-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.place-editor-grid .wide,
+.place-edit-list {
+  grid-column: 1 / -1;
+}
+
+.place-editor-grid label {
+  display: grid;
+  gap: 7px;
+  font-weight: 700;
+}
+
+.place-editor-grid input,
+.place-editor-grid select,
+.place-editor-grid textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(10,8,8,.94);
+  color: #f6efe8;
+  padding: 10px 12px;
+}
+
+.place-edit-list {
+  border: 1px solid rgba(218,184,112,.18);
+  border-radius: 18px;
+  padding: 14px;
+  background: rgba(255,255,255,.025);
+}
+
+.place-edit-list-head,
+.place-interest-editor-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.place-interest-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: rgba(0,0,0,.18);
+  margin-top: 12px;
+}
+
+.place-interest-editor-top,
+.place-interest-editor .wide {
+  grid-column: 1 / -1;
+}
+
+.place-modal .button,
+.place-modal button,
+.place-edit-list .mini-add,
+.place-interest-editor .row-del {
+  color: #fff !important;
+}
+
+@media (max-width: 760px) {
+  .places-floating-actions {
+    right: 14px;
+    bottom: 14px;
+  }
+  .place-editor-grid,
+  .place-interest-editor {
+    grid-template-columns: 1fr;
+  }
+  .place-modal {
+    width: 98vw;
+    max-height: 94vh;
+  }
+}
+
+
+/* v156 — link interni nei testi modificabili + hover pulito nelle pagine luogo */
+.lore-link{
   color:var(--gold2);
-  line-height:1.28;
-  align-self:end;
+  text-decoration:none;
+  border-bottom:1px solid rgba(234,213,154,.42);
+  transition:color .18s ease,border-color .18s ease,background .18s ease;
 }
-.doc-list .doc-row.has-preview .doc-row-link span:not(.doc-thumb){
-  grid-column:3;
-  grid-row:1 / span 2;
-  color:var(--muted);
-  line-height:1.5;
-  align-self:center;
+.lore-link:hover{color:#fff0b7;border-bottom-color:var(--gold2);background:rgba(234,213,154,.06)}
+.place-detail-page .place-interest-card,
+.place-detail-page .place-extra-section .info-card{
+  transform:none!important;
+  cursor:default;
 }
-.doc-list .doc-row.has-preview .doc-row-link:hover{
-  background:rgba(124,16,24,.22);
-  color:var(--text);
+.place-detail-page .place-interest-card:hover,
+.place-detail-page .place-extra-section .info-card:hover{
+  transform:none!important;
+  border-color:var(--line)!important;
+  background:linear-gradient(155deg,var(--panel),var(--panel2))!important;
 }
-.archive-editing .archive-inline-actions [data-add-item],
-.archive-editing .archive-inline-actions [data-add-item] *,
-.archive-editing button[data-add-item],
-.archive-editing button[data-add-item] *{
+.place-detail-page .place-interest-card:after,
+.place-detail-page .place-extra-section .info-card:after{
+  display:none!important;
+  content:none!important;
+}
+.place-detail-page .place-extra-section .info-card[data-tip]:hover:after,
+.place-detail-page .place-extra-section .info-card[data-tip]:focus:after{
+  display:none!important;
+}
+
+/* v157 — overlay link sicuri: evita anchor annidati nei testi con [[label|href]] */
+.city-card.place-card-editable,
+.personaggi-card{position:relative;}
+.personaggi-card-main{display:contents;color:inherit;text-decoration:none;}
+.card-overlay-link{position:absolute;inset:0;z-index:1;text-indent:-9999px;overflow:hidden;}
+.city-card.place-card-editable .lore-link,
+.personaggi-card .lore-link,
+.personaggi-card-actions,
+.personaggi-card .mini-sheet-link{position:relative;z-index:4;}
+.personaggi-card-actions{pointer-events:auto;}
+.card-overlay-link:hover~.personaggi-card-actions{z-index:4;}
+
+/* v158 — uniforma SOLO lo stile dei menu modifica allo stile Luoghi; nessuna logica JS/save/auth toccata */
+.sheet-floating-actions,
+.archive-floating-actions,
+.diary-floating-actions,
+.xp-floating-actions{
+  position:fixed!important;
+  right:22px!important;
+  bottom:22px!important;
+  z-index:9998!important;
+  display:flex!important;
+  flex-direction:column-reverse!important;
+  align-items:flex-end!important;
+  gap:10px!important;
+}
+.sheet-floating-toggle{
+  width:58px!important;
+  height:58px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(218,184,112,.55)!important;
+  background:linear-gradient(135deg, rgba(92,24,24,.96), rgba(34,18,18,.96))!important;
+  color:#fff!important;
+  box-shadow:0 16px 36px rgba(0,0,0,.45)!important;
+  cursor:pointer!important;
+  display:grid!important;
+  place-items:center!important;
+  padding:0!important;
+  font-size:1.45rem!important;
+}
+.sheet-floating-toggle span{display:none!important;}
+.sheet-floating-toggle::before{content:"✦";line-height:1;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.55);}
+.sheet-floating-menu{
+  display:none!important;
+  min-width:220px!important;
+  max-width:min(320px, calc(100vw - 44px))!important;
+  padding:10px!important;
+  border-radius:18px!important;
+  border:1px solid rgba(218,184,112,.36)!important;
+  background:rgba(26,18,18,.98)!important;
+  box-shadow:0 18px 40px rgba(0,0,0,.5)!important;
+  opacity:1!important;
+  transform:none!important;
+  pointer-events:auto!important;
+  backdrop-filter:none!important;
+}
+.sheet-floating-actions.open .sheet-floating-menu,
+.archive-floating-actions.open .sheet-floating-menu,
+.diary-floating-actions.open .sheet-floating-menu,
+.xp-floating-actions.open .sheet-floating-menu{
+  display:grid!important;
+  gap:8px!important;
+}
+.sheet-floating-actions .button,
+.sheet-floating-actions summary.button,
+.sheet-floating-menu .button,
+.sheet-floating-menu button,
+.sheet-floating-menu a.button,
+.sheet-floating-menu label.button{
+  width:100%!important;
+  min-width:0!important;
+  min-height:0!important;
+  text-align:left!important;
+  padding:10px 12px!important;
+  border-radius:12px!important;
+  border:1px solid rgba(255,255,255,.1)!important;
+  background:rgba(120,32,32,.88)!important;
+  color:#fff!important;
+  cursor:pointer!important;
+  box-shadow:none!important;
+  transform:none!important;
+  opacity:1!important;
+  line-height:1.25!important;
+  font-size:.95rem!important;
+  text-shadow:none!important;
+}
+.sheet-floating-actions .button:hover,
+.sheet-floating-actions summary.button:hover,
+.sheet-floating-menu .button:hover,
+.sheet-floating-menu button:hover,
+.sheet-floating-menu a.button:hover,
+.sheet-floating-menu label.button:hover{
+  background:rgba(150,42,42,.95)!important;
+  border-color:rgba(218,184,112,.38)!important;
+  transform:none!important;
+}
+.sheet-floating-actions .floating-tools{width:100%!important;position:relative!important;}
+.sheet-floating-actions .floating-tools > summary.button{list-style:none!important;}
+.sheet-floating-actions .floating-tools > summary.button::-webkit-details-marker{display:none!important;}
+.sheet-floating-actions .floating-tools .sheet-tools-grid{
+  position:static!important;
+  width:100%!important;
+  min-width:0!important;
+  max-height:min(52vh,360px)!important;
+  margin-top:8px!important;
+  padding:8px!important;
+  display:grid!important;
+  gap:8px!important;
+  border-radius:16px!important;
+  border:1px solid rgba(218,184,112,.22)!important;
+  background:rgba(10,8,8,.55)!important;
+  box-shadow:none!important;
+  overflow:auto!important;
+}
+
+/* Stesso linguaggio visivo dei campi ellittici del modale Luoghi, applicato ai modali/editor già esistenti */
+.personaggi-modal,
+.sheet-modal,
+.spell-desc-modal,
+.place-modal{
+  border-radius:24px!important;
+  border:1px solid rgba(218,184,112,.38)!important;
+  background:rgba(25,18,18,.99)!important;
+  box-shadow:0 24px 70px rgba(0,0,0,.62)!important;
+}
+.personaggi-modal input,
+.personaggi-modal select,
+.personaggi-modal textarea,
+.sheet-modal input,
+.sheet-modal select,
+.sheet-modal textarea,
+.spell-desc-modal input,
+.spell-desc-modal select,
+.spell-desc-modal textarea,
+.place-modal input,
+.place-modal select,
+.place-modal textarea,
+.editing .editable-field,
+.editing [contenteditable="true"]{
+  border-radius:12px!important;
+  border:1px solid rgba(255,255,255,.12)!important;
+  background:rgba(10,8,8,.94)!important;
+  color:#f6efe8!important;
+  box-shadow:none!important;
+}
+.personaggi-modal input,
+.personaggi-modal select,
+.personaggi-modal textarea,
+.sheet-modal input,
+.sheet-modal select,
+.sheet-modal textarea,
+.spell-desc-modal input,
+.spell-desc-modal select,
+.spell-desc-modal textarea,
+.place-modal input,
+.place-modal select,
+.place-modal textarea{
+  padding:10px 12px!important;
+}
+.personaggi-modal input:focus,
+.personaggi-modal select:focus,
+.personaggi-modal textarea:focus,
+.sheet-modal input:focus,
+.sheet-modal select:focus,
+.sheet-modal textarea:focus,
+.spell-desc-modal input:focus,
+.spell-desc-modal select:focus,
+.spell-desc-modal textarea:focus,
+.place-modal input:focus,
+.place-modal select:focus,
+.place-modal textarea:focus,
+.editing .editable-field:focus,
+.editing [contenteditable="true"]:focus{
+  outline:none!important;
+  border-color:rgba(218,184,112,.62)!important;
+  box-shadow:0 0 0 3px rgba(218,184,112,.12)!important;
+}
+.personaggi-modal .button,
+.sheet-modal .button,
+.spell-desc-modal .button,
+.place-modal .button{
+  border-radius:12px!important;
+}
+
+/* Pagine luogo statiche: rimuove hover inutile sulle card non cliccabili, inclusa Accademia di Medicina */
+.place-detail-page article.card:not(:has(a)):hover,
+.place-detail-page .panel article.card:not(:has(a)):hover{
+  transform:none!important;
+  border-color:var(--line)!important;
+  background:linear-gradient(155deg,var(--panel),var(--panel2))!important;
+}
+.place-detail-page article.card:not(:has(a)){
+  cursor:default!important;
+}
+
+@media (max-width:760px){
+  .sheet-floating-actions,
+  .archive-floating-actions,
+  .diary-floating-actions,
+  .xp-floating-actions{
+    right:14px!important;
+    bottom:14px!important;
+  }
+  .sheet-floating-menu{
+    min-width:min(82vw,220px)!important;
+    max-width:calc(100vw - 28px)!important;
+  }
+}
+
+/* v159 — patch chirurgica richiesta: personaggi/diario/EXP, solo CSS visuale */
+/* Personaggi: pulsanti Modifica/Elimina leggibili, senza toccare le card */
+.personaggi-card-actions .edit-personaggio,
+.personaggi-card-actions .delete-personaggio-card,
+.personaggi-card-actions .button,
+.personaggi-master-dock .button,
+.personaggio-detail-actions .button,
+#personaggiMasterDock .button{
+  color:#fff!important;
+  text-shadow:none!important;
+}
+.personaggi-card-actions .edit-personaggio:hover,
+.personaggi-card-actions .delete-personaggio-card:hover{
   color:#fff!important;
 }
+
+/* Personaggi: il modale descrittivo torna più pulito e leggibile, senza cambiare card/schede */
+.personaggi-modal{
+  max-width:min(920px,calc(100vw - 32px))!important;
+}
+.personaggi-modal .personaggi-form-grid{
+  gap:16px!important;
+}
+.personaggi-modal label{
+  color:var(--gold2)!important;
+  font-weight:700!important;
+  letter-spacing:.02em!important;
+}
+.personaggi-modal input,
+.personaggi-modal select,
+.personaggi-modal textarea{
+  width:100%!important;
+  border-radius:10px!important;
+  border:1px solid rgba(200,164,93,.26)!important;
+  background:rgba(255,255,255,.055)!important;
+  color:var(--text)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.04)!important;
+}
+.personaggi-modal textarea[name="longDesc"],
+.personaggi-modal textarea[name="events"]{
+  min-height:260px!important;
+  line-height:1.65!important;
+  padding:14px 15px!important;
+  font-size:1rem!important;
+  white-space:pre-wrap!important;
+}
+.personaggi-modal textarea[name="desc"]{
+  min-height:96px!important;
+  line-height:1.55!important;
+}
+.personaggi-modal footer{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  gap:10px!important;
+  justify-content:flex-end!important;
+}
+.personaggi-modal footer .button{
+  color:#fff!important;
+}
+
+/* Diario: più respiro tra titoli/sottotitoli e testi */
+.diary-section .section-title,
+.diary-hero .hero-title{
+  margin-bottom:22px!important;
+}
+.diary-hero .hero-subtitle,
+.diary-section .section-note{
+  margin-top:10px!important;
+  margin-bottom:34px!important;
+}
+.diary-session-card .tag{
+  margin-bottom:14px!important;
+}
+.diary-session-card h3{
+  margin-top:8px!important;
+  margin-bottom:18px!important;
+  line-height:1.22!important;
+}
+.diary-session-card p{
+  margin-top:0!important;
+  line-height:1.7!important;
+}
+.diary-lore-panel > summary,
+.diary-dreams-shell > summary,
+.xp-main-details > summary,
+.xp-registry-section > summary,
+.xp-levels-panel > summary{
+  display:flex!important;
+  align-items:flex-start!important;
+  justify-content:space-between!important;
+  gap:18px!important;
+  row-gap:8px!important;
+  line-height:1.25!important;
+}
+.diary-lore-panel > summary span,
+.diary-dreams-shell > summary span,
+.xp-main-details > summary span,
+.xp-registry-section > summary span,
+.xp-levels-panel > summary span{
+  display:block!important;
+  margin-right:10px!important;
+}
+.diary-lore-panel > summary small,
+.diary-dreams-shell > summary small,
+.xp-main-details > summary small,
+.xp-registry-section > summary small,
+.xp-levels-panel > summary small{
+  display:block!important;
+  margin-top:3px!important;
+  color:var(--muted)!important;
+  line-height:1.35!important;
+  text-align:right!important;
+}
+.diary-editing .diary-lore-panel > summary small,
+.diary-editing .diary-lore-panel > summary span,
+.xp-editing .xp-main-details > summary small,
+.xp-editing .xp-main-details > summary span,
+.xp-editing .xp-registry-section > summary small,
+.xp-editing .xp-registry-section > summary span{
+  padding:2px 4px!important;
+}
+
+/* Diario: sezione sogni appena più ampia e ariosa */
+.diary-dreams-shell{
+  width:min(1120px,100%)!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+.diary-dreams-body,
+.diary-dream-list,
+.diary-dream-panel .dream-box{
+  width:100%!important;
+}
+.diary-dream-panel .dream-box{
+  padding:28px 30px!important;
+  line-height:1.82!important;
+}
+.diary-editing .diary-dream-panel textarea[data-diary-field="body"]{
+  min-height:260px!important;
+}
+
+/* EXP: separa visivamente titolo/sottotitolo nei summary */
+.xp-main-details > summary,
+.xp-registry-section > summary,
+.xp-levels-panel > summary{
+  padding-top:18px!important;
+  padding-bottom:18px!important;
+}
+.xp-main-details > summary span,
+.xp-registry-section > summary span,
+.xp-levels-panel > summary span{
+  font-size:1.15rem!important;
+  color:var(--gold2)!important;
+}
+.xp-main-details > summary small,
+.xp-registry-section > summary small,
+.xp-levels-panel > summary small{
+  min-width:max-content!important;
+}
+
 @media(max-width:760px){
-  .doc-list .doc-row.has-preview .doc-row-link{
-    grid-template-columns:76px 1fr;
-    gap:8px 12px;
-    min-height:112px;
+  .diary-lore-panel > summary,
+  .diary-dreams-shell > summary,
+  .xp-main-details > summary,
+  .xp-registry-section > summary,
+  .xp-levels-panel > summary{
+    flex-direction:column!important;
+    align-items:flex-start!important;
   }
-  .doc-list .doc-row.has-preview .doc-row-link img,
-  .doc-list .doc-row.has-preview .doc-row-link .doc-thumb{
-    width:76px;
-    height:104px;
+  .diary-lore-panel > summary small,
+  .diary-dreams-shell > summary small,
+  .xp-main-details > summary small,
+  .xp-registry-section > summary small,
+  .xp-levels-panel > summary small{
+    text-align:left!important;
+    min-width:0!important;
   }
-  .doc-list .doc-row.has-preview .doc-row-link strong{
-    grid-column:2;
-    grid-row:1;
-  }
-  .doc-list .doc-row.has-preview .doc-row-link span:not(.doc-thumb){
-    grid-column:2;
-    grid-row:2;
+  .personaggi-modal textarea[name="longDesc"],
+  .personaggi-modal textarea[name="events"]{
+    min-height:210px!important;
   }
 }
+
+
+/* v160 — header globale rifinito + Auth: Master offline solo davvero offline */
+.topbar{
+  position:sticky!important;
+  top:0!important;
+  z-index:10000!important;
+  background:linear-gradient(180deg,rgba(8,6,5,.96),rgba(8,6,5,.84))!important;
+  border-bottom:1px solid rgba(200,164,93,.30)!important;
+  box-shadow:0 10px 34px rgba(0,0,0,.42)!important;
+  backdrop-filter:blur(16px)!important;
+  -webkit-backdrop-filter:blur(16px)!important;
+}
+.topbar::after{
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:-1px;
+  height:1px;
+  background:linear-gradient(90deg,transparent,rgba(234,213,154,.55),transparent);
+  pointer-events:none;
+}
+.nav{
+  min-height:72px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:space-between!important;
+  gap:18px!important;
+}
+.brand{
+  display:inline-flex!important;
+  align-items:center!important;
+  min-height:44px!important;
+  padding:0 4px!important;
+  color:var(--gold2,#ead59a)!important;
+  text-decoration:none!important;
+  letter-spacing:.105em!important;
+  text-shadow:0 0 18px rgba(234,213,154,.18),0 2px 0 rgba(0,0,0,.5)!important;
+}
+.nav .links{
+  align-items:center!important;
+  gap:8px!important;
+  color:var(--muted,#b8aa8c)!important;
+}
+.nav .links a{
+  position:relative!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:38px!important;
+  padding:9px 13px!important;
+  border:1px solid transparent!important;
+  border-radius:999px!important;
+  color:rgba(240,228,207,.84)!important;
+  text-decoration:none!important;
+  line-height:1!important;
+  transition:background .18s ease,border-color .18s ease,color .18s ease,transform .18s ease!important;
+}
+.nav .links a:hover,
+.nav .links a:focus-visible{
+  color:#fff6d6!important;
+  background:rgba(124,16,24,.30)!important;
+  border-color:rgba(234,213,154,.30)!important;
+  transform:translateY(-1px)!important;
+  outline:none!important;
+}
+.nav .links a.auth-nav-link{
+  color:#fff!important;
+  border-color:rgba(200,164,93,.30)!important;
+  background:linear-gradient(145deg,rgba(124,16,24,.58),rgba(40,25,17,.42))!important;
+  box-shadow:0 10px 24px rgba(0,0,0,.20)!important;
+}
+.nav-toggle{
+  color:#fff3c8!important;
+  background:linear-gradient(145deg,rgba(124,16,24,.42),rgba(12,10,8,.92))!important;
+  border:1px solid rgba(234,213,154,.42)!important;
+  border-radius:999px!important;
+  width:46px!important;
+  height:42px!important;
+  padding:0!important;
+  box-shadow:0 10px 24px rgba(0,0,0,.36)!important;
+}
+.nav-toggle:hover,
+.nav-toggle:focus-visible{
+  color:#fff!important;
+  background:linear-gradient(145deg,rgba(124,16,24,.62),rgba(28,20,15,.96))!important;
+  border-color:rgba(234,213,154,.70)!important;
+  outline:none!important;
+}
+@media(max-width:900px){
+  .nav{min-height:66px!important;}
+  .brand{font-size:clamp(1.28rem,7vw,1.78rem)!important;max-width:calc(100% - 62px)!important;overflow:hidden!important;text-overflow:ellipsis!important;}
+  .nav .links{
+    top:calc(100% + 10px)!important;
+    padding:12px!important;
+    gap:6px!important;
+    background:linear-gradient(180deg,rgba(12,9,7,.99),rgba(21,14,12,.98))!important;
+    border:1px solid rgba(234,213,154,.34)!important;
+    border-radius:18px!important;
+    box-shadow:0 22px 58px rgba(0,0,0,.72),inset 0 0 0 1px rgba(255,255,255,.025)!important;
+  }
+  .nav.nav-open .links,
+  .nav .links.open{display:flex!important;}
+  .nav .links a{
+    width:100%!important;
+    justify-content:flex-start!important;
+    min-height:46px!important;
+    padding:14px 16px!important;
+    border-radius:13px!important;
+    border:1px solid rgba(200,164,93,.12)!important;
+    background:rgba(0,0,0,.20)!important;
+  }
+  .nav .links a + a{margin-top:2px!important;}
+  .nav .links a.auth-nav-link{background:rgba(124,16,24,.52)!important;}
+}
+@media(max-width:520px){
+  .page,.nav{width:min(100% - 20px,1240px)!important;}
+  .brand{letter-spacing:.075em!important;}
+}
+.auth-body .local-master-tools[hidden]{display:none!important;}
+.auth-body:not(.offline-master-available) .local-master-tools{display:none!important;}

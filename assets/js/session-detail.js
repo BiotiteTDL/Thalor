@@ -4,6 +4,8 @@ const app=document.getElementById('sessionDetailApp');
 const slug='diario';
 const storageKey='thalor.diary.v1';
 const esc=(v)=>String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+const internalHref=(href)=>{const raw=String(href||'').trim();if(!raw)return '#';if(/^(javascript:|data:|vbscript:|https?:|mailto:|tel:|\/\/)/i.test(raw))return '#';return raw.replace(/["'<>\s]/g,'');};
+const richText=(v)=>esc(v).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g,(_,label,href)=>`<a class="lore-link" href="${esc(internalHref(href))}">${esc(label)}</a>`);
 const nl=(v)=>String(v??'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
 const params=new URLSearchParams(location.search);
 const sessionId=params.get('id')||'';
@@ -23,7 +25,7 @@ function normalize(data){
   })):[]};
 }
 function findIndex(data){return data.sessions.findIndex(s=>String(s.id)===String(sessionId));}
-function paragraphHtml(text){const parts=nl(text);return parts.length?parts.map(p=>`<p>${esc(p)}</p>`).join(''):'<p class="muted">Nessun dettaglio inserito.</p>';}
+function paragraphHtml(text){const parts=nl(text);return parts.length?parts.map(p=>`<p>${richText(p)}</p>`).join(''):'<p class="muted">Nessun dettaglio inserito.</p>';}
 function floatingActions(edit){return `<nav class="sheet-floating-actions diary-floating-actions" aria-label="Azioni sessione"><button class="sheet-floating-toggle" id="sheetFloatingToggle" type="button" aria-label="Apri menu sessione" aria-expanded="false"><span></span><span></span><span></span></button><div class="sheet-floating-menu" id="sheetFloatingMenu"><button class="button primary-action" id="sessionEditSave" type="button">${edit?'Salva':'Modifica'}</button>${edit?`<button class="button ghost-button" id="sessionCancelEdit" type="button">Annulla</button>`:''}<a class="button ghost-button" href="../diario.html">Torna al diario</a></div></nav>`;}
 function render(data,editing=false){
   data=normalize(data);
@@ -39,9 +41,9 @@ function render(data,editing=false){
   app.classList.toggle('diary-editing',!!edit);
   app.innerHTML=`
     <section class="hero dynamic-session-hero">
-      <span class="tag"${edit?' contenteditable="true" spellcheck="false" data-session-field="tag"':''}>${esc(s.tag)}</span>
-      <h1 class="hero-title"${edit?' contenteditable="true" spellcheck="false" data-session-field="title"':''}>${esc(s.title)}</h1>
-      <p class="hero-subtitle"${edit?' contenteditable="true" spellcheck="false" data-session-field="description"':''}>${esc(s.description)}</p>
+      <span class="tag"${edit?' contenteditable="true" spellcheck="false" data-session-field="tag"':''}>${edit?esc(s.tag):richText(s.tag)}</span>
+      <h1 class="hero-title"${edit?' contenteditable="true" spellcheck="false" data-session-field="title"':''}>${edit?esc(s.title):richText(s.title)}</h1>
+      <p class="hero-subtitle"${edit?' contenteditable="true" spellcheck="false" data-session-field="description"':''}>${edit?esc(s.description):richText(s.description)}</p>
     </section>
     <section class="panel lore-section session-text dynamic-session-text">
       ${edit?`<label class="diary-edit-label wide session-detail-body-label">Testo pagina sessione<textarea data-session-field="detailBody">${esc(s.detailBody)}</textarea></label>`:paragraphHtml(s.detailBody)}

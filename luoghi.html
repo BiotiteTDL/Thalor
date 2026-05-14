@@ -4,9 +4,9 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Thalor — Luoghi</title>
-<link href="assets/css/style.css" rel="stylesheet"/>
+<link href="assets/css/style.css?v=160" rel="stylesheet"/>
 </head>
-<body>
+<body class="places-index-page" data-root-prefix="">
 <div class="topbar">
 <nav class="nav">
 <a class="brand" href="index.html">Thalor</a>
@@ -34,53 +34,15 @@ Passa il mouse sulla mappa per ingrandire i dettagli con la lente.
 </div>
 </section>
 
-<section>
-<h2 class="section-title">Esplorazione</h2>
-
-<div class="grid places-grid-two">
-
-<article class="card">
-<div class="icon">🏙</div>
-<h3>Città</h3>
-<p>Centri abitati, porti, capitali, roccaforti e crocevia commerciali.</p>
-<div class="city-list compact-city-list">
-<a class="city-card" href="luoghi/valkren/index.html">
-<h3>L’Insenno di Valkren</h3>
-<p>
-Piccolo villaggio marittimo avvolto dalla nebbia salmastra, dove ha avuto inizio la campagna.
-</p>
-</a>
-
-<a class="city-card" href="luoghi/portogrigio.html">
-<h3>Portogrigio</h3>
-<p>Il più grande porto della costa occidentale di Thalor, avvolto dalla nebbia marina e dominato dal commercio.</p>
-</a>
-</div>
-</article>
-
-
-<article class="card">
-<div class="icon">⛓</div>
-<h3>Dungeon</h3>
-<p>Cripte, grotte, rovine rituali, sotterranei e luoghi già esplorati durante la campagna.</p>
-
-<div class="city-list compact-city-list">
-
-<a class="city-card" href="luoghi/portogrigio/accademia-medicina.html">
-<h3>Accademia di Medicina</h3>
-<p>I laboratori proibiti di Otmar Van Verschuer nascosti sotto il distretto accademico di Portogrigio.</p>
-</a>
-
-</div>
-</article>
-
-
-</div>
-</section>
+<div data-places-index></div>
 
 <footer>Thalor</footer>
 </main>
 
 <script src="assets/js/main.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase-config.js"></script>
+<script src="assets/js/supabase-auth.js?v=162"></script>
+<script src="assets/js/places-edit.js"></script>
 </body>
 </html>
