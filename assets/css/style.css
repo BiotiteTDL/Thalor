@@ -7770,165 +7770,75 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
   display:inline-block!important;
 }
 
-/* Patch UX scheda/personaggio — CD extra, ritratto e accesso header */
-.links{align-items:center;}
-.nav .auth-nav-link{margin-left:10px;padding:.48rem 1.05rem;min-height:38px;position:relative;isolation:isolate;background:linear-gradient(135deg,rgba(126,21,28,.72),rgba(218,184,93,.20));border-color:rgba(246,215,145,.55);color:#fff4d9!important;box-shadow:0 10px 26px rgba(0,0,0,.26),inset 0 1px 0 rgba(255,240,200,.14);}
-.nav .auth-nav-link::before{content:"";position:absolute;left:-15px;top:7px;bottom:7px;width:1px;background:rgba(218,184,93,.28);}
-.nav .auth-nav-link:hover,.nav .auth-nav-link:focus-visible{transform:translateY(-1px);background:linear-gradient(135deg,rgba(154,26,35,.86),rgba(218,184,93,.28));box-shadow:0 14px 30px rgba(0,0,0,.34),0 0 0 2px rgba(246,215,145,.10);}
-.pro-portrait-frame{min-height:260px;background:radial-gradient(circle at 65% 35%,#392819,#090706 70%);}
-.pro-portrait-frame img{max-height:none!important;object-fit:cover!important;object-position:center center!important;filter:contrast(1.04) saturate(1.04);}
-.pro-portrait-frame.portrait-abraxas img{object-position:right center!important;}
-.portrait-edit-tools small{display:block;}
-.spell-dc-extra-box{margin:10px 0 12px;padding:12px;border:1px solid rgba(207,166,101,.22);border-radius:16px;background:rgba(9,7,6,.36);}
-.spell-dc-extra-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;color:#f5dfac;}
-.spell-dc-extra-list{display:grid;gap:8px;}
-.spell-dc-extra-row{display:grid;grid-template-columns:minmax(150px,1fr) 92px minmax(190px,1.4fr) auto;gap:8px;align-items:end;padding:9px;border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.035);}
-.spell-dc-extra-row label{font-size:.72rem;color:#cdbb9b;text-transform:uppercase;letter-spacing:.04em;}
-.spell-dc-extra-row input{width:100%;margin-top:4px;}
-.spell-dc-extra-empty{margin:0!important;color:#bda982!important;font-size:.9rem;}
-@media(max-width:860px){.nav .auth-nav-link{margin-left:0;width:100%;}.nav .auth-nav-link::before{display:none}.pro-portrait-frame{min-height:300px}.pro-portrait-frame img{min-height:300px}.spell-dc-extra-row{grid-template-columns:1fr 90px}.spell-dc-extra-row label:nth-child(3){grid-column:1/-1}.spell-dc-extra-row .row-del{grid-column:2;justify-self:end}}
-
-/* v78 — CD aggiuntive visibili accanto alla CD base, senza sovrascriverla */
-.dynamic-sheet-page .spell-dc-extra-badges{
-  display:inline-flex;
-  align-items:center;
-  flex-wrap:wrap;
-  gap:6px;
-  margin-left:6px;
-}
-.dynamic-sheet-page .spell-dc-extra-badge{
-  display:inline-grid;
-  grid-template-columns:auto auto auto;
-  align-items:center;
-  gap:5px;
-  padding:5px 9px;
-  border:1px solid rgba(207,166,101,.34);
-  border-radius:999px;
-  background:linear-gradient(135deg,rgba(207,166,101,.16),rgba(0,0,0,.24));
-  color:#f3e7d0;
-  font-size:.78rem;
-  line-height:1;
-  white-space:nowrap;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
-}
-.dynamic-sheet-page .spell-dc-extra-badge span{
-  max-width:150px;
+/* vXP restore — editor tabella EXP conservativo: contenuti storici preservati */
+.xp-page .xp-main-details,
+.xp-page .xp-levels-panel,
+.xp-page .xp-registry-section{
+  border:1px solid rgba(207,166,101,.22);
+  border-radius:24px;
+  background:linear-gradient(180deg,rgba(24,18,13,.94),rgba(14,10,8,.9));
+  box-shadow:0 18px 45px rgba(0,0,0,.24);
+  margin:18px 0;
   overflow:hidden;
-  text-overflow:ellipsis;
 }
-.dynamic-sheet-page .spell-dc-extra-badge strong{
-  color:var(--sheet-accent);
+.xp-page .xp-main-details > summary,
+.xp-page .xp-levels-panel > summary,
+.xp-page .xp-registry-section > summary{
+  cursor:pointer;
+  list-style:none;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:18px 22px;
+  color:#f3dfb8;
   font-weight:900;
 }
-.dynamic-sheet-page .spell-dc-extra-badge em{
-  font-style:normal;
-  color:#cdbb9b;
-  font-size:.72rem;
-}
+.xp-page .xp-main-details > summary::-webkit-details-marker,
+.xp-page .xp-levels-panel > summary::-webkit-details-marker,
+.xp-page .xp-registry-section > summary::-webkit-details-marker{display:none;}
+.xp-page .xp-main-details > summary::after,
+.xp-page .xp-levels-panel > summary::after,
+.xp-page .xp-registry-section > summary::after{content:'▾';opacity:.8;transition:transform .18s ease;}
+.xp-page .xp-main-details:not([open]) > summary::after,
+.xp-page .xp-levels-panel:not([open]) > summary::after,
+.xp-page .xp-registry-section:not([open]) > summary::after{transform:rotate(-90deg);}
+.xp-page summary small{display:block;color:rgba(232,214,178,.62);font-size:.78rem;font-weight:600;margin-top:4px;}
+.xp-page .xp-registry-list{padding:0 18px 18px;}
+.xp-page .xp-registry-section{background:rgba(255,255,255,.035);box-shadow:none;margin:12px 0;}
+.xp-page .xp-table-wrap{overflow:auto;}
+.xp-page .editable-field{outline:1px dashed rgba(207,166,101,.45);outline-offset:3px;border-radius:8px;min-width:36px;background:rgba(207,166,101,.08);}
+.xp-page .xp-inline-actions{display:flex;gap:10px;flex-wrap:wrap;padding:12px 18px 18px;}
+.xp-page .xp-delete-row,.xp-page .row-del{width:32px;height:32px;border-radius:999px;border:1px solid rgba(190,86,69,.45);color:#ffd8cf;background:rgba(190,86,69,.16);cursor:pointer;font-weight:900;}
+.xp-page.xp-editing .archive-table td[contenteditable="true"]{min-width:78px;}
+.xp-page.xp-editing .archive-table td:first-child[contenteditable="true"]{min-width:180px;text-align:left;}
+.xp-floating-actions .sheet-floating-menu{min-width:210px;}
 @media(max-width:720px){
-  .dynamic-sheet-page .spell-dc-extra-badges{width:100%;justify-content:center;margin:6px 0 0;}
-  .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
-  .dynamic-sheet-page .spell-dc-extra-badge span{max-width:42vw;}
+  .xp-page .xp-main-details > summary,
+  .xp-page .xp-levels-panel > summary,
+  .xp-page .xp-registry-section > summary{align-items:flex-start;padding:16px;}
+  .xp-page .xp-registry-list{padding:0 10px 12px;}
+  .xp-page .archive-table{min-width:720px;}
 }
 
-/* v79 — uniforma stile CD aggiuntive al badge CD base, mantenendole distinguibili */
-.dynamic-sheet-page .spell-circle > summary{
-  gap:8px;
-}
-.dynamic-sheet-page .spell-dc-extra-badges{
-  margin-left:0;
-  gap:7px;
-}
-.dynamic-sheet-page .spell-dc-extra-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:7px;
-  min-height:31px;
-  padding:6px 10px;
-  border-radius:999px;
-  border:1px solid rgba(207,166,101,.26);
-  background:rgba(127,35,31,.34);
-  color:#ffe4c4;
-  font-size:.78rem;
-  line-height:1;
-  font-weight:800;
-  white-space:nowrap;
-  box-shadow:inset 0 1px 0 rgba(255,240,200,.08),0 8px 18px rgba(0,0,0,.16);
-}
-/* v80 — rimosso prefisso visivo duplicato: il badge mostra solo Nome + CD valore */
-.dynamic-sheet-page .spell-dc-extra-badge span{
-  max-width:145px;
-  color:#f7e8cb;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.dynamic-sheet-page .spell-dc-extra-badge strong{
-  color:#fff2d2;
-  font-size:.82rem;
-  font-weight:900;
-}
-.dynamic-sheet-page .spell-dc-extra-badge em{
-  margin-left:-2px;
-  padding-left:6px;
-  border-left:1px solid rgba(246,215,145,.18);
-  color:#d6bd8f;
-  font-size:.72rem;
-  font-style:normal;
-  font-weight:800;
-}
-.dynamic-sheet-page.editing .spell-dc-extra-box{
-  border-color:rgba(207,166,101,.26);
-  background:rgba(18,13,10,.58);
-  box-shadow:inset 0 1px 0 rgba(255,240,200,.05);
-}
-.dynamic-sheet-page.editing .spell-dc-extra-row{
-  border-color:rgba(207,166,101,.18);
-  background:rgba(127,35,31,.13);
-}
-@media(max-width:720px){
-  .dynamic-sheet-page .spell-dc-extra-badges{width:100%;justify-content:center;margin:6px 0 0;}
-  .dynamic-sheet-page .spell-dc-extra-badge{max-width:100%;}
-  .dynamic-sheet-page .spell-dc-extra-badge span{max-width:38vw;}
-}
 
-/* Diario master edit — solo UI, senza alterare auth/save globali */
-.diary-page .diary-hero{min-height:auto;display:block;text-align:center;padding:56px 0 34px;}
-.diary-page .hero-title{margin-bottom:18px;}
-.diary-top-info{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:26px auto 24px;max-width:980px;text-align:left;}
-.diary-date-card,.diary-calendar-card{min-height:0;}
-.diary-date-card p,.diary-calendar-card p{margin-bottom:8px;}
-.diary-status{margin-top:16px;}
-.diary-edit-grid .diary-session-card{position:relative;min-height:210px;padding:24px;text-decoration:none;color:inherit;border:1px solid var(--line);background:linear-gradient(155deg,var(--panel),var(--panel2));box-shadow:0 18px 48px rgba(0,0,0,.42);overflow:hidden;}
-.diary-card-link{position:absolute;inset:0;z-index:1;}
-.diary-session-card > *:not(.diary-card-link){position:relative;z-index:2;}
-.diary-session-card h3{color:var(--gold2);margin:0 0 10px;font-size:1.38rem;}
-.diary-session-card p{color:var(--muted);line-height:1.58;margin:0;}
-.diary-lore-list{display:grid;gap:18px;max-width:1050px;margin:0 auto;}
-.diary-lore-panel{padding:0;margin:0;overflow:hidden;}
-.diary-lore-panel summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;color:var(--gold2);}
-.diary-lore-panel summary::-webkit-details-marker{display:none;}
-.diary-lore-panel summary:after{content:'+';font-size:1.7rem;color:var(--muted);flex:0 0 auto;}
-.diary-lore-panel[open] summary:after{content:'–';}
-.diary-lore-panel summary span{font-size:1.35rem;font-weight:bold;}
-.diary-lore-panel summary small{display:block;color:var(--muted);font-size:.86rem;font-weight:normal;text-align:right;}
-.diary-lore-body{border-top:1px solid rgba(200,164,93,.18);padding:clamp(22px,4vw,38px);}
-.diary-lore-body p{margin:0 0 1rem;line-height:1.75;color:var(--muted);}
-.diary-page.diary-editing [contenteditable="true"]{outline:1px dashed rgba(234,213,154,.45);background:rgba(0,0,0,.22);border-radius:8px;padding:4px 7px;}
-.diary-edit-label{display:grid;gap:6px;margin-top:14px;color:var(--gold2);font-size:.85rem;letter-spacing:.04em;}
-.diary-edit-label input,.diary-edit-label textarea{width:100%;border:1px solid rgba(200,164,93,.28);background:rgba(0,0,0,.35);color:var(--text);padding:10px 12px;border-radius:10px;font-family:inherit;}
-.diary-edit-label textarea{min-height:260px;line-height:1.6;resize:vertical;}
-.diary-delete{margin-top:14px;min-width:auto;}
-.diary-floating-actions{z-index:90;}
-@media(max-width:760px){.diary-top-info{grid-template-columns:1fr}.diary-lore-panel summary{display:block}.diary-lore-panel summary small{text-align:left;margin-top:6px}.diary-lore-panel summary:after{float:right;margin-top:-1.6rem}}
-
-/* Diario — Sogni e Visioni collassabili */
-.diary-dreams-shell{max-width:1050px;margin:0 auto;padding:0;overflow:hidden;}
-.diary-dreams-shell > summary{background:linear-gradient(155deg,rgba(46,31,25,.88),rgba(16,12,11,.94));}
-.diary-dreams-body{background:rgba(0,0,0,.08);}
-.diary-dream-list{max-width:none;}
-.diary-dream-panel{background:linear-gradient(155deg,var(--panel),var(--panel2));}
-.diary-dream-panel summary a{color:var(--gold2);text-decoration:none;}
-.diary-dream-panel summary a:hover{text-decoration:underline;}
-.diary-dream-panel .dream-box{white-space:pre-line;color:var(--muted);line-height:1.75;}
-.diary-page.diary-editing .diary-dream-panel .dream-box{white-space:normal;}
-@media(max-width:760px){.diary-dreams-shell > summary{display:block}.diary-dreams-shell > summary small{text-align:left;margin-top:6px}.diary-dreams-shell > summary:after{float:right;margin-top:-1.6rem}}
+/* vXP compact linked editor — categorie più piccole e registro editabile */
+.xp-page .xp-current-panel{margin-bottom:14px;}
+.xp-page .xp-main-details,
+.xp-page .xp-levels-panel,
+.xp-page .xp-registry-section{border-radius:16px;margin:10px 0;}
+.xp-page .xp-main-details > summary,
+.xp-page .xp-levels-panel > summary,
+.xp-page .xp-registry-section > summary{padding:10px 14px;min-height:0;font-size:.98rem;}
+.xp-page summary small{font-size:.68rem;margin-top:2px;letter-spacing:.03em;}
+.xp-page .xp-registry-list{padding:0 10px 10px;}
+.xp-page .xp-table-wrap{margin:8px 0;}
+.xp-page .archive-table.compact th,
+.xp-page .archive-table.compact td{padding:6px 8px;font-size:.86rem;line-height:1.25;}
+.xp-page .xp-inline-actions{padding:6px 10px 10px;gap:6px;}
+.xp-page .xp-inline-actions .button,
+.xp-floating-actions .button{padding:7px 10px;font-size:.78rem;}
+.xp-page .xp-delete-row,.xp-page .row-del{width:24px;height:24px;font-size:.85rem;}
+.xp-page.xp-editing .archive-table td[contenteditable="true"]{min-width:56px;}
+.xp-page.xp-editing .archive-table td:first-child[contenteditable="true"]{min-width:135px;}
+@media(max-width:720px){.xp-page .archive-table{min-width:620px}.xp-page .xp-main-details > summary,.xp-page .xp-levels-panel > summary,.xp-page .xp-registry-section > summary{padding:9px 12px}.xp-page .archive-table.compact th,.xp-page .archive-table.compact td{font-size:.8rem;padding:6px}}
