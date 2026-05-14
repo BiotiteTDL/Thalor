@@ -5,6 +5,9 @@ const slug='diario';
 const storageKey='thalor.diary.v1';
 const esc=(v)=>String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 const nl=(v)=>String(v??'').split(/\n+/).map(x=>x.trim()).filter(Boolean);
+const makeSessionId=(value)=>String(value||'sessione').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,56)||('sessione-'+Date.now());
+const sessionDetailHref=(id)=>`diario/sessione-dettaglio.html?id=${encodeURIComponent(String(id||''))}`;
+const uniqueSessionId=(sessions,title)=>{const base=makeSessionId(title||'nuova-sessione');let id=base,n=2;const used=new Set((sessions||[]).map(s=>String(s.id||'')));while(used.has(id)){id=`${base}-${n++}`;}return id;};
 const authAvailable=()=>!!(window.ThalorAuth&&typeof window.ThalorAuth.init==='function');
 function canMasterEdit(){
   try{return authAvailable()&&window.ThalorAuth.isMaster&&window.ThalorAuth.isMaster();}catch(e){return false;}
@@ -199,7 +202,7 @@ function normalize(data){
     dateNote:String(data.dateNote||fb.dateNote),
     months:Array.isArray(data.months)&&data.months.length?data.months.map(String):fb.months,
     weekdays:Array.isArray(data.weekdays)&&data.weekdays.length?data.weekdays.map(String):fb.weekdays,
-    sessions:Array.isArray(data.sessions)?data.sessions.map(s=>({tag:String(s.tag||'Sessione'),title:String(s.title||'Nuova sessione'),href:String(s.href||'#'),description:String(s.description||'')})):fb.sessions,
+    sessions:Array.isArray(data.sessions)?data.sessions.map((s,i)=>({id:String(s.id||makeSessionId(s.title||('sessione-'+(i+1)))),tag:String(s.tag||'Sessione'),title:String(s.title||'Nuova sessione'),href:String(s.href||sessionDetailHref(s.id||makeSessionId(s.title||('sessione-'+(i+1))))),description:String(s.description||''),detailTitle:String(s.detailTitle||s.title||'Nuova sessione'),detailBody:String(s.detailBody||s.body||s.description||'')})):fb.sessions.map((s,i)=>({id:String(s.id||makeSessionId(s.title||('sessione-'+(i+1)))),...s})),
     dreamSections:Array.isArray(data.dreamSections)?data.dreamSections.map(x=>({character:String(x.character||'Personaggio'),characterUrl:String(x.characterUrl||'#'),title:String(x.title||'Nuova visione'),body:String(x.body||'')})):fb.dreamSections,
     loreSections:Array.isArray(data.loreSections)?data.loreSections.map(x=>({title:String(x.title||'Nuova sezione lore'),subtitle:String(x.subtitle||''),paragraphs:Array.isArray(x.paragraphs)?x.paragraphs.map(String):nl(x.body||'')})):fb.loreSections
   };
@@ -226,7 +229,7 @@ function render(data,editing=false){
   <section class="diary-section" data-diary-sessions>
     <h2 class="section-title">Sessioni</h2>
     <div class="session-grid diary-edit-grid">
-      ${data.sessions.map((s,i)=>`<article class="session-card diary-session-card" data-session-index="${i}"><span class="tag"${eattr} ${fieldAttrs('tag',i,'session')}>${esc(s.tag)}</span><h3${eattr} ${fieldAttrs('title',i,'session')}>${esc(s.title)}</h3><p${eattr} ${fieldAttrs('description',i,'session')}>${esc(s.description)}</p>${edit?`<label class="diary-edit-label">Link pagina <input value="${esc(s.href)}" ${fieldAttrs('href',i,'session')}></label><button type="button" class="row-del diary-delete" data-delete-session="${i}">×</button>`:`<a class="diary-card-link" href="${esc(s.href)}" aria-label="Apri ${esc(s.title)}"></a>`}</article>`).join('')}
+      ${data.sessions.map((s,i)=>{const href=s.href&&s.href!=='#'?s.href:sessionDetailHref(s.id);return `<article class="session-card diary-session-card" data-session-index="${i}"><span class="tag"${eattr} ${fieldAttrs('tag',i,'session')}>${esc(s.tag)}</span><h3${eattr} ${fieldAttrs('title',i,'session')}>${esc(s.title)}</h3><p${eattr} ${fieldAttrs('description',i,'session')}>${esc(s.description)}</p>${edit?`<label class="diary-edit-label">Link pagina <input value="${esc(href)}" ${fieldAttrs('href',i,'session')}></label><label class="diary-edit-label wide diary-session-detail-edit">Testo pagina dettaglio <textarea ${fieldAttrs('detailBody',i,'session')}>${esc(s.detailBody||s.description||'')}</textarea></label><a class="button ghost-button diary-open-detail" href="${esc(href)}">Apri pagina</a><button type="button" class="row-del diary-delete" data-delete-session="${i}">×</button>`:`<a class="diary-card-link" href="${esc(href)}" aria-label="Apri ${esc(s.title)}"></a>`}</article>`}).join('')}
     </div>
   </section>
   <section class="diary-section" data-diary-dreams>
@@ -259,7 +262,7 @@ function collect(prev){
   const monthsText=simple('months')||'';
   d.months=monthsText.split(',').map(x=>x.trim()).filter(Boolean);
   app.querySelectorAll('[data-diary-type="weekday"]').forEach(el=>{d.weekdays[Number(el.dataset.diaryIndex)||0]=el.textContent.trim();});
-  app.querySelectorAll('[data-diary-type="session"]').forEach(el=>{const i=Number(el.dataset.diaryIndex)||0;const f=el.dataset.diaryField;d.sessions[i]=d.sessions[i]||{tag:'Sessione',title:'Nuova sessione',href:'#',description:''};d.sessions[i][f]=(f==='href'?el.value:el.textContent).trim();});
+  app.querySelectorAll('[data-diary-type="session"]').forEach(el=>{const i=Number(el.dataset.diaryIndex)||0;const f=el.dataset.diaryField;d.sessions[i]=d.sessions[i]||{id:uniqueSessionId(d.sessions,'Nuova sessione'),tag:'Sessione',title:'Nuova sessione',href:'#',description:'',detailBody:''};d.sessions[i][f]=(f==='href'||f==='detailBody'?el.value:el.textContent).trim();if(!d.sessions[i].id)d.sessions[i].id=uniqueSessionId(d.sessions,d.sessions[i].title);if(!d.sessions[i].href||d.sessions[i].href==='#')d.sessions[i].href=sessionDetailHref(d.sessions[i].id);});
   app.querySelectorAll('[data-diary-type="dream"]').forEach(el=>{const i=Number(el.dataset.diaryIndex)||0;const f=el.dataset.diaryField;d.dreamSections[i]=d.dreamSections[i]||{character:'Personaggio',characterUrl:'#',title:'Nuova visione',body:''};d.dreamSections[i][f]=(f==='characterUrl'||f==='body'?el.value:el.textContent).trim();});
   app.querySelectorAll('[data-diary-type="lore"]').forEach(el=>{const i=Number(el.dataset.diaryIndex)||0;const f=el.dataset.diaryField;d.loreSections[i]=d.loreSections[i]||{title:'Nuova lore',subtitle:'',paragraphs:[]};if(f==='paragraphs')d.loreSections[i].paragraphs=nl(el.value);else d.loreSections[i][f]=el.textContent.trim();});
   d.sessions=d.sessions.filter(Boolean);
@@ -302,7 +305,7 @@ function bind(data){
   const cancel=document.getElementById('diaryCancelEdit');
   if(cancel)cancel.onclick=()=>render(data,false);
   const addS=document.getElementById('diaryAddSession');
-  if(addS)addS.onclick=()=>{const d=collect(data);d.sessions.push({tag:'Nuova sessione',title:'Titolo sessione',href:'#',description:'Descrizione della sessione.'});render(d,true);};
+  if(addS)addS.onclick=()=>{const d=collect(data);const id=uniqueSessionId(d.sessions,'nuova-sessione');d.sessions.push({id,tag:'Nuova sessione',title:'Titolo sessione',href:sessionDetailHref(id),description:'Descrizione della sessione.',detailTitle:'Titolo sessione',detailBody:'Testo della nuova pagina sessione.'});render(d,true);};
   const addD=document.getElementById('diaryAddDream');
   if(addD)addD.onclick=()=>{const d=collect(data);d.dreamSections.push({character:'Personaggio',characterUrl:'#',title:'Nuova visione',body:'Testo della visione.'});render(d,true);};
   const addL=document.getElementById('diaryAddLore');
