@@ -43,20 +43,44 @@
   }
 
   function isLocalPreview(){
-    const h = location.hostname;
-    return location.protocol === 'file:' || h === 'localhost' || h === '127.0.0.1' || h === '';
+    const h = String(location.hostname || '').toLowerCase();
+    const p = String(location.protocol || '').toLowerCase();
+    return p === 'file:' ||
+      h === '' ||
+      h === 'localhost' ||
+      h === '127.0.0.1' ||
+      h === '::1' ||
+      /^192\.168\./.test(h) ||
+      /^10\./.test(h) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(h);
   }
+
+  function safeGet(key){ try{ return localStorage.getItem(key); }catch(e){ return null; } }
+  function safeSessionGet(key){ try{ return sessionStorage.getItem(key); }catch(e){ return null; } }
+  function safeSet(key,value){ try{ localStorage.setItem(key,value); }catch(e){} try{ sessionStorage.setItem(key,value); }catch(e){} }
+  function safeRemove(key){ try{ localStorage.removeItem(key); }catch(e){} try{ sessionStorage.removeItem(key); }catch(e){} }
 
   function localMasterEnabled(){
     try{
+      const localPreview = isLocalPreview();
       const params = new URLSearchParams(location.search);
+
+      // Il Master offline è SOLO per anteprima locale: file://, localhost, rete locale.
+      // Su GitHub Pages / sito pubblico non deve mai concedere permessi, nemmeno se
+      // il browser è offline o conserva un vecchio flag in localStorage.
+      if(!localPreview){
+        safeRemove('thalor.offlineMaster');
+        return false;
+      }
+
       if(params.get('master') === 'offline' || params.get('thalorMaster') === '1'){
-        localStorage.setItem('thalor.offlineMaster','1');
+        safeSet('thalor.offlineMaster','1');
       }
       if(params.get('master') === 'off' || params.get('thalorMaster') === '0'){
-        localStorage.removeItem('thalor.offlineMaster');
+        safeRemove('thalor.offlineMaster');
       }
-      return isLocalPreview() && localStorage.getItem('thalor.offlineMaster') === '1';
+
+      return safeGet('thalor.offlineMaster') === '1' || safeSessionGet('thalor.offlineMaster') === '1';
     }catch(e){
       return false;
     }
@@ -515,6 +539,7 @@
   async function saveCharacter(slug, data){
     const client = makeClient();
     if(isLocalPreview()) { saveDebug('save:local-preview', { slug }); return { mode:'local-preview' }; }
+    state.localMaster = localMasterEnabled();
     if(state.localMaster) { saveDebug('save:local-master', { slug }); return { mode:'local-master' }; }
     if(!state.configured || !client) { saveDebug('save:local-no-config', { slug }); return { mode:'local' }; }
 
@@ -631,7 +656,21 @@
     statusText,
     isLocalPreview,
     localMasterEnabled,
-    enableLocalMaster(){ if(isLocalPreview()) localStorage.setItem('thalor.offlineMaster','1'); state.localMaster=localMasterEnabled(); return state.localMaster; },
-    disableLocalMaster(){ localStorage.removeItem('thalor.offlineMaster'); state.localMaster=false; return false; }
+    enableLocalMaster(){
+      if(!isLocalPreview()) return false;
+      safeSet('thalor.offlineMaster','1');
+      state.localMaster = true;
+      state.ready = true;
+      window.dispatchEvent(new CustomEvent('thalor-auth-changed', { detail: state }));
+      window.dispatchEvent(new CustomEvent('thalor-local-master-changed', { detail: { enabled:true, state } }));
+      return true;
+    },
+    disableLocalMaster(){
+      safeRemove('thalor.offlineMaster');
+      state.localMaster = false;
+      window.dispatchEvent(new CustomEvent('thalor-auth-changed', { detail: state }));
+      window.dispatchEvent(new CustomEvent('thalor-local-master-changed', { detail: { enabled:false, state } }));
+      return false;
+    }
   };
 })();

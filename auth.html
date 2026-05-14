@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Thalor — Accesso</title>
-  <link href="assets/css/style.css?v=160" rel="stylesheet"/>
+  <link href="assets/css/style.css?v=161" rel="stylesheet"/>
 
 <style>
 .auth-actions-clean .button{
@@ -65,7 +65,7 @@
           <button class="button ghost-button" id="enableLocalMasterBtn" type="button">Attiva Master offline</button>
           <button class="button ghost-button danger-action" id="disableLocalMasterBtn" type="button">Disattiva Master offline</button>
         </div>
-        <p class="auth-mini-note local-master-tools" id="localMasterNote" hidden>Disponibile solo aprendo il sito in locale/localhost. Non modifica ruoli, permessi o login online.</p>
+        <p class="auth-mini-note local-master-tools" id="localMasterNote" hidden>Disponibile in locale/offline. Non modifica ruoli, permessi o login online.</p>
       </form>
     </section>
   </main>
@@ -73,14 +73,14 @@
   <script src="assets/js/main.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="assets/js/supabase-config.js"></script>
-  <script src="assets/js/supabase-auth.js?v=162"></script>
+  <script src="assets/js/supabase-auth.js?v=offline-master-172"></script>
   <script>
   (async()=>{
     const st=document.getElementById('authStatus');
     const form=document.getElementById('authForm');
     const localTools=document.getElementById('localMasterTools');
     const localNote=document.getElementById('localMasterNote');
-    const shouldShowOfflineMasterTools=()=>navigator.onLine===false;
+    const shouldShowOfflineMasterTools=()=>{try{return !!window.ThalorAuth?.isLocalPreview?.();}catch(e){return location.protocol==='file:';}};
     const applyOfflineMasterVisibility=()=>{
       const showOfflineTools=shouldShowOfflineMasterTools();
       document.documentElement.classList.toggle('offline-master-available', showOfflineTools);

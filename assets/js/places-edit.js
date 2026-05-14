@@ -121,9 +121,27 @@ function load(){
 }
 function save(data){ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
 function findPlace(slug){ return load().places.find(p=>p.slug===slug) || FALLBACK.places.find(p=>p.slug===slug); }
+function isLocalPreview(){
+  try{
+    const h = String(location.hostname || '').toLowerCase();
+    const pr = String(location.protocol || '').toLowerCase();
+    return pr === 'file:' || h === '' || h === 'localhost' || h === '127.0.0.1' || h === '::1' || /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(h);
+  }catch(e){ return false; }
+}
+function offlineMasterFlag(){
+  try{
+    const params = new URLSearchParams(location.search);
+    if(params.get('master') === 'offline' || params.get('thalorMaster') === '1') return true;
+    return localStorage.getItem('thalor.offlineMaster') === '1' || sessionStorage.getItem('thalor.offlineMaster') === '1';
+  }catch(e){ return false; }
+}
 async function canEdit(){
   try{ if(window.ThalorAuth?.init) await window.ThalorAuth.init(); }catch(e){}
-  try{ return !!window.ThalorAuth?.isMaster?.(); }catch(e){ return false; }
+  try{ if(window.ThalorAuth?.canEdit?.('__places__')) return true; }catch(e){}
+  try{ if(window.ThalorAuth?.isMaster?.()) return true; }catch(e){}
+  // Fallback indispensabile per pagine statiche dei luoghi aperte in file:// / localhost:
+  // se il Master offline è attivo ma l'auth non è ancora pronta, il tondino deve comunque comparire.
+  return isLocalPreview() && offlineMasterFlag();
 }
 function fileToData(input){
   return new Promise(resolve=>{
@@ -306,6 +324,10 @@ function enhanceStaticPage(place){
     if(main){ main.innerHTML=''; main.appendChild(app); const f=document.createElement('footer'); f.textContent='Thalor'; main.appendChild(f); renderDetail(stored); }
   }
 }
+async function ensureFloatingEditor(place){
+  if(document.querySelector('.places-floating-actions')) return;
+  if(await canEdit()) floatingEditor(place || null);
+}
 async function init(){
   document.body.classList.add('places-edit-ready');
   if(document.querySelector('[data-places-index]')) renderIndex();
@@ -313,7 +335,13 @@ async function init(){
   let place=slug?findPlace(slug):null;
   if(document.querySelector('[data-place-detail]')) renderDetail(place);
   else if(document.body.dataset.placeSlug) enhanceStaticPage(place);
-  if(await canEdit()) floatingEditor(place || null);
+  await ensureFloatingEditor(place || null);
+  // Alcune pagine statiche caricano/aggiornano lo stato master dopo questo script:
+  // riprovo e ascolto i cambi di auth/offline master senza toccare il resto della pagina.
+  setTimeout(()=>ensureFloatingEditor(place || null), 250);
+  setTimeout(()=>ensureFloatingEditor(place || null), 1000);
+  window.addEventListener('thalor-auth-changed', ()=>ensureFloatingEditor(place || null));
+  window.addEventListener('thalor-local-master-changed', ()=>ensureFloatingEditor(place || null));
 }
 init();
 })();

@@ -1,16 +1,18 @@
 (function(){
 const app=document.getElementById('characterSheetApp'); if(!app) return;
-const slug=app.dataset.character;
 const params=new URLSearchParams(location.search);
+const slug=(app.dataset.character||params.get('character')||params.get('slug')||'').trim();
 const companionIndex=params.has('companion')?Number(params.get('companion')):null;
 const isCompanion=Number.isInteger(companionIndex)&&companionIndex>=0;
 const parentStorageKey=`thalor.sheet.${slug}.v5`;
 const storageKey=isCompanion?`thalor.sheet.${slug}.companion.${companionIndex}.v1`:parentStorageKey;
 const oldKeys=isCompanion?[]:[`thalor.sheet.${slug}.v4`,`thalor.sheet.${slug}.v3`,`thalor.sheet.${slug}.v2`];
+function safeJsonParse(raw){try{return raw?JSON.parse(raw):null}catch(e){return null}}
+function firstValidLocal(keys){for(const k of keys){const raw=localStorage.getItem(k);const parsed=safeJsonParse(raw);if(parsed)return {key:k,data:parsed,raw};if(raw)localStorage.removeItem(k);}return null}
 let authState={configured:false,ready:false};
 function authAvailable(){return !!window.ThalorAuth;}
 function authNorm(v){return String(v||'').trim().toLowerCase();}
-function authLocalPreview(){const h=location.hostname;return location.protocol==='file:'||h==='localhost'||h==='127.0.0.1'||h==='';}
+function authLocalPreview(){const h=String(location.hostname||'').toLowerCase();const p=String(location.protocol||'').toLowerCase();return p==='file:'||h===''||h==='localhost'||h==='127.0.0.1'||h==='::1'||/^192\.168\./.test(h)||/^10\./.test(h)||/^172\.(1[6-9]|2\d|3[0-1])\./.test(h);}
 function sheetHasDirectAccess(auth){
   const st=auth?.state||{};
   const wanted=authNorm(slug);
@@ -18,14 +20,12 @@ function sheetHasDirectAccess(auth){
 }
 function sheetCanEdit(){
   const auth=window.ThalorAuth;
+  if(authLocalPreview()) return true;
   if(!auth) return false;
   const st=auth.state||{};
   if(st.localMaster) return true;
   if(authNorm(st.profile?.role)==='master') return true;
   if(sheetHasDirectAccess(auth)) return true;
-  // In locale/preview NON rendere tutto modificabile automaticamente: serve Master offline o ruolo della scheda.
-  // Non modifica ThalorAuth.canEdit né la logica Supabase, limita solo la UI della scheda.
-  if(authLocalPreview()) return false;
   return !!auth.canEdit(slug);
 }
 async function refreshEditPermission(){
@@ -167,9 +167,14 @@ function bonusTip(b,forcedTarget){
   return lines.join('\n');
 }
 
-function normalizeBonusList(list){return (Array.isArray(list)?list:[]).map(b=>Object.assign({},blank.bonus,b,{target:b.target||'ac',save:b.save||'all',type:b.type||'senza tipo',value:num(b.value)}))}
+function asArray(value){
+  if(Array.isArray(value)) return value;
+  if(value && typeof value==='object') return Object.values(value).filter(v=>v && typeof v==='object');
+  return [];
+}
+function normalizeBonusList(list){return asArray(list).map(b=>Object.assign({},blank.bonus,b,{target:b.target||'ac',save:b.save||'all',type:b.type||'senza tipo',value:num(b.value)}))}
 function stackBonuses(list){const grouped={};let total=0;normalizeBonusList(list).forEach(b=>{const v=num(b.value);if(!v)return;const t=String(b.type||'senza tipo').toLowerCase();if(STACKING_TYPES.has(t)){total+=v;return;}const key=t; if(grouped[key]==null)grouped[key]=v; else grouped[key]=v>=0?Math.max(grouped[key],v):Math.min(grouped[key],v);});return total+Object.values(grouped).reduce((a,b)=>a+num(b),0)}
-function globalBonusTotals(d){const buckets={ac:[],touch:[],flat:[],attack:[],damage:[],initiative:[],grapple:[],skill:[],srCheck:[],fortitude:[],reflex:[],will:[],FOR:[],DES:[],COS:[],INT:[],SAG:[],CAR:[]};function add(b){b=Object.assign({},blank.bonus,b);if(b.target==='save'){if(!b.save||b.save==='all'){buckets.fortitude.push(b);buckets.reflex.push(b);buckets.will.push(b)}else if(buckets[b.save])buckets[b.save].push(b);return;} if(buckets[b.target])buckets[b.target].push(b);} (d.defenses||[]).forEach(x=>normalizeBonusList(x.bonuses).forEach(add));(d.feats||[]).forEach(x=>normalizeBonusList(x.bonuses).forEach(add));(d.features||[]).forEach(x=>normalizeBonusList(x.bonuses).forEach(add));(d.combat?.tempBonuses||[]).forEach(add);(d.inventorySections||[]).forEach(sec=>(sec.items||[]).forEach(it=>{if(String(it.equipped||'No').toLowerCase().startsWith('s')) normalizeBonusList(it.bonuses).forEach(add);}));AB.forEach(([k])=>normalizeBonusList(d.abilities?.[k]?.bonuses).forEach(b=>add(Object.assign({},b,{target:k}))));return Object.fromEntries(Object.entries(buckets).map(([k,v])=>[k,stackBonuses(v)]));}
+function globalBonusTotals(d){const buckets={ac:[],touch:[],flat:[],attack:[],damage:[],initiative:[],grapple:[],skill:[],srCheck:[],fortitude:[],reflex:[],will:[],FOR:[],DES:[],COS:[],INT:[],SAG:[],CAR:[]};function add(b){b=Object.assign({},blank.bonus,b);if(b.target==='save'){if(!b.save||b.save==='all'){buckets.fortitude.push(b);buckets.reflex.push(b);buckets.will.push(b)}else if(buckets[b.save])buckets[b.save].push(b);return;} if(buckets[b.target])buckets[b.target].push(b);} (d.defenses||[]).forEach(x=>normalizeBonusList(x.bonuses).forEach(add));(d.feats||[]).forEach(x=>normalizeBonusList(x.bonuses).forEach(add));(d.features||[]).forEach(x=>normalizeBonusList(x.bonuses).forEach(add));(d.combat?.tempBonuses||[]).forEach(add);asArray(d.inventorySections).forEach(sec=>asArray(sec.items).forEach(it=>{if(String(it.equipped||'No').toLowerCase().startsWith('s')) normalizeBonusList(it.bonuses).forEach(add);}));AB.forEach(([k])=>normalizeBonusList(d.abilities?.[k]?.bonuses).forEach(b=>add(Object.assign({},b,{target:k}))));return Object.fromEntries(Object.entries(buckets).map(([k,v])=>[k,stackBonuses(v)]));}
 function bonusRows(path,list){list=normalizeBonusList(list);let count=list.length;return `<div class="bonus-popup-compact edit-only"><button class="mini-add compact-bonus-open" type="button" data-open-bonus-modal="${esc(path)}"><span>Bonus avanzati</span><strong>${count}</strong></button></div>`}
 function bonusSummary(list, forcedTarget){
   list=normalizeBonusList(list);
@@ -223,9 +228,9 @@ function defaultXpThreshold(level){level=Math.max(1,num(level)||1);return Math.f
 function xpThreshold(table,level){level=Math.max(1,num(level)||1);const row=(table||[]).find(r=>num(r.livello)===level);const val=num(row?.xp_minimi);if(row && (level===1 || val>0))return val;return defaultXpThreshold(level)}
 function xpLevelFromXp(table,xp){xp=Math.max(0,num(xp));let lvl=1;const max=Math.max(20,...(table||[]).map(r=>num(r.livello)||0));for(let l=1;l<=max+1;l++){if(xp>=xpThreshold(table,l))lvl=l;else break;}return Math.max(1,lvl)}
 function xpCalc(d,xpData){
-  const pdata=xpData?.personaggi?.[slug]||{};
-  const rawXp=String(d.identity?.xp??'').trim();
-  const xp=/[0-9]/.test(rawXp)?num(rawXp):num(pdata.xp_totali);
+  const key=String(slug||d.meta?.slug||'').trim();
+  const pdata=xpData?.personaggi?.[key]||{};
+  const xp=num(pdata.xp_totali);
   const table=(xpData?.tabella_xp||[]).slice().sort((a,b)=>num(a.livello)-num(b.livello));
   const classLevel=Math.max(1,totalLevel(d));
   const xpLevel=xpLevelFromXp(table,xp);
@@ -286,7 +291,7 @@ function migrateLegacyAcBonuses(d){
   return d;
 }
 
-function normalize(d){d=JSON.parse(JSON.stringify(d||{}));d.schemaVersion=9;d.identity=d.identity||{};d.armorClass=d.armorClass||{};d.combat=d.combat||{};d.combat.hpTemp=d.combat.hpTemp??0;d.combat.nonlethal=d.combat.nonlethal??0;d.combat.stable=d.combat.stable||'No';d.combat.tempBonuses=normalizeBonusList(d.combat.tempBonuses||[]);d=migrateLegacyAcBonuses(d);d.defenses=d.defenses||[];d.skills=d.skills||[];d.feats=d.feats||[];d.features=d.features||[];d.feats=d.feats.map(x=>Object.assign({},blank.feat,x,{bonuses:normalizeBonusList(x.bonuses||[])}));d.features=d.features.map(x=>Object.assign({},blank.feature,x,{bonuses:normalizeBonusList(x.bonuses||[])}));d.languages=d.languages||[];d.spells=d.spells||{};d.inventory=d.inventory||[];d.inventorySections=Array.isArray(d.inventorySections)?d.inventorySections:[];if(!d.inventorySections.length&&Array.isArray(d.inventory)&&d.inventory.length){d.inventorySections=[Object.assign({},blank.inventorySection,{name:'Inventario',items:d.inventory})];}d.inventorySections=d.inventorySections.map(sec=>Object.assign({},blank.inventorySection,sec,{items:(sec.items||[]).map(it=>Object.assign({},blank.item,it,{equipped:it.equipped||'No',bonuses:normalizeBonusList(it.bonuses||[])}))}));d.companions=Array.isArray(d.companions)?d.companions:[];d.companions=d.companions.map((c,i)=>{let cc=Object.assign({},blank.companion,c||{});cc.sheet=normalize(cc.sheet||companionTemplate(cc.name||('Creatura '+(i+1)),cc.kind||'Creatura'));cc.name=cc.sheet.identity?.name||cc.name||('Creatura '+(i+1));cc.kind=cc.kind||cc.sheet.meta?.subtitle||'Creatura';return cc;});d.money=d.money||{};d.conditions=(d.conditions||[]).filter(c=>!String(c.notes||'').startsWith('Aggiunta automatica da '));d.changeLog=d.changeLog||[];d.secrets=d.secrets||{playerVisible:'',dmNotes:'',loginRequired:true};d.classLevels=d.classLevels&&d.classLevels.length?d.classLevels:parseClassLevels(d.identity.classLevel);if(!d.classLevels.length)d.classLevels=[{name:d.identity.classLevel||'Classe da definire',level:num(d.identity.level)||3,notes:''}];d.classLevels=d.classLevels.map(c=>Object.assign({},blank.classLevel,c,{level:Math.max(1,num(c.level)||1)}));d.identity.classLevel=classSummary(d);d.identity.level=totalLevel(d);d.spellcasting=d.spellcasting||{};d.spellcasting.defaultAbility=d.spellcasting.defaultAbility||'';if(d.spellcasting.casterLevel==null||d.spellcasting.casterLevel==='')d.spellcasting.casterLevel=totalLevel(d);d.spellcasting.srMisc=d.spellcasting.srMisc??0;d.spellcasting.circles=d.spellcasting.circles||{};d.spellcasting.groups=Array.isArray(d.spellcasting.groups)?d.spellcasting.groups:[];
+function normalize(d){d=JSON.parse(JSON.stringify(d||{}));d.schemaVersion=9;d.identity=d.identity||{};d.armorClass=d.armorClass||{};d.combat=d.combat||{};d.combat.hpTemp=d.combat.hpTemp??0;d.combat.nonlethal=d.combat.nonlethal??0;d.combat.stable=d.combat.stable||'No';d.combat.tempBonuses=normalizeBonusList(d.combat.tempBonuses||[]);d=migrateLegacyAcBonuses(d);d.defenses=asArray(d.defenses);d.attacks=asArray(d.attacks);d.skills=asArray(d.skills);d.feats=asArray(d.feats);d.features=asArray(d.features);d.languages=asArray(d.languages);d.conditions=asArray(d.conditions);d.feats=d.feats.map(x=>Object.assign({},blank.feat,x,{bonuses:normalizeBonusList(x.bonuses||[])}));d.features=d.features.map(x=>Object.assign({},blank.feature,x,{bonuses:normalizeBonusList(x.bonuses||[])}));d.spells=d.spells||{};d.inventory=asArray(d.inventory);d.inventorySections=asArray(d.inventorySections);if(!d.inventorySections.length&&Array.isArray(d.inventory)&&d.inventory.length){d.inventorySections=[Object.assign({},blank.inventorySection,{name:'Inventario',items:d.inventory})];}d.inventorySections=d.inventorySections.map(sec=>Object.assign({},blank.inventorySection,sec,{items:asArray(sec.items).map(it=>Object.assign({},blank.item,it,{equipped:it.equipped||'No',bonuses:normalizeBonusList(it.bonuses||[])}))}));d.companions=asArray(d.companions);d.companions=d.companions.map((c,i)=>{let cc=Object.assign({},blank.companion,c||{});cc.sheet=normalize(cc.sheet||companionTemplate(cc.name||('Creatura '+(i+1)),cc.kind||'Creatura'));cc.name=cc.sheet.identity?.name||cc.name||('Creatura '+(i+1));cc.kind=cc.kind||cc.sheet.meta?.subtitle||'Creatura';return cc;});d.money=d.money||{};d.conditions=asArray(d.conditions).filter(c=>!String(c.notes||'').startsWith('Aggiunta automatica da '));d.changeLog=d.changeLog||[];d.secrets=d.secrets||{playerVisible:'',dmNotes:'',loginRequired:true};d.classLevels=d.classLevels&&d.classLevels.length?d.classLevels:parseClassLevels(d.identity.classLevel);if(!d.classLevels.length)d.classLevels=[{name:d.identity.classLevel||'Classe da definire',level:num(d.identity.level)||3,notes:''}];d.classLevels=d.classLevels.map(c=>Object.assign({},blank.classLevel,c,{level:Math.max(1,num(c.level)||1)}));d.identity.classLevel=classSummary(d);d.identity.level=totalLevel(d);d.spellcasting=d.spellcasting||{};d.spellcasting.defaultAbility=d.spellcasting.defaultAbility||'';if(d.spellcasting.casterLevel==null||d.spellcasting.casterLevel==='')d.spellcasting.casterLevel=totalLevel(d);d.spellcasting.srMisc=d.spellcasting.srMisc??0;d.spellcasting.circles=d.spellcasting.circles||{};d.spellcasting.groups=asArray(d.spellcasting.groups);
   if(!d.spellcasting.groups.length){
     const migrated=[];
     for(let lv=0;lv<=9;lv++){
@@ -297,8 +302,8 @@ function normalize(d){d=JSON.parse(JSON.stringify(d||{}));d.schemaVersion=9;d.id
     }
     d.spellcasting.groups=migrated;
   }
-  d.spellcasting.groups=d.spellcasting.groups.map((g,idx)=>Object.assign({},blank.spellCircle,g,{level:Math.max(0,Math.min(9,num(g.level)||0)),className:g.className||g.class||'',spells:(g.spells||[]).map(sp=>Object.assign({},blank.spell,sp,{castingTime:sp.castingTime||sp.time||'',time:sp.castingTime||sp.time||''}))}));
-  d.spells={};d.spellcasting.groups.forEach(g=>{let k=String(g.level);d.spells[k]=d.spells[k]||[];d.spells[k].push(...(g.spells||[]));});d.defenses.forEach(x=>{x.bonus=x.bonus==='Da compilare'?0:x.bonus;x.spellFailure=num(x.spellFailure);x.bonuses=normalizeBonusList(x.bonuses||[])});d.attacks=(d.attacks||[]).map(a=>Object.assign({},blank.attack,{prevBonus:a.bonus||'',damageDice:a.damage||a.damageDice||''},a,{attackAbility:a.attackAbility||'FOR',damageAbility:a.damageAbility||'FOR',magicBonus:a.magicBonus??a.damageMagic??0,attackMisc:a.attackMisc??0,damageMagic:a.damageMagic??0,damageMisc:a.damageMisc??0,bonuses:normalizeBonusList(a.bonuses||[])}));d.conditions=d.conditions.map(c=>Object.assign({name:'Custom',active:'Sì',duration:'',modifiers:[],strMod:0,desMod:0,cosMod:0,intMod:0,sagMod:0,carMod:0,attackMod:0,damageMod:0,acMod:0,saveMod:0,skillMod:0,notes:''},c,{modifiers:Array.isArray(c.modifiers)?c.modifiers:[]}));const byName=new Map(d.skills.map(s=>[String(s.name||'').toLowerCase(),s]));STANDARD_SKILLS.forEach(([name,ab,pen])=>{if(!byName.has(name.toLowerCase()))d.skills.push(Object.assign({},blank.skill,{name,ability:ab,standardAbility:ab,armorApplies:pen,classSkill:''}));});AB.forEach(([k])=>{d.abilities=d.abilities||{};d.abilities[k]=d.abilities[k]||{score:10,temp:0};d.abilities[k].bonuses=normalizeBonusList(d.abilities[k].bonuses||[])});d.skills.forEach(s=>{const std=STANDARD_SKILLS.find(x=>x[0].toLowerCase()===String(s.name||'').toLowerCase());s.standardAbility=s.standardAbility||std?.[1]||s.ability||'INT';if(s.armorApplies===undefined)s.armorApplies=!!std?.[2];});return d}
+  d.spellcasting.groups=d.spellcasting.groups.map((g,idx)=>Object.assign({},blank.spellCircle,g,{level:Math.max(0,Math.min(9,num(g.level)||0)),className:g.className||g.class||'',spells:asArray(g.spells).map(sp=>Object.assign({},blank.spell,sp,{castingTime:sp.castingTime||sp.time||'',time:sp.castingTime||sp.time||''}))}));
+  d.spells={};d.spellcasting.groups.forEach(g=>{g.spells=asArray(g.spells);let k=String(g.level);d.spells[k]=d.spells[k]||[];d.spells[k].push(...g.spells);});d.defenses.forEach(x=>{x.bonus=x.bonus==='Da compilare'?0:x.bonus;x.spellFailure=num(x.spellFailure);x.bonuses=normalizeBonusList(x.bonuses||[])});d.attacks=(d.attacks||[]).map(a=>Object.assign({},blank.attack,{prevBonus:a.bonus||'',damageDice:a.damage||a.damageDice||''},a,{attackAbility:a.attackAbility||'FOR',damageAbility:a.damageAbility||'FOR',magicBonus:a.magicBonus??a.damageMagic??0,attackMisc:a.attackMisc??0,damageMagic:a.damageMagic??0,damageMisc:a.damageMisc??0,bonuses:normalizeBonusList(a.bonuses||[])}));d.conditions=d.conditions.map(c=>Object.assign({name:'Custom',active:'Sì',duration:'',modifiers:[],strMod:0,desMod:0,cosMod:0,intMod:0,sagMod:0,carMod:0,attackMod:0,damageMod:0,acMod:0,saveMod:0,skillMod:0,notes:''},c,{modifiers:Array.isArray(c.modifiers)?c.modifiers:[]}));const byName=new Map(d.skills.map(s=>[String(s.name||'').toLowerCase(),s]));STANDARD_SKILLS.forEach(([name,ab,pen])=>{if(!byName.has(name.toLowerCase()))d.skills.push(Object.assign({},blank.skill,{name,ability:ab,standardAbility:ab,armorApplies:pen,classSkill:''}));});AB.forEach(([k])=>{d.abilities=d.abilities||{};d.abilities[k]=d.abilities[k]||{score:10,temp:0};d.abilities[k].bonuses=normalizeBonusList(d.abilities[k].bonuses||[])});d.skills.forEach(s=>{const std=STANDARD_SKILLS.find(x=>x[0].toLowerCase()===String(s.name||'').toLowerCase());s.standardAbility=s.standardAbility||std?.[1]||s.ability||'INT';if(s.armorApplies===undefined)s.armorApplies=!!std?.[2];});return d}
 function protectionTotals(d){let total=0,armorPenalty=0,spellFailure=0,maxDexVals=[];(d.defenses||[]).forEach(x=>{total+=num(x.bonus);armorPenalty+=num(x.checkPenalty);spellFailure+=num(x.spellFailure);if(String(x.maxDex||'').trim()!=='')maxDexVals.push(num(x.maxDex))});return{total,armorPenalty,spellFailure,maxDexLimit:maxDexVals.length?Math.min(...maxDexVals):''}}
 function calc(d){const ct=conditionTotals(d),gb=globalBonusTotals(d),dex=abilityMod(d,'DES'),str=abilityMod(d,'FOR'),ac=d.armorClass||{},pt=protectionTotals(d),rawMaxDex=pt.maxDexLimit===''?dex:Math.min(dex,pt.maxDexLimit),maxDex=ct.noDexToAC?Math.min(rawMaxDex,0):rawMaxDex,spellFailure=pt.spellFailure+ct.spellFailureMod;const flatDex=Math.min(dex,0);return{dex,str,ct,gb,pt,maxDex,flatDex,spellFailure,ca:num(ac.base??10)+pt.total+maxDex+ct.acMod+gb.ac,touch:num(ac.base??10)+maxDex+ct.acMod+gb.ac+gb.touch,flat:num(ac.base??10)+pt.total+flatDex+ct.acMod+gb.ac+gb.flat,init:dex+num(d.combat?.initiativeMisc)+ct.initMod+gb.initiative,grapple:num(d.combat?.bab)+str+num(d.combat?.grappleMisc)+gb.grapple}}
 function section(title,inner,opts={}){const sid=String(title||'sezione').toLowerCase().replace(/[^a-z0-9àèéìòù]+/gi,'-');return `<details data-detail-id="${esc(sid)}" class="sheet-dropdown panel sheet-theme-panel ${opts.wide?'wide':''}" ${opts.open?'open':''}><summary><span>${title}</span>${opts.action||''}</summary><div class="dropdown-content">${inner}</div></details>`}
@@ -394,7 +399,7 @@ function inventoryItemTip(item){
   if(bonuses.length)bits.push('Bonus:\n'+bonuses.map(b=>`• ${bonusTargetLabel(b.target,b.save)} ${sign(b.value)} ${bonusTypeLabel(b.type)}${b.source?' — '+b.source:''}${b.note?' ('+b.note+')':''}`).join('\n'));
   return bits.join('\n\n')||'Nessuna nota.';
 }
-function inventory(d){let m=d.money||{},sections=Array.isArray(d.inventorySections)?d.inventorySections:[];let inv=`<div class="section-head inventory-section-adder edit-only"><label>Nome sezione ${`<input id="newInventorySectionName" type="text" placeholder="Pozioni, Pergamene, Gemme, Documenti...">`}</label><label>Inserisci ${`<select id="newInventorySectionPos"><option value="end">In fondo</option>${sections.map((sec,i)=>`<option value="${i}">Prima di ${esc(sec.name||'Sezione')}</option>`).join('')}</select>`}</label><button class="mini-add" id="addInventorySection" type="button">+ Sezione inventario</button></div><p class="section-mini-note">L'inventario è diviso in sezioni libere. Gli oggetti possono avere note, stato equipaggiato e bonus avanzati: i bonus vengono applicati solo se l'oggetto è equipaggiato.</p><div class="inventory-sections">${sections.map((sec,si)=>`<details class="inventory-section" data-inv-section="${si}" open${dragDropAttrs(`inventorySections.${si}`)}><summary>${dragHandle(`inventorySections.${si}`)}<span>${inp(`inventorySections.${si}.name`,sec.name||'Sezione')}</span><small>${(sec.items||[]).length} oggetti</small><button class="mini-add edit-only" data-add="inventorySections.${si}.items" data-kind="item" onclick="event.stopPropagation()" hidden>+ Oggetto</button><button class="row-del edit-only" data-del="inventorySections.${si}" onclick="event.stopPropagation()" title="Elimina sezione">×</button></summary><div class="inventory-section-body"><div class="inventory-section-notes edit-only"><label>Note sezione ${inp(`inventorySections.${si}.notes`,sec.notes||'')}</label></div><div class="inventory-item-list" data-reorder-zone="inventorySections.${si}.items">${((sec.items||[]).length?sec.items:[]).map((r,i)=>{const equipped=String(r.equipped||'No').toLowerCase().startsWith('s');const tip=inventoryItemTip(r);return `<article class="inventory-item-card ${equipped?'is-equipped':''}"${dragDropAttrs(`inventorySections.${si}.items.${i}`)}><div class="inventory-item-main">${dragHandle(`inventorySections.${si}.items.${i}`,'Sposta oggetto anche in un’altra categoria')}<div class="inventory-item-name info-card" tabindex="0" data-tip="${esc(tip)}">${inp(`inventorySections.${si}.items.${i}.name`,r.name||'')}</div><div class="inventory-item-meta"><span>Q.tà ${inp(`inventorySections.${si}.items.${i}.qty`,r.qty??1,'number')}</span><span>Peso ${inp(`inventorySections.${si}.items.${i}.weight`,r.weight||'')}</span><span class="inventory-equipped">Equip. ${yesNo(`inventorySections.${si}.items.${i}.equipped`,r.equipped||'No')}</span></div><div class="inventory-item-badges">${equipped?'<span class="equipped-badge">Equipaggiato</span>':'<span class="unequipped-badge">Non equipaggiato</span>'}${bonusSummary(r.bonuses)}</div><button class="row-del edit-only inventory-delete" data-del="inventorySections.${si}.items.${i}">×</button></div><div class="inventory-item-notes edit-only"><label>Note oggetto <small>(visibili in lettura solo con hover/tap sul nome)</small>${area(`inventorySections.${si}.items.${i}.notes`,r.notes||'','item-notes-editor')}</label></div>${bonusRows(`inventorySections.${si}.items.${i}.bonuses`,r.bonuses||[])}</article>`}).join('')||`<div class="empty-row">Nessun oggetto in questa sezione.</div>`}</div></div></details>`).join('')||`<div class="empty-row">Nessuna sezione inventario. Entra in modifica e aggiungi la prima sezione.</div>`}</div><h3>Denaro</h3><div class="money-grid sheet-stat-grid">${['MP','MO','MA','MR'].map(k=>`<div class="sheet-stat"><span>${k}</span>${inp('money.'+k,m[k]||0,'number')}</div>`).join('')}</div>`;return section('Inventario e denaro',inv,{wide:true})}
+function inventory(d){let m=d.money||{},sections=asArray(d.inventorySections);let inv=`<div class="section-head inventory-section-adder edit-only"><label>Nome sezione ${`<input id="newInventorySectionName" type="text" placeholder="Pozioni, Pergamene, Gemme, Documenti...">`}</label><label>Inserisci ${`<select id="newInventorySectionPos"><option value="end">In fondo</option>${sections.map((sec,i)=>`<option value="${i}">Prima di ${esc(sec.name||'Sezione')}</option>`).join('')}</select>`}</label><button class="mini-add" id="addInventorySection" type="button">+ Sezione inventario</button></div><p class="section-mini-note">L'inventario è diviso in sezioni libere. Gli oggetti possono avere note, stato equipaggiato e bonus avanzati: i bonus vengono applicati solo se l'oggetto è equipaggiato.</p><div class="inventory-sections">${sections.map((sec,si)=>`<details class="inventory-section" data-inv-section="${si}" open${dragDropAttrs(`inventorySections.${si}`)}><summary>${dragHandle(`inventorySections.${si}`)}<span>${inp(`inventorySections.${si}.name`,sec.name||'Sezione')}</span><small>${(sec.items||[]).length} oggetti</small><button class="mini-add edit-only" data-add="inventorySections.${si}.items" data-kind="item" onclick="event.stopPropagation()" hidden>+ Oggetto</button><button class="row-del edit-only" data-del="inventorySections.${si}" onclick="event.stopPropagation()" title="Elimina sezione">×</button></summary><div class="inventory-section-body"><div class="inventory-section-notes edit-only"><label>Note sezione ${inp(`inventorySections.${si}.notes`,sec.notes||'')}</label></div><div class="inventory-item-list" data-reorder-zone="inventorySections.${si}.items">${((sec.items||[]).length?sec.items:[]).map((r,i)=>{const equipped=String(r.equipped||'No').toLowerCase().startsWith('s');const tip=inventoryItemTip(r);return `<article class="inventory-item-card ${equipped?'is-equipped':''}"${dragDropAttrs(`inventorySections.${si}.items.${i}`)}><div class="inventory-item-main">${dragHandle(`inventorySections.${si}.items.${i}`,'Sposta oggetto anche in un’altra categoria')}<div class="inventory-item-name info-card" tabindex="0" data-tip="${esc(tip)}">${inp(`inventorySections.${si}.items.${i}.name`,r.name||'')}</div><div class="inventory-item-meta"><span>Q.tà ${inp(`inventorySections.${si}.items.${i}.qty`,r.qty??1,'number')}</span><span>Peso ${inp(`inventorySections.${si}.items.${i}.weight`,r.weight||'')}</span><span class="inventory-equipped">Equip. ${yesNo(`inventorySections.${si}.items.${i}.equipped`,r.equipped||'No')}</span></div><div class="inventory-item-badges">${equipped?'<span class="equipped-badge">Equipaggiato</span>':'<span class="unequipped-badge">Non equipaggiato</span>'}${bonusSummary(r.bonuses)}</div><button class="row-del edit-only inventory-delete" data-del="inventorySections.${si}.items.${i}">×</button></div><div class="inventory-item-notes edit-only"><label>Note oggetto <small>(visibili in lettura solo con hover/tap sul nome)</small>${area(`inventorySections.${si}.items.${i}.notes`,r.notes||'','item-notes-editor')}</label></div>${bonusRows(`inventorySections.${si}.items.${i}.bonuses`,r.bonuses||[])}</article>`}).join('')||`<div class="empty-row">Nessun oggetto in questa sezione.</div>`}</div></div></details>`).join('')||`<div class="empty-row">Nessuna sezione inventario. Entra in modifica e aggiungi la prima sezione.</div>`}</div><h3>Denaro</h3><div class="money-grid sheet-stat-grid">${['MP','MO','MA','MR'].map(k=>`<div class="sheet-stat"><span>${k}</span>${inp('money.'+k,m[k]||0,'number')}</div>`).join('')}</div>`;return section('Inventario e denaro',inv,{wide:true})}
 function narrative(d){let n=d.narrative||{};return `<article class="panel sheet-theme-panel wide"><h2>Diario e legami narrativi</h2><label>Riassunto</label>${area('narrative.summary',n.summary||'')}<label>Legami</label>${area('narrative.bondsText',Array.isArray(n.bonds)?n.bonds.join('\n'):n.bondsText||'')}<label>Visioni</label>${area('narrative.visionsText',Array.isArray(n.visions)?n.visions.join('\n'):n.visionsText||'')}<label>Appunti privati / giocatore</label>${area('narrative.privateNotes',n.privateNotes||'')}</article>`}
 function classLevelsPanel(d){let list=(d.classLevels&&d.classLevels.length?d.classLevels:[blank.classLevel]);let body=`<div class="section-head identity-section-tools"><button class="mini-add" data-add="classLevels" data-kind="classLevel" hidden>+ Classe / CdP</button></div><div class="identity-class-list">${list.map((c,i)=>`<article class="identity-class-card"${dragDropAttrs(`classLevels.${i}`)}>${dragHandle(`classLevels.${i}`)}<div class="identity-class-content"><div class="identity-class-name">${inp(`classLevels.${i}.name`,c.name||'')}</div><div class="identity-class-subrow"><div class="identity-class-level"><span>Lv</span>${inp(`classLevels.${i}.level`,c.level||1,'number')}</div><div class="identity-class-notes">${inp(`classLevels.${i}.notes`,c.notes||'')}</div></div></div><button class="row-del edit-only" data-del="classLevels.${i}">×</button></article>`).join('')}</div>`;return section('Classi e livelli',body,{open:true})}
 function secretsPanel(d){let sec=d.secrets||{};return `<article class="panel sheet-theme-panel wide secret-panel"><h2>Segreti</h2><p class="section-mini-note">Sezione predisposta per Supabase: sarà visibile solo al login del personaggio corretto e al Master. Per ora resta mascherata in lettura.</p><div class="secret-locked"><strong>🔒 Accesso riservato</strong><span>Questa parte verrà collegata al login del personaggio.</span></div><div class="secret-edit edit-only"><label>Segreti del personaggio</label>${area('secrets.playerVisible',sec.playerVisible||'')}<label>Note Master / riservate</label>${area('secrets.dmNotes',sec.dmNotes||'')}</div></article>`}
@@ -407,7 +412,7 @@ function pushSnapshot(d,detail){let arr=getSnapshots();arr.unshift({when:new Dat
 function historyPanel(d){let snaps=getSnapshots();let body=`<p class="section-mini-note">Ultimi 10 salvataggi locali. Puoi ripristinare una versione precedente se qualcosa viene modificato per errore.</p><table class="sheet-table history-table"><thead><tr><th>Quando</th><th>Dettaglio</th><th>Azione</th></tr></thead><tbody>${snaps.map((s,i)=>`<tr><td>${esc(s.when||'')}</td><td>${esc(s.detail||'')}</td><td><button class="button ghost-button restore-snapshot" data-snapshot="${i}" type="button">Ripristina</button></td></tr>`).join('')||`<tr><td colspan="3" class="empty-row">Nessuno snapshot ancora disponibile.</td></tr>`}</tbody></table>`;return section('Backup / Undo',body,{wide:true})}
 
 function render(data,xpData,compendium){
-  const d=normalize(data);const can=sheetCanEdit();app.classList.toggle('no-edit-permission',!can);d.xpInfo=xpCalc(d,xpData);window.__thalorCurrentData=d;window.__thalorCompendium=compendium||window.__thalorCompendium||{};document.title=`Scheda — ${d.identity?.name||slug}`;document.body.className=`dynamic-sheet-body pro-sheet-body theme-${d.meta?.theme||'default'}`;
+  const d=normalize(data);const can=sheetCanEdit();app.classList.toggle('no-edit-permission',!can);d.xpInfo=xpCalc(d,xpData);d.identity=d.identity||{};d.identity.xp=d.xpInfo?.xp??0;window.__thalorCurrentData=d;window.__thalorCompendium=compendium||window.__thalorCompendium||{};document.title=`Scheda — ${d.identity?.name||slug}`;document.body.className=`dynamic-sheet-body pro-sheet-body theme-${d.meta?.theme||'default'}`;
   app.innerHTML=floatingActions()+`<div class="pro-sheet-shell">
     ${proHero(d)}
     ${proTopStats(d)}
@@ -1096,6 +1101,118 @@ function showBonusModal(path,baseData,xpData,compendium){
 }
 
 function loadJson(url){return fetch(url).then(r=>r.ok?r.json():null).catch(()=>null)}
+const XP_STORAGE_KEY='thalor.xp.v1';
+const XP_DEFAULT_NAMES=[['ralph','Ralph','Alessandro'],['abraxas','Abraxas','Carlo'],['igor','Igor','Gerry'],['arolf','Arolf','Ivan'],['irven','Irven','Ettore']];
+function xpRoster(data){
+  const map=new Map();
+  XP_DEFAULT_NAMES.forEach(([key,nome,player])=>map.set(key,{key,nome,player}));
+  Object.entries(data?.personaggi||{}).forEach(([key,row])=>{ if(key) map.set(key,{key,nome:row.personaggio||row.name||key,player:row.giocatore||row.playerName||row.player||''}); });
+  (data?.registro_xp||[]).forEach(row=>Object.keys(row||{}).forEach(key=>{ if(!['categoria','category','evento','event'].includes(key)&&!map.has(key)) map.set(key,{key,nome:key,player:''}); }));
+  try{
+    const reg=JSON.parse(localStorage.getItem('thalor.personaggi.registry.v2')||'null');
+    ((reg&&Array.isArray(reg.items))?reg.items:[]).forEach(item=>{const key=String(item.slug||'').trim(); if(key) map.set(key,{key,nome:item.name||key,player:item.playerName||item.player||item.giocatore||''});});
+  }catch(e){}
+  return [...map.values()];
+}
+function normalizeXpSource(input){
+  const d=input&&typeof input==='object'?JSON.parse(JSON.stringify(input)):{};
+  d.personaggi=d.personaggi&&typeof d.personaggi==='object'?d.personaggi:{};
+  d.registro_xp=Array.isArray(d.registro_xp)?d.registro_xp:[];
+  d.tabella_xp=Array.isArray(d.tabella_xp)?d.tabella_xp:[];
+  if(!d.tabella_xp.length){for(let l=1;l<=20;l++)d.tabella_xp.push({livello:l,xp_minimi:defaultXpThreshold(l),xp_per_arrivarci:l===1?'-':(l-1)*1000});}
+  const roster=xpRoster(d);
+  roster.forEach(({key,nome,player})=>{
+    const hasEvents=d.registro_xp.some(row=>row&&Object.prototype.hasOwnProperty.call(row,key));
+    const total=hasEvents?d.registro_xp.reduce((sum,row)=>sum+(Number(row?.[key])||0),0):num(d.personaggi[key]?.xp_totali);
+    const xp=Math.max(0,total||0);
+    const lvl=xpLevelFromXp(d.tabella_xp,xp);
+    const current=xpThreshold(d.tabella_xp,lvl);
+    const next=xpThreshold(d.tabella_xp,lvl+1);
+    const span=Math.max(1,next-current);
+    d.personaggi[key]=Object.assign({},d.personaggi[key]||{}, {
+      giocatore:d.personaggi[key]?.giocatore||player,
+      personaggio:d.personaggi[key]?.personaggio||nome,
+      xp_totali:xp,
+      livello:lvl,
+      prossimo_livello:next,
+      xp_mancanti:Math.max(0,next-xp),
+      avanzamento:Math.max(0,Math.min(1,(xp-current)/span))
+    });
+  });
+  return d;
+}
+function xpMeaningful(data){return !!(data&&typeof data==='object'&&((Array.isArray(data.registro_xp)&&data.registro_xp.length)||(data.personaggi&&Object.keys(data.personaggi).length)));}
+function xpDataScore(data){
+  try{
+    const d=normalizeXpSource(data||{});
+    const keys=new Set(['ralph','abraxas','igor','arolf','irven']);
+    Object.keys(d.personaggi||{}).forEach(k=>keys.add(k));
+    return [...keys].reduce((sum,k)=>sum+Math.max(0,num(d.personaggi?.[k]?.xp_totali)),0);
+  }catch(e){return 0;}
+}
+function chooseBestXpData(current,candidate,label){
+  if(!xpMeaningful(candidate)) return current;
+  const cur=normalizeXpSource(current||{});
+  const cand=normalizeXpSource(candidate||{});
+  const curScore=xpDataScore(cur);
+  const candScore=xpDataScore(cand);
+  // Evita che una copia locale/online inizializzata vuota faccia tornare tutti a 0
+  // quando il file assets/data/xp.json contiene già la tabella corretta.
+  if(curScore>0 && candScore<=0){
+    console.warn('EXP ignorata perché vuota:', label||'sorgente esterna');
+    return cur;
+  }
+  return cand;
+}
+async function loadUnifiedXpData(fallback){
+  let data=normalizeXpSource(fallback||{});
+  try{const local=safeJsonParse(localStorage.getItem(XP_STORAGE_KEY)); data=chooseBestXpData(data,local,'localStorage');}catch(e){}
+  try{
+    if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured){
+      const online=await window.ThalorAuth.loadCharacter('xp', data);
+      data=chooseBestXpData(data,online,'Supabase');
+      localStorage.setItem(XP_STORAGE_KEY,JSON.stringify(data));
+    }
+  }catch(e){console.warn('Caricamento EXP unificato non riuscito:',e);}
+  return data;
+}
+
+function isProbablyAutoBlankLocalSheet(data){
+  const d=data||{};
+  const id=d.identity||{};
+  const hasLog=Array.isArray(d.changeLog)&&d.changeLog.length>0;
+  const hasRealRows=['attacks','defenses','feats','features','languages','conditions','companions'].some(k=>Array.isArray(d[k])&&d[k].length>0);
+  const hasInventory=Array.isArray(d.inventorySections)&&d.inventorySections.some(sec=>Array.isArray(sec.items)&&sec.items.length>0);
+  const hasSpells=d.spellcasting&&Array.isArray(d.spellcasting.groups)&&d.spellcasting.groups.some(g=>Array.isArray(g.spells)&&g.spells.length>0);
+  const classLevels=Array.isArray(d.classLevels)?d.classLevels:[];
+  const genericClass=classLevels.length===1 && /^classe$/i.test(String(classLevels[0].name||'')) && Number(classLevels[0].level||1)===1;
+  const genericIdentity=String(id.race||'').trim()==='' && String(id.classLevel||'').trim()==='' && String(id.xp??'0').trim()==='0' && Number(id.level||1)===1;
+  return !hasLog && !hasRealRows && !hasInventory && !hasSpells && genericClass && genericIdentity;
+}
+function chooseSheetData(base, localFound){
+  if(!localFound) return base;
+  const local=localFound.data;
+  if(base && isProbablyAutoBlankLocalSheet(local)){
+    try{ localStorage.removeItem(localFound.key); }catch(e){}
+    return base;
+  }
+  return local;
+}
+
+
+
+function registryBlankSheetFromList(slug){
+  try{
+    const raw=JSON.parse(localStorage.getItem('thalor.personaggi.registry.v2')||'null');
+    const items=(raw&&Array.isArray(raw.items))?raw.items:[];
+    const item=items.find(x=>String(x.slug||'')===String(slug||''));
+    const fallbackName=String(slug||'Nuovo personaggio').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+    const safeItem=item||{type:'pg',slug,name:fallbackName,playerName:'',desc:'Scheda creata automaticamente dal collegamento.',img:'',longDesc:''};
+    const data={schemaVersion:9,meta:{slug,permissionRole:slug,characterRole:slug,theme:safeItem.type==='png'?'necrotic':'default',crest:safeItem.type==='png'?'☽':'✦',subtitle:safeItem.type==='png'?'PNG':'Personaggio',profileUrl:`dettaglio.html?id=${slug}`},identity:{name:safeItem.name||'Nuovo personaggio',player:safeItem.playerName||safeItem.player||safeItem.giocatore||'',race:'',classLevel:'',alignment:'',deity:'',xp:0,level:1},appearance:{size:'',age:'',sex:'',height:'',weight:'',eyes:'',hair:'',skin:'',marks:''},portrait:{image:safeItem.img&&String(safeItem.img).startsWith('data:')?safeItem.img:(safeItem.img?('../'+String(safeItem.img).replace(/^\.\//,'')):''),alt:safeItem.name||'',quote:safeItem.desc||''},abilities:{FOR:{score:10,base:10,temp:0,bonuses:[]},DES:{score:10,base:10,temp:0,bonuses:[]},COS:{score:10,base:10,temp:0,bonuses:[]},INT:{score:10,base:10,temp:0,bonuses:[]},SAG:{score:10,base:10,temp:0,bonuses:[]},CAR:{score:10,base:10,temp:0,bonuses:[]}},combat:{hpMax:1,hpCurrent:1,hpTemp:0,nonlethal:0,stable:'No',speed:'',bab:0,grappleMisc:0,initiativeMisc:0,tempBonuses:[]},armorClass:{base:10},saves:{fortitude:{base:0,magic:0,misc:0,ability:'COS'},reflex:{base:0,magic:0,misc:0,ability:'DES'},will:{base:0,magic:0,misc:0,ability:'SAG'}},attacks:[],defenses:[],skills:[],feats:[],features:[],languages:[],conditions:[],spellcasting:{defaultAbility:'',casterLevel:1,srMisc:0,groups:[]},inventorySections:[{name:'Inventario',notes:'',items:[]}],money:{MP:0,MO:0,MA:0,MR:0},narrative:{diary:safeItem.longDesc||safeItem.desc||'',bonds:''},secrets:{playerVisible:'',dmNotes:'',loginRequired:true},classLevels:[{name:safeItem.type==='png'?'PNG':'Classe',level:1,notes:''}],companions:[],changeLog:[]};
+    localStorage.setItem(`thalor.sheet.${slug}.v5`,JSON.stringify(data));
+    return data;
+  }catch(e){return null;}
+}
 
 // v104 — mobile performance hint: evita repaint inutili sui telefoni e segnala viewport compatta al CSS.
 (function(){
@@ -1107,16 +1224,21 @@ function loadJson(url){return fetch(url).then(r=>r.ok?r.json():null).catch(()=>n
 (async function startSheet(){
   try{
     if(authAvailable()) await window.ThalorAuth.init();
-    let [base,xp,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
+    let [base,xpBase,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
+    let xp=await loadUnifiedXpData(xpBase);
     base=base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
-    let local=localStorage.getItem(parentStorageKey)||oldKeys.map(k=>localStorage.getItem(k)).find(Boolean);
-    if(!base && local) base=JSON.parse(local);
+    const localFound=firstValidLocal([parentStorageKey,...oldKeys]);
+    if(!base && localFound) base=localFound.data;
+    if(!base && slug) base=registryBlankSheetFromList(slug);
+    if(!base && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
     if(!base)throw new Error('Dati scheda non trovati.');
     window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
-    let sheetData=local?JSON.parse(local):base;
+    let sheetData=chooseSheetData(base, localFound);
     if(authAvailable() && window.ThalorAuth.state.configured){
-      sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData);
+      const beforeRemote=sheetData;
+      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData); }
+      catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
       localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData)));
     }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
