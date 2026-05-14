@@ -8695,3 +8695,64 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
 .dynamic-sheet-page [data-tip]:hover{
   box-shadow:0 0 0 1px rgba(216,180,106,.35),0 0 14px rgba(216,180,106,.12);
 }
+
+
+/* v124 — tooltip a click: scroll interno reale + chiusura a tema */
+.thalor-floating-tip{
+  pointer-events:auto!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  scrollbar-width:thin;
+  padding:18px 18px 18px 20px!important;
+  border:1px solid rgba(218,184,112,.78)!important;
+  background:linear-gradient(145deg,#120b08,#20130d)!important;
+  box-shadow:0 26px 70px rgba(0,0,0,.82),0 0 0 1px rgba(255,223,154,.10) inset!important;
+}
+.thalor-floating-tip-content{
+  display:block!important;
+  max-height:calc(46vh - 12px)!important;
+  overflow:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  padding-right:34px!important;
+}
+.thalor-floating-tip-close{
+  position:sticky!important;
+  top:0!important;
+  float:right!important;
+  z-index:2!important;
+  display:inline-grid!important;
+  place-items:center!important;
+  width:30px!important;
+  height:30px!important;
+  margin:-6px -6px 6px 10px!important;
+  border-radius:999px!important;
+  border:1px solid rgba(235,202,129,.82)!important;
+  background:radial-gradient(circle at 35% 25%,#6f3a1c,#25130d 72%)!important;
+  color:#ffe2a0!important;
+  font-size:.92rem!important;
+  font-weight:900!important;
+  line-height:1!important;
+  cursor:pointer!important;
+  box-shadow:0 8px 18px rgba(0,0,0,.48),0 0 0 1px rgba(255,255,255,.06) inset!important;
+}
+.thalor-floating-tip-close:hover,
+.thalor-floating-tip-close:focus-visible{
+  border-color:#ffe2a0!important;
+  color:#fff5d6!important;
+  outline:none!important;
+  box-shadow:0 0 0 3px rgba(218,184,112,.18),0 8px 18px rgba(0,0,0,.48)!important;
+}
+@media(max-width:720px){
+  .thalor-floating-tip{
+    left:10px!important;
+    right:10px!important;
+    width:auto!important;
+    max-width:none!important;
+    max-height:62vh!important;
+  }
+  .thalor-floating-tip-content{
+    max-height:calc(62vh - 18px)!important;
+  }
+}

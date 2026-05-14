@@ -671,7 +671,35 @@ function download(name,text){const a=document.createElement('a');a.href=URL.crea
 let floatingTip=null, floatingTipSource=null, floatingTipBound=false;
 function hideFloatingTip(){if(floatingTip){floatingTip.remove();floatingTip=null;floatingTipSource=null}}
 function placeFloatingTip(source){if(!floatingTip)return;const r=source.getBoundingClientRect();floatingTip.style.left='0px';floatingTip.style.top='0px';const w=floatingTip.offsetWidth||420,h=floatingTip.offsetHeight||120;let left=r.left;left=Math.max(12,Math.min(left,window.innerWidth-w-12));let top=r.bottom+10;if(top+h>window.innerHeight-12)top=r.top-h-10;if(top<12)top=12;floatingTip.style.left=left+'px';floatingTip.style.top=top+'px'}
-function showFloatingTip(source){if(app.classList.contains('editing'))return;const text=source.dataset.tip||'';if(!text.trim())return;hideFloatingTip();floatingTip=document.createElement('div');floatingTip.className='thalor-floating-tip';floatingTip.innerHTML=`<button type="button" class="thalor-floating-tip-close" aria-label="Chiudi descrizione">×</button><div class="thalor-floating-tip-content"></div>`;floatingTip.querySelector('.thalor-floating-tip-content').textContent=text;floatingTip.querySelector('.thalor-floating-tip-close').addEventListener('click',ev=>{ev.stopPropagation();hideFloatingTip();});floatingTip.addEventListener('click',ev=>ev.stopPropagation());document.body.appendChild(floatingTip);floatingTipSource=source;placeFloatingTip(source)}
+function showFloatingTip(source){
+  if(app.classList.contains('editing'))return;
+  const text=source.dataset.tip||'';
+  if(!text.trim())return;
+  hideFloatingTip();
+  floatingTip=document.createElement('div');
+  floatingTip.className='thalor-floating-tip';
+  floatingTip.innerHTML=`<button type="button" class="thalor-floating-tip-close" aria-label="Chiudi descrizione" title="Chiudi">✕</button><div class="thalor-floating-tip-content"></div>`;
+  floatingTip.querySelector('.thalor-floating-tip-content').textContent=text;
+  floatingTip.querySelector('.thalor-floating-tip-close').addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();hideFloatingTip();});
+  floatingTip.addEventListener('click',ev=>ev.stopPropagation());
+  floatingTip.addEventListener('wheel',ev=>{ev.stopPropagation();},{passive:false});
+  let tipTouchY=0;
+  floatingTip.addEventListener('touchstart',ev=>{tipTouchY=ev.touches&&ev.touches.length?ev.touches[0].clientY:0;},{passive:true});
+  floatingTip.addEventListener('touchmove',ev=>{
+    ev.stopPropagation();
+    const currentY=ev.touches&&ev.touches.length?ev.touches[0].clientY:tipTouchY;
+    const deltaY=tipTouchY-currentY;
+    tipTouchY=currentY;
+    const canScroll=floatingTip.scrollHeight>floatingTip.clientHeight;
+    if(!canScroll){ev.preventDefault();return;}
+    const atTop=floatingTip.scrollTop<=0;
+    const atBottom=Math.ceil(floatingTip.scrollTop+floatingTip.clientHeight)>=floatingTip.scrollHeight;
+    if((atTop&&deltaY<0)||(atBottom&&deltaY>0))ev.preventDefault();
+  },{passive:false});
+  document.body.appendChild(floatingTip);
+  floatingTipSource=source;
+  placeFloatingTip(source);
+}
 function bindTooltips(){hideFloatingTip();document.querySelectorAll('.info-row,.info-card').forEach(el=>{el.addEventListener('click',ev=>{if(app.classList.contains('editing'))return;const interactive=ev.target.closest('input,textarea,select,button,a,[data-del],[data-path],[data-drag-path]');if(interactive&&interactive!==el)return;ev.preventDefault();ev.stopPropagation();if(floatingTipSource===el)hideFloatingTip();else showFloatingTip(el);});el.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();el.click();}});});if(!floatingTipBound){floatingTipBound=true;document.addEventListener('click',hideFloatingTip);document.addEventListener('keydown',ev=>{if(ev.key==='Escape')hideFloatingTip();});window.addEventListener('scroll',hideFloatingTip,{passive:true});window.addEventListener('resize',hideFloatingTip,{passive:true});}}
 
 
