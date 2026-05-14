@@ -8676,3 +8676,22 @@ body.editing .dynamic-sheet-page .pro-spell-table .spell-delete-button{
     margin-bottom: 10px;
   }
 }
+
+
+/* v82 — tooltip click affordance */
+.dynamic-sheet-page .spell-row,
+.dynamic-sheet-page .info-card,
+.dynamic-sheet-page .info-row,
+.dynamic-sheet-page .tooltip-cards .wa-card,
+.dynamic-sheet-page [data-tip]{
+  cursor:pointer;
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+
+.dynamic-sheet-page .spell-row:hover,
+.dynamic-sheet-page .info-card:hover,
+.dynamic-sheet-page .info-row:hover,
+.dynamic-sheet-page .tooltip-cards .wa-card:hover,
+.dynamic-sheet-page [data-tip]:hover{
+  box-shadow:0 0 0 1px rgba(216,180,106,.35),0 0 14px rgba(216,180,106,.12);
+}
