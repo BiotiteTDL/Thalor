@@ -1,0 +1,15 @@
+Inserisci qui i video loop per gli effetti animati in formato .webm.
+Nomi attesi dal Tavolo Master:
+- fog.webm
+- rain.webm
+- blood-ritual.webm
+- fire.webm
+- magic-aura.webm
+- shadows.webm
+- ritual-circle.webm
+- torch-light.webm
+- poison.webm
+- spell-area.webm
+
+Consigli: video brevi in loop, 512x512 o 1024x1024, possibilmente webm VP9 con trasparenza.
+Se un file manca, il Tavolo Master usa un fallback animato procedurale.
