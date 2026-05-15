@@ -988,7 +988,40 @@ function bindPortraitUpload(data,xpData){
     }catch(err){alert('Non riesco a caricare questa immagine: '+(err.message||err));}
   };
 }
+
+function bindHorizontalWheelScroll(){
+  const selectors=[
+    '.dynamic-sheet-page .sheet-dropdown[data-detail-id="abilità"] .dropdown-content',
+    '.dynamic-sheet-page .abilities-panel',
+    '.dynamic-sheet-page .history-table',
+    '.dynamic-sheet-page .skill-table',
+    '.dynamic-sheet-page .spell-circle',
+    '.dynamic-sheet-page .spell-circles',
+    '.dynamic-sheet-page .pro-spell-table',
+    '.dynamic-sheet-page .spell-table'
+  ].join(',');
+  document.querySelectorAll(selectors).forEach(el=>{
+    if(el.__thalorHorizontalWheelBound)return;
+    el.__thalorHorizontalWheelBound=true;
+    el.addEventListener('wheel',ev=>{
+      if(ev.ctrlKey||ev.metaKey)return;
+      const canScrollX=el.scrollWidth>el.clientWidth+2;
+      if(!canScrollX)return;
+      const delta=Math.abs(ev.deltaY)>=Math.abs(ev.deltaX)?ev.deltaY:ev.deltaX;
+      if(!delta)return;
+      const max=el.scrollWidth-el.clientWidth;
+      const before=el.scrollLeft;
+      const next=Math.max(0,Math.min(max,before+delta));
+      if(next===before)return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      el.scrollLeft=next;
+    },{passive:false});
+  });
+}
+
 function bind(data,xpData,compendium){
+  bindHorizontalWheelScroll();
   const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
   const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{if(app.classList.contains('editing')){await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);keepViewportStable(()=>enable(false));}else{if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());}};
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
