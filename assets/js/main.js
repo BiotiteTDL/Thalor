@@ -107,3 +107,45 @@ window.addEventListener('beforeunload', function(){
     Object.keys(sessionStorage).forEach(function(k){ if(k.indexOf(prefix)===0) sessionStorage.removeItem(k); });
   }catch(e){}
 });
+
+
+// v190: link Tavolo Master visibile solo con permessi Master già verificati
+(function(){
+  function isLocalPreview(){
+    var h=String(location.hostname||'').toLowerCase();
+    var pr=String(location.protocol||'').toLowerCase();
+    return pr==='file:'||h===''||h==='localhost'||h==='127.0.0.1'||h==='::1'||/^192\.168\./.test(h)||/^10\./.test(h)||/^172\.(1[6-9]|2\d|3[0-1])\./.test(h);
+  }
+  function shouldShowMasterLink(){
+    try{
+      if(window.ThalorAuth && typeof window.ThalorAuth.isMaster==='function') return !!window.ThalorAuth.isMaster();
+      if(localStorage.getItem('thalor.masterNav')==='1') return true;
+      if(isLocalPreview() && (localStorage.getItem('thalor.offlineMaster')==='1'||sessionStorage.getItem('thalor.offlineMaster')==='1')) return true;
+    }catch(e){}
+    return false;
+  }
+  function ensureMasterLinks(){
+    document.querySelectorAll('.nav .links').forEach(function(links){
+      var href=(location.pathname.indexOf('/archivio/')>-1||location.pathname.indexOf('/diario/')>-1||location.pathname.indexOf('/luoghi/')>-1||location.pathname.indexOf('/personaggi/')>-1)?'../tavolo-master.html':'tavolo-master.html';
+      var link=links.querySelector('.master-nav-link');
+      if(!link){
+        link=document.createElement('a');
+        link.className='master-nav-link';
+        link.href=href;
+        link.textContent='Tavolo Master';
+        link.hidden=true;
+        var auth=links.querySelector('.auth-nav-link');
+        links.insertBefore(link,auth||null);
+      }
+      link.hidden=!shouldShowMasterLink();
+    });
+  }
+  document.addEventListener('DOMContentLoaded',function(){
+    ensureMasterLinks();
+    if(window.ThalorAuth && typeof window.ThalorAuth.init==='function'){
+      window.ThalorAuth.init().finally(ensureMasterLinks);
+    }
+  });
+  window.addEventListener('thalor-auth-changed',ensureMasterLinks);
+  window.addEventListener('thalor-local-master-changed',ensureMasterLinks);
+})();

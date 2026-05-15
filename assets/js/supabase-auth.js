@@ -500,7 +500,12 @@
 
   function isMaster(){
     state.localMaster = localMasterEnabled();
-    return state.localMaster || norm(state.profile?.role) === 'master';
+    const ok = state.localMaster || norm(state.profile?.role) === 'master';
+    try{
+      if(ok) localStorage.setItem('thalor.masterNav','1');
+      else localStorage.removeItem('thalor.masterNav');
+    }catch(e){}
+    return ok;
   }
 
   function canEdit(slug){
