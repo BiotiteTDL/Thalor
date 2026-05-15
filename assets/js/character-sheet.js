@@ -9,19 +9,6 @@ const storageKey=isCompanion?`thalor.sheet.${slug}.companion.${companionIndex}.v
 const oldKeys=isCompanion?[]:[`thalor.sheet.${slug}.v4`,`thalor.sheet.${slug}.v3`,`thalor.sheet.${slug}.v2`];
 function safeJsonParse(raw){try{return raw?JSON.parse(raw):null}catch(e){return null}}
 function firstValidLocal(keys){for(const k of keys){const raw=localStorage.getItem(k);const parsed=safeJsonParse(raw);if(parsed)return {key:k,data:parsed,raw};if(raw)localStorage.removeItem(k);}return null}
-function compactSheetForStorage(d){
-  const copy=normalize(d||{});
-  if(Array.isArray(copy.changeLog))copy.changeLog=copy.changeLog.slice(-80);
-  return copy;
-}
-function safeLocalSet(key,value){
-  try{localStorage.setItem(key,value);return true;}
-  catch(err){
-    try{localStorage.removeItem(snapshotKey());localStorage.setItem(key,value);return true;}
-    catch(e){console.warn('Thalor localStorage pieno o non disponibile:', e);return false;}
-  }
-}
-function safeLocalSetJson(key,value){return safeLocalSet(key,JSON.stringify(value));}
 let authState={configured:false,ready:false};
 function authAvailable(){return !!window.ThalorAuth;}
 function authNorm(v){return String(v||'').trim().toLowerCase();}
@@ -50,7 +37,7 @@ async function refreshEditPermission(){
 function emergencyDraftKey(){return `thalor.unsaved.${slug}${isCompanion?'.companion.'+companionIndex:''}.v1`;}
 function saveEmergencyDraft(data,reason){
   try{
-    safeLocalSetJson(emergencyDraftKey(), {when:new Date().toISOString(), reason:reason||'', data:compactSheetForStorage(data)});
+    localStorage.setItem(emergencyDraftKey(), JSON.stringify({when:new Date().toISOString(), reason:reason||'', data:normalize(data)}));
   }catch(e){ console.warn('Emergency draft failed:', e); }
 }
 function authStatusText(){return authAvailable()?window.ThalorAuth.statusText():'Modalità locale.';}
@@ -421,17 +408,8 @@ function logPanel(d){let rows=(d.changeLog||[]).slice().reverse().slice(0,30);le
 
 function snapshotKey(){return storageKey+'.snapshots'}
 function getSnapshots(){try{return JSON.parse(localStorage.getItem(snapshotKey())||'[]')}catch(e){return []}}
-function pushSnapshot(d,detail){
-  let arr=getSnapshots();
-  arr.unshift({when:new Date().toLocaleString('it-IT'),detail:detail||'Snapshot automatico',data:compactSheetForStorage(d)});
-  arr=arr.slice(0,4);
-  if(!safeLocalSetJson(snapshotKey(),arr)){
-    arr=arr.slice(0,1);
-    safeLocalSetJson(snapshotKey(),arr);
-  }
-  return arr;
-}
-function historyPanel(d){let snaps=getSnapshots();let body=`<p class="section-mini-note">Ultimi 4 salvataggi locali. Puoi ripristinare una versione precedente se qualcosa viene modificato per errore.</p><table class="sheet-table history-table"><thead><tr><th>Quando</th><th>Dettaglio</th><th>Azione</th></tr></thead><tbody>${snaps.map((s,i)=>`<tr><td>${esc(s.when||'')}</td><td>${esc(s.detail||'')}</td><td><button class="button ghost-button restore-snapshot" data-snapshot="${i}" type="button">Ripristina</button></td></tr>`).join('')||`<tr><td colspan="3" class="empty-row">Nessuno snapshot ancora disponibile.</td></tr>`}</tbody></table>`;return section('Backup / Undo',body,{wide:true})}
+function pushSnapshot(d,detail){let arr=getSnapshots();arr.unshift({when:new Date().toLocaleString('it-IT'),detail:detail||'Snapshot automatico',data:normalize(d)});arr=arr.slice(0,10);localStorage.setItem(snapshotKey(),JSON.stringify(arr));return arr}
+function historyPanel(d){let snaps=getSnapshots();let body=`<p class="section-mini-note">Ultimi 10 salvataggi locali. Puoi ripristinare una versione precedente se qualcosa viene modificato per errore.</p><table class="sheet-table history-table"><thead><tr><th>Quando</th><th>Dettaglio</th><th>Azione</th></tr></thead><tbody>${snaps.map((s,i)=>`<tr><td>${esc(s.when||'')}</td><td>${esc(s.detail||'')}</td><td><button class="button ghost-button restore-snapshot" data-snapshot="${i}" type="button">Ripristina</button></td></tr>`).join('')||`<tr><td colspan="3" class="empty-row">Nessuno snapshot ancora disponibile.</td></tr>`}</tbody></table>`;return section('Backup / Undo',body,{wide:true})}
 
 function render(data,xpData,compendium){
   const d=normalize(data);const can=sheetCanEdit();app.classList.toggle('no-edit-permission',!can);d.xpInfo=xpCalc(d,xpData);d.identity=d.identity||{};d.identity.xp=d.xpInfo?.xp??0;window.__thalorCurrentData=d;window.__thalorCompendium=compendium||window.__thalorCompendium||{};document.title=`Scheda — ${d.identity?.name||slug}`;document.body.className=`dynamic-sheet-body pro-sheet-body theme-${d.meta?.theme||'default'}`;
@@ -649,7 +627,7 @@ function floatingActions(){if(!sheetCanEdit())return '';return `<nav class="shee
 function localCompendiumKey(){return 'thalor.compendium.local.v1'}
 function mergeCompendium(base){let local={};try{local=JSON.parse(localStorage.getItem(localCompendiumKey())||'{}')}catch(e){};return Object.assign({spells:[],feats:[],features:[]},base||{},local)}
 function upsertComp(arr,item){if(!item||!String(item.name||'').trim())return;let name=String(item.name).trim().toLowerCase();let i=arr.findIndex(x=>String(x.name||'').trim().toLowerCase()===name);let clean=JSON.parse(JSON.stringify(item));if(i>=0)arr[i]=Object.assign({},arr[i],clean);else arr.push(clean)}
-function updateCompendiumFromSheet(d){let comp=mergeCompendium(window.__thalorCompendium||{});comp.spells=comp.spells||[];comp.feats=comp.feats||[];comp.features=comp.features||[];(d.feats||[]).forEach(x=>upsertComp(comp.feats,x));(d.features||[]).forEach(x=>upsertComp(comp.features,x));(d.spellcasting?.groups||[]).flatMap(g=>g.spells||[]).forEach(x=>upsertComp(comp.spells,x));try{safeLocalSetJson(localCompendiumKey(),comp);}catch(e){console.warn('Compendio locale non salvato:',e);}window.__thalorCompendium=comp;return comp}
+function updateCompendiumFromSheet(d){let comp=mergeCompendium(window.__thalorCompendium||{});comp.spells=comp.spells||[];comp.feats=comp.feats||[];comp.features=comp.features||[];(d.feats||[]).forEach(x=>upsertComp(comp.feats,x));(d.features||[]).forEach(x=>upsertComp(comp.features,x));(d.spellcasting?.groups||[]).flatMap(g=>g.spells||[]).forEach(x=>upsertComp(comp.spells,x));localStorage.setItem(localCompendiumKey(),JSON.stringify(comp));window.__thalorCompendium=comp;return comp}
 function applyCompendiumHints(){const comp=window.__thalorCompendium||{};document.querySelectorAll('input.compendium-name[data-path]').forEach(el=>{el.addEventListener('change',()=>{let name=String(el.value||'').trim().toLowerCase();let path=el.dataset.path||'';let group=path.startsWith('feats')?'feats':path.startsWith('features')?'features':'';if(!group)return;let found=(comp[group]||[]).find(x=>String(x.name||'').trim().toLowerCase()===name);if(!found)return;let base=path.split('.').slice(0,2).join('.');let desc=document.querySelector(`[data-path=\"${base}.description\"]`);let src=document.querySelector(`[data-path=\"${base}.source\"]`);if(desc&&!desc.value)desc.value=found.description||found.notes||'';if(src&&!src.value)src.value=found.source||'';});});document.querySelectorAll('.spell-row input[data-path$=".name"]').forEach(el=>{el.addEventListener('change',()=>{let name=String(el.value||'').trim().toLowerCase();let found=(comp.spells||[]).find(x=>String(x.name||'').trim().toLowerCase()===name);if(!found)return;let parts=el.dataset.path.split('.');let base=parts.slice(0,-1).join('.');['school','castingTime','target','duration','description'].forEach(k=>{let f=document.querySelector(`[data-path=\"${base}.${k}\"]`);if(f&&!f.value)f.value=found[k]||found.time||'';});});});}
 
 function detailStableKey(d,i){
@@ -853,7 +831,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     let draft=normalize(fromDom?collect(data):data);
     saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
     if(!await refreshEditPermission()){
-      try{ safeLocalSetJson(storageKey,compactSheetForStorage(draft)); }catch(e){}
+      try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
       alert(editDeniedMessage());
       const ls=document.getElementById('localStatus'); if(ls)ls.textContent='Sessione non valida: copia locale/emergenza salvata, ma non pubblicata online.';
       return draft;
@@ -863,7 +841,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     if(previous)pushSnapshot(previous,detail||'Prima del salvataggio');
     let u=draft;
     u.changeLog=u.changeLog||[];
-    u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate online.'});u.changeLog=u.changeLog.slice(-80);
+    u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate online.'});
     let parentForCloud=null;
     if(isCompanion){
       let parent=null;try{parent=JSON.parse(localStorage.getItem(parentStorageKey)||'null')}catch(e){}
@@ -874,10 +852,10 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
       parent.companions[companionIndex].sheet=u;
       parent.companions[companionIndex].name=u.identity?.name||parent.companions[companionIndex].name||'Creatura';
       parent.companions[companionIndex].kind=parent.companions[companionIndex].kind||u.meta?.subtitle||'Creatura';
-      safeLocalSetJson(parentStorageKey,compactSheetForStorage(parent));
+      localStorage.setItem(parentStorageKey,JSON.stringify(parent));
       parentForCloud=parent;
     } else {
-      safeLocalSetJson(storageKey,compactSheetForStorage(u));
+      localStorage.setItem(storageKey,JSON.stringify(u));
       oldKeys.forEach(k=>localStorage.removeItem(k));
     }
 
@@ -1051,8 +1029,8 @@ function bind(data,xpData,compendium){
   const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};
   const exportCompendiumBtn=document.getElementById('exportCompendium'); if(exportCompendiumBtn) exportCompendiumBtn.onclick=()=>download('thalor-compendio-locale.json',JSON.stringify(mergeCompendium(window.__thalorCompendium||{}),null,2));
   const printSheetBtn=document.getElementById('floatPrintSheet'); if(printSheetBtn) printSheetBtn.onclick=()=>{document.querySelectorAll('details').forEach(d=>d.open=true);window.print();};
-  const importSheetInput=document.getElementById('importSheet'); if(importSheetInput) importSheetInput.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const u=normalize(JSON.parse(r.result));u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Import JSON',detail:'Scheda importata manualmente.'});u.changeLog=u.changeLog.slice(-80);saveCurrentSheet(u,xpData,'Scheda importata manualmente.',false,false);enable(false);document.getElementById('localStatus').textContent='Scheda importata e salvata nel browser.'}catch(err){alert('JSON non valido')}};r.readAsText(f)};
-  document.querySelectorAll('.restore-snapshot').forEach(btn=>btn.onclick=e=>{e.preventDefault();e.stopPropagation();let arr=getSnapshots();let snap=arr[num(btn.dataset.snapshot)];if(!snap||!snap.data)return;let u=normalize(snap.data);u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Ripristino snapshot',detail:'Ripristinata versione del '+(snap.when||'')});u.changeLog=u.changeLog.slice(-80);saveCurrentSheet(u,xpData,'Snapshot ripristinato.',false,false);enable(false);document.getElementById('localStatus').textContent='Snapshot ripristinato.';});
+  const importSheetInput=document.getElementById('importSheet'); if(importSheetInput) importSheetInput.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const u=normalize(JSON.parse(r.result));u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Import JSON',detail:'Scheda importata manualmente.'});saveCurrentSheet(u,xpData,'Scheda importata manualmente.',false,false);enable(false);document.getElementById('localStatus').textContent='Scheda importata e salvata nel browser.'}catch(err){alert('JSON non valido')}};r.readAsText(f)};
+  document.querySelectorAll('.restore-snapshot').forEach(btn=>btn.onclick=e=>{e.preventDefault();e.stopPropagation();let arr=getSnapshots();let snap=arr[num(btn.dataset.snapshot)];if(!snap||!snap.data)return;let u=normalize(snap.data);u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Ripristino snapshot',detail:'Ripristinata versione del '+(snap.when||'')});saveCurrentSheet(u,xpData,'Snapshot ripristinato.',false,false);enable(false);document.getElementById('localStatus').textContent='Snapshot ripristinato.';});
   document.querySelectorAll('[data-add]').forEach(b=>b.onclick=e=>{
     e.preventDefault();e.stopPropagation();
     const sec=nearestSection(b);
@@ -1325,7 +1303,7 @@ function registryBlankSheetFromList(slug){
     const fallbackName=String(slug||'Nuovo personaggio').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
     const safeItem=item||{type:'pg',slug,name:fallbackName,playerName:'',desc:'Scheda creata automaticamente dal collegamento.',img:'',longDesc:''};
     const data={schemaVersion:9,meta:{slug,permissionRole:slug,characterRole:slug,theme:safeItem.type==='png'?'necrotic':'default',crest:safeItem.type==='png'?'☽':'✦',subtitle:safeItem.type==='png'?'PNG':'Personaggio',profileUrl:`dettaglio.html?id=${slug}`},identity:{name:safeItem.name||'Nuovo personaggio',player:safeItem.playerName||safeItem.player||safeItem.giocatore||'',race:'',classLevel:'',alignment:'',deity:'',xp:0,level:1},appearance:{size:'',age:'',sex:'',height:'',weight:'',eyes:'',hair:'',skin:'',marks:''},portrait:{image:safeItem.img&&String(safeItem.img).startsWith('data:')?safeItem.img:(safeItem.img?('../'+String(safeItem.img).replace(/^\.\//,'')):''),alt:safeItem.name||'',quote:safeItem.desc||''},abilities:{FOR:{score:10,base:10,temp:0,bonuses:[]},DES:{score:10,base:10,temp:0,bonuses:[]},COS:{score:10,base:10,temp:0,bonuses:[]},INT:{score:10,base:10,temp:0,bonuses:[]},SAG:{score:10,base:10,temp:0,bonuses:[]},CAR:{score:10,base:10,temp:0,bonuses:[]}},combat:{hpMax:1,hpCurrent:1,hpTemp:0,nonlethal:0,stable:'No',speed:'',bab:0,grappleMisc:0,initiativeMisc:0,tempBonuses:[]},armorClass:{base:10},saves:{fortitude:{base:0,magic:0,misc:0,ability:'COS'},reflex:{base:0,magic:0,misc:0,ability:'DES'},will:{base:0,magic:0,misc:0,ability:'SAG'}},attacks:[],defenses:[],skills:[],feats:[],features:[],languages:[],conditions:[],spellcasting:{defaultAbility:'',casterLevel:1,srMisc:0,groups:[]},inventorySections:[{name:'Inventario',notes:'',items:[]}],money:{MP:0,MO:0,MA:0,MR:0},narrative:{diary:safeItem.longDesc||safeItem.desc||'',bonds:''},secrets:{playerVisible:'',dmNotes:'',loginRequired:true},classLevels:[{name:safeItem.type==='png'?'PNG':'Classe',level:1,notes:''}],companions:[],changeLog:[]};
-    safeLocalSetJson(`thalor.sheet.${slug}.v5`,compactSheetForStorage(data));
+    localStorage.setItem(`thalor.sheet.${slug}.v5`,JSON.stringify(data));
     return data;
   }catch(e){return null;}
 }
@@ -1355,7 +1333,7 @@ function registryBlankSheetFromList(slug){
       const beforeRemote=sheetData;
       try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData); }
       catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
-      safeLocalSetJson(parentStorageKey,compactSheetForStorage(sheetData));
+      localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData)));
     }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}
