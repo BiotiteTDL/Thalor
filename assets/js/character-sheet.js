@@ -700,7 +700,37 @@ function showFloatingTip(source){
   floatingTipSource=source;
   placeFloatingTip(source);
 }
-function bindTooltips(){hideFloatingTip();document.querySelectorAll('.info-row,.info-card').forEach(el=>{el.addEventListener('click',ev=>{if(app.classList.contains('editing'))return;const interactive=ev.target.closest('input,textarea,select,button,a,[data-del],[data-path],[data-drag-path]');if(interactive&&interactive!==el)return;ev.preventDefault();ev.stopPropagation();if(floatingTipSource===el)hideFloatingTip();else showFloatingTip(el);});el.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();el.click();}});});if(!floatingTipBound){floatingTipBound=true;document.addEventListener('click',hideFloatingTip);document.addEventListener('keydown',ev=>{if(ev.key==='Escape')hideFloatingTip();});window.addEventListener('scroll',hideFloatingTip,{passive:true});window.addEventListener('resize',hideFloatingTip,{passive:true});}}
+function isTooltipEditableTarget(target){
+  return !!(target&&target.closest&&target.closest('input,textarea,select,button,a,[contenteditable="true"],[data-del],[data-path],[data-drag-path]'));
+}
+function bindTooltips(){
+  hideFloatingTip();
+  document.querySelectorAll('.info-row,.info-card').forEach(el=>{
+    el.addEventListener('click',ev=>{
+      if(app.classList.contains('editing'))return;
+      const interactive=isTooltipEditableTarget(ev.target);
+      if(interactive&&interactive!==el)return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      if(floatingTipSource===el)hideFloatingTip();
+      else showFloatingTip(el);
+    });
+    el.addEventListener('keydown',ev=>{
+      if(isTooltipEditableTarget(ev.target))return;
+      if(ev.key==='Enter'||ev.key===' '){
+        ev.preventDefault();
+        el.click();
+      }
+    });
+  });
+  if(!floatingTipBound){
+    floatingTipBound=true;
+    document.addEventListener('click',hideFloatingTip);
+    document.addEventListener('keydown',ev=>{if(ev.key==='Escape')hideFloatingTip();});
+    window.addEventListener('scroll',hideFloatingTip,{passive:true});
+    window.addEventListener('resize',hideFloatingTip,{passive:true});
+  }
+}
 
 
 let spellDescModal=null;
