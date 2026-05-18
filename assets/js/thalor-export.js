@@ -289,6 +289,23 @@
       }
     };
 
+    if(window.ThalorNormalize && typeof window.ThalorNormalize.build === 'function'){
+      try{
+        archive.data.normalized = window.ThalorNormalize.build(archive);
+        archive.summary.normalizedRelations = archive.data.normalized.counts.relations;
+        archive.summary.normalizedTimeline = archive.data.normalized.counts.timeline;
+        archive.sources.normalized = 'thalor-normalize-v1';
+        log('Normalizzazione completata', `${archive.data.normalized.counts.relations} relazioni, ${archive.data.normalized.counts.timeline} voci timeline.`);
+      }catch(e){
+        archive.sources.normalized = 'error';
+        archive.normalizationError = e.message || String(e);
+        log('Normalizzazione non riuscita', archive.normalizationError);
+      }
+    }else{
+      archive.sources.normalized = 'missing-script';
+      log('Normalizzatore non caricato', 'Il JSON verrà esportato senza data.normalized.');
+    }
+
     currentArchive = archive;
     updatePreview(archive);
     log('Archivio pronto', `${archive.summary.characters} personaggi, ${archive.summary.sessions} sessioni, ${archive.summary.places} luoghi.`);
@@ -307,6 +324,8 @@
         ['Luoghi', archive.summary.places],
         ['Sessioni', archive.summary.sessions],
         ['Eventi XP', archive.summary.xpEvents],
+        ['Relazioni normalizzate', archive.summary.normalizedRelations || 0],
+        ['Timeline normalizzata', archive.summary.normalizedTimeline || 0],
         ['Categorie documenti', archive.summary.documentsCategories],
         ['Categorie simboli', archive.summary.symbolsCategories]
       ].map(([k,v])=>`<div class="export-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
@@ -355,7 +374,7 @@
         <div class="hero-box export-hero-box">
           <p class="eyebrow">Archivio Thalor</p>
           <h1>Esporta JSON</h1>
-          <p class="subtitle">Genera un unico file leggibile con personaggi, schede, luoghi, diario, esperienza, documenti, simboli e compendi statici. È pensato per backup, passaggio in chat e consultazione della lore.</p>
+          <p class="subtitle">Genera un unico file leggibile con personaggi, schede, luoghi, diario, esperienza, documenti, simboli e compendi statici. Include anche una sezione normalizzata con slug coerenti, relazioni automatiche e timeline base.</p>
           <div class="actions export-actions">
             <button class="button" id="generateArchiveBtn" type="button">Genera archivio</button>
             <button class="button ghost-button" id="downloadArchiveBtn" type="button">Scarica JSON</button>
@@ -365,7 +384,7 @@
       </section>
       <section class="panel export-panel">
         <h2 class="section-title">Contenuto esportato</h2>
-        <p class="section-note">Se sei online e Supabase è configurato, l’export prova prima a leggere i dati pubblicati. Se qualcosa non risponde, usa cache locale e file statici come fallback.</p>
+        <p class="section-note">Se sei online e Supabase è configurato, l’export prova prima a leggere i dati pubblicati. Se qualcosa non risponde, usa cache locale e file statici come fallback. La sezione <code>data.normalized</code> contiene la versione ordinata e standardizzata dell’archivio.</p>
         <div class="export-stats" id="exportStats"></div>
         <textarea id="exportPreview" class="export-preview" spellcheck="false" placeholder="Clicca “Genera archivio” per vedere qui il JSON."></textarea>
         <div class="export-log" id="exportLog" aria-live="polite"></div>
