@@ -868,11 +868,10 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
       parent.companions[companionIndex].sheet=u;
       parent.companions[companionIndex].name=u.identity?.name||parent.companions[companionIndex].name||'Creatura';
       parent.companions[companionIndex].kind=parent.companions[companionIndex].kind||u.meta?.subtitle||'Creatura';
-      localStorage.setItem(parentStorageKey,JSON.stringify(parent));
+      try{localStorage.setItem(parentStorageKey,JSON.stringify(parent));}catch(e){console.warn('Cache locale scheda principale non aggiornata: continuo con Supabase.',e);}
       parentForCloud=parent;
     } else {
-      localStorage.setItem(storageKey,JSON.stringify(u));
-      oldKeys.forEach(k=>localStorage.removeItem(k));
+      try{localStorage.setItem(storageKey,JSON.stringify(u)); oldKeys.forEach(k=>localStorage.removeItem(k));}catch(e){console.warn('Cache locale scheda non aggiornata: continuo con Supabase.',e);}
     }
 
     document.querySelectorAll('#floatEditSaveSheet,.section-save-btn').forEach(b=>{ try{ b.disabled=true; b.classList.add('is-saving'); }catch(e){} });
