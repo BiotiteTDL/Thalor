@@ -1339,8 +1339,14 @@ function registryBlankSheetFromList(slug){
     const localFound=firstValidLocal([parentStorageKey,...oldKeys]);
     if(!base && localFound) base=localFound.data;
     if(!base && slug) base=registryBlankSheetFromList(slug);
+    // Browser mai loggati/non master non hanno localStorage: prima di dichiarare la scheda mancante,
+    // prova a leggerla direttamente da Supabase con SELECT pubblica.
+    if(!base && slug && authAvailable() && window.ThalorAuth.state.configured){
+      try{ base=await window.ThalorAuth.loadCharacter(slug, null,{publicRead:true,timeoutMs:12000}); }
+      catch(e){ console.warn('Prelettura pubblica scheda non riuscita:',e); }
+    }
     if(!base && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
-    if(!base)throw new Error('Dati scheda non trovati.');
+    if(!base)throw new Error('Dati scheda non trovati online. Controlla che la scheda sia salvata su Supabase e che la policy SELECT pubblica sia attiva.');
     window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
     let sheetData=chooseSheetData(base, localFound);
