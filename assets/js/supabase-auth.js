@@ -524,57 +524,42 @@
     );
   }
 
-  async function loadCharacter(slug, fallback, options={}){
-    await init();
+  async function loadPublicCharacter(slug, fallback){
     if(!state.configured) return fallback;
 
-    // Lettura pubblica robusta: l'elenco personaggi e le schede devono potersi leggere
-    // anche senza poteri. Alcune policy Supabase distinguono tra ruolo authenticated e anon:
-    // se un utente è loggato ma non ha permessi, il token authenticated può vedere meno
-    // dell'anon pubblico. Per questo proviamo sempre anche con la chiave anon.
-    const base = restBaseUrl();
-    const url = base + '/character_sheets?select=data,updated_at&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
-    const tokens = [];
-    const anonToken = cfg.anonKey;
-    if(options.publicFirst !== false && anonToken) tokens.push({ label:'anon', token:anonToken });
-    if(state.session?.access_token) tokens.push({ label:'session', token:state.session.access_token });
-    if(options.publicFirst === false && anonToken) tokens.push({ label:'anon', token:anonToken });
-
-    const seen = new Set();
-    let lastProblem = null;
-    for(const candidate of tokens){
-      if(!candidate.token || seen.has(candidate.token)) continue;
-      seen.add(candidate.token);
-      try{
-        const { response, body } = await timeoutFetch(url, {
-          method: 'GET',
-          headers: {
-            'apikey': cfg.anonKey,
-            'Authorization': 'Bearer ' + candidate.token,
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache, no-store, max-age=0',
-            'Pragma': 'no-cache'
-          },
-          cache: 'no-store'
-        }, options.timeoutMs || 14000, 'Lettura Supabase ' + candidate.label);
-        if(!response.ok){
-          lastProblem = 'HTTP ' + response.status + ' ' + (body || '');
-          console.warn('Supabase loadCharacter HTTP (' + candidate.label + '):', response.status, body);
-          continue;
-        }
-        const rows = body ? JSON.parse(body) : [];
-        if(rows && rows[0] && rows[0].data) return rows[0].data;
-        lastProblem = 'nessuna riga per slug ' + slug + ' con token ' + candidate.label;
-      }catch(err){
-        lastProblem = err;
-        console.warn('Supabase loadCharacter (' + candidate.label + '):', err);
+    // Lettura PUBBLICA sempre con chiave anon, anche se nel browser esiste una sessione login.
+    // Con RLS Supabase una richiesta authenticated senza permessi può vedere meno della policy anon:
+    // era il motivo per cui chi era loggato ma senza poteri non vedeva i personaggi nuovi.
+    try{
+      const base = restBaseUrl();
+      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&t=' + Date.now();
+      const { response, body } = await timeoutFetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': cfg.anonKey,
+          'Authorization': 'Bearer ' + cfg.anonKey,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
+      }, 12000, 'Lettura pubblica Supabase');
+      if(!response.ok){
+        console.warn('Supabase loadPublicCharacter HTTP:', response.status, body);
+        return fallback;
       }
+      const rows = body ? JSON.parse(body) : [];
+      return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
+    }catch(err){
+      console.warn('Supabase loadPublicCharacter:', err);
+      return fallback;
     }
+  }
 
-    if(options.strict){
-      throw new Error('Dati online non leggibili per "' + slug + '". ' + (lastProblem && lastProblem.message ? lastProblem.message : (lastProblem || '')));
-    }
-    return fallback;
+  async function loadCharacter(slug, fallback){
+    // La lettura delle schede/personaggi deve essere pubblica e identica per tutti.
+    // I permessi servono solo per save/update, non per decidere cosa mostrare.
+    return loadPublicCharacter(slug, fallback);
   }
 
   async function saveCharacter(slug, data){
@@ -690,6 +675,7 @@
     isMaster,
     canEdit,
     loadCharacter,
+    loadPublicCharacter,
     saveCharacter,
     debugLog: () => { try{return JSON.parse(localStorage.getItem('thalor.lastSaveDebug')||'[]')}catch(e){return []} },
     enableDebug: () => { try{localStorage.setItem('thalor.debug.save','1')}catch(e){} },

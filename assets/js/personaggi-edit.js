@@ -146,27 +146,7 @@
   function registryPayload(items=state.items,deleted=state.deleted){return {updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:items||[],deleted:deleted||[]};}
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(raw.items);} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
-  async function readFresh(){
-    const localItems=readLocal();
-    try{
-      if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
-      if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicFirst:true,strict:true,timeoutMs:16000});
-        if(online&&Array.isArray(online.items)){
-          try{localStorage.setItem(LIST_KEY,JSON.stringify(online));}catch(e){}
-          return applyRegistryPayload(online);
-        }
-        console.warn('Registro personaggi online letto ma non valido:', online);
-      }
-    }catch(e){
-      console.warn('Registro personaggi online non disponibile, uso fallback locale/base:',e);
-      const app=$('#personaggiApp');
-      if(app && !state.master){
-        app.dataset.onlineRegistryError=(e&&e.message)||String(e);
-      }
-    }
-    return localItems;
-  }
+  async function readFresh(){let localItems=readLocal();try{if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await (window.ThalorAuth.loadPublicCharacter?window.ThalorAuth.loadPublicCharacter(REGISTRY_SLUG,null):window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null));if(online&&Array.isArray(online.items)){try{localStorage.setItem(LIST_KEY,JSON.stringify(online));}catch(e){}return applyRegistryPayload(online);}}}catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}return localItems;}
   function isDataImage(v){return /^data:image\//i.test(String(v||''));}
   function slimRegistryForLocal(payload){
     const clone=JSON.parse(JSON.stringify(payload||{}));
@@ -260,7 +240,7 @@
   function syncSheetRole(item){try{ensureRole(item); const key=sheetKey(item.slug); const raw=localStorage.getItem(key); if(!raw)return; const data=JSON.parse(raw); data.meta=data.meta||{}; data.meta.slug=item.slug; data.meta.permissionRole=item.slug; data.meta.characterRole=item.slug; data.meta.profileUrl=`dettaglio.html?id=${item.slug}`; data.identity=data.identity||{}; data.identity.name=data.identity.name||item.name||'Nuovo personaggio'; if(item.playerName!==undefined)data.identity.player=item.playerName||''; localStorage.setItem(key,JSON.stringify(data));}catch(e){console.warn('Aggiornamento ruolo scheda non riuscito:',e);}}
   function sheetHref(item){return `personaggi/scheda.html?character=${encodeURIComponent(item.slug)}`;}
   function detailHref(item){return `personaggi/dettaglio.html?id=${encodeURIComponent(item.slug)}`;}
-  function renderList(){const app=$('#personaggiApp'); if(!app)return; state.items=state.items||read(); const groups={pg:state.items.filter(i=>i.type==='pg'),png:state.items.filter(i=>i.type==='png')}; const warn=app.dataset.onlineRegistryError&&!state.master?`<section class="panel" style="margin-bottom:18px"><strong>Registro online non leggibile.</strong><br><small>Sto mostrando una copia base/locale. Controlla la policy SELECT pubblica su Supabase per lo slug __personaggi__.</small></section>`:''; app.innerHTML=`${warn}<h2 class="section-title">Personaggi</h2><p class="section-note">Ogni scheda raccoglie immagine, descrizione e background pubblico del personaggio.</p>${groupHtml('Giocanti',groups.pg)}${groupHtml('PNG',groups.png)}`; bindList(); renderPanel();}
+  function renderList(){const app=$('#personaggiApp'); if(!app)return; state.items=state.items||read(); const groups={pg:state.items.filter(i=>i.type==='pg'),png:state.items.filter(i=>i.type==='png')}; app.innerHTML=`<h2 class="section-title">Personaggi</h2><p class="section-note">Ogni scheda raccoglie immagine, descrizione e background pubblico del personaggio.</p>${groupHtml('Giocanti',groups.pg)}${groupHtml('PNG',groups.png)}`; bindList(); renderPanel();}
   function groupHtml(title,items){return `<h2 class="section-title personaggi-group-title">${esc(title)}</h2><div class="character-list personaggi-list">${items.map(cardHtml).join('')||'<article class="card empty-row">Nessun personaggio.</article>'}</div>`;}
   function cardHtml(item){const hasSheet=!!(item.sheet||localStorage.getItem(sheetKey(item.slug))); const showSheet=item.type==='pg'||state.master; return `<article class="card character-card personaggi-card ${item.slug==='abraxas'?'abraxas':''}" data-personaggio="${esc(item.slug)}"><div class="personaggi-card-main"><img alt="${esc(item.name)}" src="${esc(item.img||'assets/img/Thalor16k.jpg')}" loading="lazy" decoding="async"><div class="content"><span class="tag" title="${esc(permissionNote(item))}">${item.type==='png'?'PNG':'PG'}</span><h3>${richText(item.name)}</h3><p>${richText(item.desc||'')}</p></div></div><a class="card-overlay-link personaggi-card-overlay" href="${esc(detailHref(item))}" aria-label="Apri ${esc(item.name)}"></a><div class="personaggi-card-actions">${showSheet?(hasSheet?`<a class="button mini-sheet-link" href="${esc(sheetHref(item))}">Apri scheda</a>`:`<button class="button mini-sheet-link create-png-sheet" type="button" data-create-sheet="${esc(item.slug)}">Crea scheda</button>`):''}${state.master?`<button class="button ghost-button edit-personaggio" type="button" data-edit-personaggio="${esc(item.slug)}">Modifica</button><button class="button ghost-button delete-sheet-card" type="button" data-delete-sheet="${esc(item.slug)}">Elimina scheda</button><button class="button ghost-button delete-personaggio-card" type="button" data-delete-personaggio="${esc(item.slug)}">Elimina</button>`:''}</div></article>`;}
   function bindList(){ $$('.create-png-sheet').forEach(b=>b.onclick=async()=>{const item=state.items.find(x=>x.slug===b.dataset.createSheet); if(!item)return; const sheetData=ensureSheet(item,false); if(!(await saveOnlineSheet(item,sheetData)))return; if(!(await save()))return; renderList();}); $$('.edit-personaggio').forEach(b=>b.onclick=()=>openEditor(state.items.find(x=>x.slug===b.dataset.editPersonaggio))); $$('.delete-personaggio-card').forEach(b=>b.onclick=()=>removePersonaggio(state.items.find(x=>x.slug===b.dataset.deletePersonaggio))); $$('.delete-sheet-card').forEach(b=>b.onclick=()=>deleteSheetOnly(state.items.find(x=>x.slug===b.dataset.deleteSheet)));  }
