@@ -251,7 +251,37 @@
   function openEditor(item,opts={}){if(!item)return; let modal=document.createElement('div'); modal.className='personaggi-modal-backdrop'; modal.innerHTML=`<form class="personaggi-modal panel"><header><h2>${opts.isNew?'Nuovo personaggio':esc(item.name||'Personaggio')}</h2><button type="button" class="modal-x">×</button></header><div class="personaggi-form-grid"><label>Tipo<select name="type"><option value="pg" ${item.type==='pg'?'selected':''}>PG</option><option value="png" ${item.type==='png'?'selected':''}>PNG</option></select></label><label>Nome<input name="name" value="${esc(item.name||'')}" required></label><label>Nome giocatore<input name="playerName" value="${esc(item.playerName||item.player||item.giocatore||'')}" placeholder="Da associare alla scheda"></label><label>Slug<input name="slug" value="${esc(item.slug||'')}"></label><label>Ruolo permesso<input name="roleSlug" value="${esc(item.roleSlug||item.slug||'')}" readonly title="Questo valore segue lo slug: assegna questo character_slug nei permessi Supabase del giocatore."></label><label>Pagina descrizione<input name="href" value="${esc(item.href||'')}"></label><label class="wide">Descrizione breve<textarea name="desc">${esc(item.desc||'')}</textarea></label><label class="wide">Descrizione pagina<textarea name="longDesc">${esc(item.longDesc||htmlToEditText(item.longHtml)||'')}</textarea></label><label class="wide">Eventi in campagna<textarea name="events">${esc(item.events||htmlToEditText(item.eventsHtml)||'')}</textarea></label><label class="wide">Immagine<input type="file" name="imgFile" accept="image/*"><input name="img" value="${esc(item.img||'')}"></label></div><footer>${opts.isNew?'':`<button type="button" class="button ghost-button delete-personaggio">Elimina</button>`}<button type="button" class="button ghost-button ensure-sheet">Crea/Aggiorna scheda vuota</button><button type="submit" class="button save-button">Salva</button></footer></form>`; document.body.appendChild(modal); const form=$('form',modal); $('.modal-x',modal).onclick=()=>modal.remove(); const del=$('.delete-personaggio',modal); if(del)del.onclick=()=>{modal.remove(); removePersonaggio(item);}; $('.ensure-sheet',modal).onclick=async()=>{const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); makeLinks(item); const sheetData=ensureSheet(item,false); if(!(await saveOnlineSheet(item,sheetData)))return; if(!(await save()))return; if($('#personaggiApp')){renderList();} alert('Scheda personaggio creata e salvata online. Permesso da assegnare al giocatore: '+item.slug);}; $('[name="imgFile"]',form).onchange=async e=>{const file=e.target.files&&e.target.files[0]; if(!file)return; const imgInput=$('[name="img"]',form); const saveBtn=$('.save-button',form); try{ if(saveBtn)saveBtn.disabled=true; imgInput.value='Ottimizzazione immagine in corso…'; imgInput.dataset.pendingImage='1'; const optimized=await thalorOptimizeImage(file,{maxSide:1200,quality:0.74,maxBytes:650000}); imgInput.value=optimized; delete imgInput.dataset.pendingImage; }catch(err){ console.warn('Ottimizzazione immagine non riuscita:',err); alert('Non riesco a preparare questa immagine per il salvataggio. Prova a convertirla in JPG/WebP o a ridurla.'); imgInput.value=''; delete imgInput.dataset.pendingImage; }finally{ if(saveBtn)saveBtn.disabled=false; }}; form.onsubmit=async e=>{e.preventDefault(); const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); if(old!==item.slug){const oldData=localStorage.getItem(sheetKey(old)); if(oldData&&!localStorage.getItem(sheetKey(item.slug))){localStorage.setItem(sheetKey(item.slug),oldData); localStorage.removeItem(sheetKey(old));}} makeLinks(item); const sheetData=ensureSheet(item,false); syncSheetRole(item); if(!(await saveOnlineSheet(item,readSheetForItem(item)||sheetData)))return; if(!(await save()))return; modal.remove(); if($('#personaggiApp')){renderList();}else if($('#personaggioDetailApp')){initDetail();} };}
   function upsertPersonaggio(item,oldSlug){state.items=state.items||read(); makeLinks(item); const idx=state.items.findIndex(x=>x.slug===(oldSlug||item.slug)); if(idx>=0)state.items[idx]=Object.assign({},item); else state.items.push(Object.assign({},item)); state.deleted=(state.deleted||[]).filter(x=>x!==item.slug);}
   function collectForm(form,item,oldSlug){const fd=new FormData(form); item.type=fd.get('type')||'pg'; item.name=fd.get('name')||'Nuovo personaggio'; const desired=slugify(fd.get('slug')||item.name); item.slug=(oldSlug&&desired!==oldSlug&&state.items.some(i=>i!==item&&i.slug===desired))?uniqueSlug(desired):desired; item.playerName=fd.get('playerName')||''; ensureRole(item); makeLinks(item); item.desc=fd.get('desc')||''; item.longDesc=fd.get('longDesc')||''; item.events=fd.get('events')||''; item.longHtml=''; item.eventsHtml=''; item.img=fd.get('img')||''; return item;}
-  async function initList(){state.master=await canMaster(); state.items=await readFresh(); if(state.restoreDefaultContent)await save(); renderList();}
+  let personaggiRefreshBusy=false;
+  let personaggiLastRefresh=0;
+  async function refreshPersonaggiList(force=false){
+    if(!$('#personaggiApp'))return;
+    const now=Date.now();
+    if(personaggiRefreshBusy)return;
+    if(!force && now-personaggiLastRefresh<1200)return;
+    personaggiRefreshBusy=true;
+    try{
+      const wasMaster=state.master;
+      state.master=await canMaster();
+      state.items=await readFresh();
+      personaggiLastRefresh=Date.now();
+      if(state.restoreDefaultContent)await save();
+      renderList();
+      if(wasMaster!==state.master){document.body.classList.toggle('personaggi-editing',false);}
+    }catch(e){
+      console.warn('Aggiornamento elenco personaggi non riuscito:',e);
+    }finally{
+      personaggiRefreshBusy=false;
+    }
+  }
+  async function initList(){await refreshPersonaggiList(true);}
+  function bindAutoRefresh(){
+    if(window.__thalorPersonaggiAutoRefreshBound)return;
+    window.__thalorPersonaggiAutoRefreshBound=true;
+    window.addEventListener('focus',()=>refreshPersonaggiList(false));
+    window.addEventListener('pageshow',()=>refreshPersonaggiList(true));
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPersonaggiList(false);});
+    window.addEventListener('storage',e=>{if(e&&e.key===LIST_KEY)refreshPersonaggiList(true);});
+  }
   function paragraphs(text){return String(text||'').split(/\n{2,}/).map(x=>x.trim()).filter(Boolean).map(p=>`<p>${richText(p)}</p>`).join('');}
   function htmlToEditText(html){const d=document.createElement('div'); d.innerHTML=String(html||''); return Array.from(d.children).map(el=>el.textContent.trim()).filter(Boolean).join('\n\n');}
   function richBlock(html,text){return html ? String(html) : paragraphs(text||'');}
@@ -326,7 +356,7 @@
     };
     $('#detailEditPersonaggio').onclick=()=>openEditor(item);
   }
-  if($('#personaggiApp')) initList();
+  if($('#personaggiApp')){bindAutoRefresh(); initList();}
   if($('#personaggioDetailApp')) canMaster().then(m=>{state.master=m; initDetail();});
 })();
 
