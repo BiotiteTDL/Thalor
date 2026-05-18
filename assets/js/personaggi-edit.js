@@ -146,7 +146,39 @@
   function registryPayload(items=state.items,deleted=state.deleted){return {updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:items||[],deleted:deleted||[]};}
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(raw.items);} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
-  async function readFresh(){let localItems=readLocal();try{if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null);if(online&&Array.isArray(online.items)){try{localStorage.setItem(LIST_KEY,JSON.stringify(online));}catch(e){}return applyRegistryPayload(online);}}}catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}return localItems;}
+  function cacheRegistry(raw){try{localStorage.setItem(LIST_KEY,JSON.stringify(raw));}catch(e){}}
+  async function loadRegistryDirect(){
+    const cfg=window.THALOR_SUPABASE||{};
+    if(!cfg.url||!cfg.anonKey||navigator.onLine===false)return null;
+    const base=String(cfg.url||'').replace(/\/rest\/v1\/?$/,'').replace(/\/$/,'')+'/rest/v1';
+    const token=(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.session&&window.ThalorAuth.state.session.access_token)||cfg.anonKey;
+    const url=base+'/character_sheets?select=data,updated_at&slug=eq.'+encodeURIComponent(REGISTRY_SLUG)+'&limit=1&_thalor_no_cache='+Date.now();
+    const controller=new AbortController();
+    const timer=setTimeout(()=>controller.abort(),9000);
+    try{
+      const response=await fetch(url,{method:'GET',headers:{apikey:cfg.anonKey,Authorization:'Bearer '+token,Accept:'application/json','Cache-Control':'no-cache','Pragma':'no-cache'},cache:'no-store',signal:controller.signal});
+      if(!response.ok)return null;
+      const rows=await response.json();
+      const data=rows&&rows[0]&&rows[0].data;
+      return data&&Array.isArray(data.items)?data:null;
+    }catch(e){
+      console.warn('Registro personaggi direct fetch non disponibile:',e);
+      return null;
+    }finally{clearTimeout(timer);}
+  }
+  async function readFresh(){
+    const localItems=readLocal();
+    try{
+      if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
+      if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null);
+        if(online&&Array.isArray(online.items)){cacheRegistry(online);return applyRegistryPayload(online);}
+      }
+    }catch(e){console.warn('Registro personaggi online non disponibile tramite ThalorAuth:',e);}
+    const direct=await loadRegistryDirect();
+    if(direct){cacheRegistry(direct);return applyRegistryPayload(direct);}
+    return localItems;
+  }
   function isDataImage(v){return /^data:image\//i.test(String(v||''));}
   function slimRegistryForLocal(payload){
     const clone=JSON.parse(JSON.stringify(payload||{}));
@@ -257,12 +289,14 @@
     if(!$('#personaggiApp'))return;
     const now=Date.now();
     if(personaggiRefreshBusy)return;
-    if(!force && now-personaggiLastRefresh<1200)return;
+    if(!force && now-personaggiLastRefresh<900)return;
     personaggiRefreshBusy=true;
     try{
       const wasMaster=state.master;
-      state.master=await canMaster();
+      // Prima rileggo i dati freschi: su mobile/PC l'elenco non deve restare bloccato
+      // dietro init/auth o dietro la cache locale.
       state.items=await readFresh();
+      try{state.master=await canMaster();}catch(e){state.master=false;}
       personaggiLastRefresh=Date.now();
       if(state.restoreDefaultContent)await save();
       renderList();
@@ -277,9 +311,12 @@
   function bindAutoRefresh(){
     if(window.__thalorPersonaggiAutoRefreshBound)return;
     window.__thalorPersonaggiAutoRefreshBound=true;
-    window.addEventListener('focus',()=>refreshPersonaggiList(false));
+    window.addEventListener('focus',()=>refreshPersonaggiList(true));
     window.addEventListener('pageshow',()=>refreshPersonaggiList(true));
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPersonaggiList(false);});
+    window.addEventListener('popstate',()=>refreshPersonaggiList(true));
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)refreshPersonaggiList(true);});
+    document.addEventListener('resume',()=>refreshPersonaggiList(true));
+    document.addEventListener('touchstart',()=>refreshPersonaggiList(false),{passive:true});
     window.addEventListener('storage',e=>{if(e&&e.key===LIST_KEY)refreshPersonaggiList(true);});
   }
   function paragraphs(text){return String(text||'').split(/\n{2,}/).map(x=>x.trim()).filter(Boolean).map(p=>`<p>${richText(p)}</p>`).join('');}

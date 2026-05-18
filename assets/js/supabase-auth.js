@@ -533,14 +533,15 @@
     try{
       const base = restBaseUrl();
       const token = state.session?.access_token || cfg.anonKey;
-      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1';
+      const url = base + '/character_sheets?select=data,updated_at&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_thalor_no_cache=' + Date.now();
       const { response, body } = await timeoutFetch(url, {
         method: 'GET',
         headers: {
           'apikey': cfg.anonKey,
           'Authorization': 'Bearer ' + token,
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
         },
         cache: 'no-store'
       }, 12000, 'Lettura Supabase');
