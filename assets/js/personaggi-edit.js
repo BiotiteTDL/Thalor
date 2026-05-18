@@ -146,7 +146,63 @@
   function registryPayload(items=state.items,deleted=state.deleted){return {updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:items||[],deleted:deleted||[]};}
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(raw.items);} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
-  async function readFresh(){let localItems=readLocal();try{if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await (window.ThalorAuth.loadPublicCharacter?window.ThalorAuth.loadPublicCharacter(REGISTRY_SLUG,null):window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null));if(online&&Array.isArray(online.items)){try{localStorage.setItem(LIST_KEY,JSON.stringify(online));}catch(e){}return applyRegistryPayload(online);}}}catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}return localItems;}
+  function itemFromSheetRow(row){
+    const slug=String(row?.slug||'').trim();
+    const data=row?.data||{};
+    if(!slug || slug===REGISTRY_SLUG) return null;
+    const identity=data.identity||{};
+    const meta=data.meta||{};
+    const portrait=data.portrait||{};
+    const narrative=data.narrative||{};
+    const type=String(meta.subtitle||meta.type||'').toLowerCase().includes('png')?'png':'pg';
+    const item=makeLinks({
+      type,
+      slug,
+      name:identity.name||meta.name||slug.replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),
+      playerName:identity.player||'',
+      roleSlug:slug,
+      permissionRole:slug,
+      desc:portrait.quote||meta.subtitle||'Personaggio salvato online.',
+      img:portrait.image ? String(portrait.image).replace(/^\.\.\//,'') : 'assets/img/Thalor16k.jpg',
+      longDesc:narrative.diary||'',
+      events:''
+    });
+    return item;
+  }
+  async function supplementFromOnlineSheets(items){
+    const list=Array.isArray(items)?items.slice():[];
+    if(!(window.ThalorAuth&&window.ThalorAuth.loadCharacterRows)) return list;
+    const rows=await window.ThalorAuth.loadCharacterRows();
+    if(!rows.length) return list;
+    const deleted=new Set(state.deleted||[]);
+    const existing=new Set(list.map(i=>i&&i.slug).filter(Boolean));
+    rows.forEach(row=>{
+      const slug=String(row?.slug||'').trim();
+      if(!slug || slug===REGISTRY_SLUG || deleted.has(slug) || existing.has(slug)) return;
+      const item=itemFromSheetRow(row);
+      if(item){list.push(item); existing.add(item.slug);}
+    });
+    return list;
+  }
+  async function readFresh(){
+    let localItems=readLocal();
+    try{
+      if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
+      if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null);
+        if(online&&Array.isArray(online.items)){
+          const merged=applyRegistryPayload(online);
+          const supplemented=await supplementFromOnlineSheets(merged);
+          const payload=registryPayload(supplemented,state.deleted);
+          try{localStorage.setItem(LIST_KEY,JSON.stringify(payload));}catch(e){}
+          return supplemented;
+        }
+        const recovered=await supplementFromOnlineSheets(localItems);
+        if(recovered.length!==localItems.length) return recovered;
+      }
+    }catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}
+    return localItems;
+  }
   function isDataImage(v){return /^data:image\//i.test(String(v||''));}
   function slimRegistryForLocal(payload){
     const clone=JSON.parse(JSON.stringify(payload||{}));

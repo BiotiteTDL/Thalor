@@ -524,42 +524,67 @@
     );
   }
 
-  async function loadPublicCharacter(slug, fallback){
+  async function loadCharacter(slug, fallback){
+    await init();
     if(!state.configured) return fallback;
 
-    // Lettura PUBBLICA sempre con chiave anon, anche se nel browser esiste una sessione login.
-    // Con RLS Supabase una richiesta authenticated senza permessi può vedere meno della policy anon:
-    // era il motivo per cui chi era loggato ma senza poteri non vedeva i personaggi nuovi.
+    // Lettura sempre fresca: la cache del browser/localStorage deve essere solo un fallback offline.
+    // Per la lettura pubblica usiamo SEMPRE la anon key: così un utente loggato senza poteri
+    // non rischia di leggere meno dati per colpa di policy diverse su authenticated.
     try{
       const base = restBaseUrl();
-      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&t=' + Date.now();
+      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1';
       const { response, body } = await timeoutFetch(url, {
         method: 'GET',
         headers: {
           'apikey': cfg.anonKey,
           'Authorization': 'Bearer ' + cfg.anonKey,
           'Accept': 'application/json',
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-          'Pragma': 'no-cache'
+          'Cache-Control': 'no-cache'
         },
         cache: 'no-store'
-      }, 12000, 'Lettura pubblica Supabase');
+      }, 12000, 'Lettura Supabase');
       if(!response.ok){
-        console.warn('Supabase loadPublicCharacter HTTP:', response.status, body);
+        console.warn('Supabase loadCharacter HTTP:', response.status, body);
         return fallback;
       }
       const rows = body ? JSON.parse(body) : [];
       return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
     }catch(err){
-      console.warn('Supabase loadPublicCharacter:', err);
+      console.warn('Supabase loadCharacter:', err);
       return fallback;
     }
   }
 
-  async function loadCharacter(slug, fallback){
-    // La lettura delle schede/personaggi deve essere pubblica e identica per tutti.
-    // I permessi servono solo per save/update, non per decidere cosa mostrare.
-    return loadPublicCharacter(slug, fallback);
+  async function loadCharacterRows(){
+    await init();
+    if(!state.configured) return [];
+
+    // Recovery pubblico dell'elenco: serve quando __personaggi__ esiste ma non contiene
+    // ancora una scheda nuova già salvata come riga singola in character_sheets.
+    try{
+      const base = restBaseUrl();
+      const url = base + '/character_sheets?select=slug,data,updated_at&order=updated_at.desc&limit=1000';
+      const { response, body } = await timeoutFetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': cfg.anonKey,
+          'Authorization': 'Bearer ' + cfg.anonKey,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        cache: 'no-store'
+      }, 12000, 'Lettura elenco schede Supabase');
+      if(!response.ok){
+        console.warn('Supabase loadCharacterRows HTTP:', response.status, body);
+        return [];
+      }
+      const rows = body ? JSON.parse(body) : [];
+      return Array.isArray(rows) ? rows : [];
+    }catch(err){
+      console.warn('Supabase loadCharacterRows:', err);
+      return [];
+    }
   }
 
   async function saveCharacter(slug, data){
@@ -675,7 +700,7 @@
     isMaster,
     canEdit,
     loadCharacter,
-    loadPublicCharacter,
+    loadCharacterRows,
     saveCharacter,
     debugLog: () => { try{return JSON.parse(localStorage.getItem('thalor.lastSaveDebug')||'[]')}catch(e){return []} },
     enableDebug: () => { try{localStorage.setItem('thalor.debug.save','1')}catch(e){} },
