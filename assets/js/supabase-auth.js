@@ -527,32 +527,37 @@
     await init();
     if(!state.configured) return fallback;
 
-    // Lettura sempre fresca: la cache del browser/localStorage deve essere solo un fallback offline.
-    // Usiamo PostgREST diretto con cache:no-store, così anche da mobile un refresh rilegge Supabase.
-    try{
-      const base = restBaseUrl();
-      const token = state.session?.access_token || cfg.anonKey;
-      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1';
-      const { response, body } = await timeoutFetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': cfg.anonKey,
-          'Authorization': 'Bearer ' + token,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        cache: 'no-store'
-      }, 12000, 'Lettura Supabase');
-      if(!response.ok){
-        console.warn('Supabase loadCharacter HTTP:', response.status, body);
-        return fallback;
+    // Lettura sempre fresca e indipendente dai permessi di modifica.
+    // Prima provo come anon: se le policy permettono lettura pubblica, anche chi non ha poteri
+    // vede il JSON aggiornato invece del fallback locale/base. Se anon non basta, provo col token utente.
+    const base = restBaseUrl();
+    const url = base + '/character_sheets?select=data,updated_at&slug=eq.' + encodeURIComponent(slug) + '&limit=1';
+    const tokens = [cfg.anonKey];
+    if(state.session?.access_token && state.session.access_token !== cfg.anonKey) tokens.push(state.session.access_token);
+    for(const token of tokens){
+      try{
+        const { response, body } = await timeoutFetch(url, {
+          method: 'GET',
+          headers: {
+            'apikey': cfg.anonKey,
+            'Authorization': 'Bearer ' + token,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        }, 12000, 'Lettura Supabase');
+        if(!response.ok){
+          console.warn('Supabase loadCharacter HTTP:', response.status, body);
+          continue;
+        }
+        const rows = body ? JSON.parse(body) : [];
+        if(rows && rows[0] && rows[0].data) return rows[0].data;
+      }catch(err){
+        console.warn('Supabase loadCharacter:', err);
       }
-      const rows = body ? JSON.parse(body) : [];
-      return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
-    }catch(err){
-      console.warn('Supabase loadCharacter:', err);
-      return fallback;
     }
+    return fallback;
   }
 
   async function saveCharacter(slug, data){

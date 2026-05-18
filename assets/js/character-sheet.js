@@ -1349,7 +1349,7 @@ function registryBlankSheetFromList(slug){
       const beforeRemote=sheetData;
       try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData); }
       catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
-      localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData)));
+      try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}

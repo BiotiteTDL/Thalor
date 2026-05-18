@@ -147,7 +147,44 @@
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(raw.items);} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
   async function readFresh(){let localItems=readLocal();try{if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null);if(online&&Array.isArray(online.items)){try{localStorage.setItem(LIST_KEY,JSON.stringify(online));}catch(e){}return applyRegistryPayload(online);}}}catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}return localItems;}
-  function save(){(state.items||[]).forEach(ensureRole); const payload=registryPayload(); try{ localStorage.setItem(LIST_KEY,JSON.stringify(payload)); state.restoreDefaultContent=false; if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&!window.ThalorAuth.state.localMaster&&navigator.onLine!==false){window.ThalorAuth.saveCharacter(REGISTRY_SLUG,payload).catch(e=>console.warn('Salvataggio registro personaggi online non riuscito:',e));} return true; }catch(e){ console.error('Salvataggio registro personaggi non riuscito:',e); alert('Salvataggio personaggio non riuscito: probabilmente l’immagine è troppo pesante per il salvataggio locale. Prova con un file più leggero o senza immagine.'); return false; }}
+  function isDataImage(v){return /^data:image\//i.test(String(v||''));}
+  function slimRegistryForLocal(payload){
+    const clone=JSON.parse(JSON.stringify(payload||{}));
+    (clone.items||[]).forEach(it=>{
+      // Ultima difesa anti-quota: se una vecchia immagine base64 è ancora enorme,
+      // non blocchiamo il salvataggio del registro. Il dato completo viene comunque
+      // mandato a Supabase sotto; in locale resta un placeholder sicuro.
+      if(isDataImage(it.img) && String(it.img).length>850000){
+        it.img='assets/img/Thalor16k.jpg';
+        it.imgLocalNote='Immagine rimossa dalla cache locale perché troppo pesante.';
+      }
+    });
+    return clone;
+  }
+  function save(){
+    (state.items||[]).forEach(ensureRole);
+    const payload=registryPayload();
+    let localOk=false;
+    try{
+      localStorage.setItem(LIST_KEY,JSON.stringify(payload));
+      localOk=true;
+    }catch(e){
+      try{
+        localStorage.setItem(LIST_KEY,JSON.stringify(slimRegistryForLocal(payload)));
+        localOk=true;
+        console.warn('Registro personaggi salvato in locale in forma alleggerita:',e);
+      }catch(e2){
+        console.error('Salvataggio registro personaggi non riuscito:',e2);
+        alert('Salvataggio locale non riuscito: il browser ha esaurito lo spazio. Ho provato ad alleggerire le immagini, ma la cache è ancora piena. Cancella vecchi backup locali o usa immagini più leggere.');
+        return false;
+      }
+    }
+    state.restoreDefaultContent=false;
+    if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&!window.ThalorAuth.state.localMaster&&navigator.onLine!==false){
+      window.ThalorAuth.saveCharacter(REGISTRY_SLUG,payload).catch(e=>console.warn('Salvataggio registro personaggi online non riuscito:',e));
+    }
+    return localOk;
+  }
   function removePersonaggio(item){if(!item)return; const name=item.name||'questo personaggio'; if(!confirm(`Eliminare ${name} e la sua scheda?`))return; if(!confirm('Conferma definitiva: questa azione rimuove anche la scheda collegata salvata in locale.'))return; const slug=item.slug; state.items=state.items.filter(x=>x.slug!==slug); const defaultSlug=DEFAULTS.some(d=>d.slug===slug); if(defaultSlug&&!state.deleted.includes(slug))state.deleted.push(slug); try{localStorage.removeItem(sheetKey(slug));}catch(e){} save(); if($('#personaggiApp')){renderList();}else{location.href='../personaggi.html';}}
   function deleteSheetOnly(item){if(!item)return; const name=item.name||item.slug||'personaggio'; if(!confirm(`Eliminare solo la scheda di ${name}? La pagina personaggio resterà nel menu.`))return; try{localStorage.removeItem(sheetKey(item.slug)); localStorage.removeItem(sheetKey(item.slug)+'.snapshots');}catch(e){} renderList();}
   async function canMaster(){try{if(window.ThalorAuth){await window.ThalorAuth.init(true); return !!(window.ThalorAuth.isMaster&&window.ThalorAuth.isMaster());}}catch(e){} return !window.ThalorAuth;}
@@ -166,7 +203,7 @@
   function uniqueSlug(base){let slug=slugify(base); let n=2; while(state.items.some(i=>i.slug===slug)){slug=slugify(base)+'-'+n++;} return slug;}
   function makeLinks(item){ensureRole(item); item.href=`personaggi/dettaglio.html?id=${encodeURIComponent(item.slug)}`; item.sheet=`personaggi/scheda.html?character=${encodeURIComponent(item.slug)}`; return item;}
   function newItem(type){state.items=state.items||read(); const name=type==='pg'?'Nuovo personaggio':'Nuovo PNG'; const slug=uniqueSlug(name); const item=makeLinks({type,slug,name,playerName:'',roleSlug:slug,permissionRole:slug,desc:'Nuova descrizione breve.',img:'assets/img/Thalor16k.jpg',longDesc:'',events:''}); openEditor(item,{isNew:true});}
-  function openEditor(item,opts={}){if(!item)return; let modal=document.createElement('div'); modal.className='personaggi-modal-backdrop'; modal.innerHTML=`<form class="personaggi-modal panel"><header><h2>${opts.isNew?'Nuovo personaggio':esc(item.name||'Personaggio')}</h2><button type="button" class="modal-x">×</button></header><div class="personaggi-form-grid"><label>Tipo<select name="type"><option value="pg" ${item.type==='pg'?'selected':''}>PG</option><option value="png" ${item.type==='png'?'selected':''}>PNG</option></select></label><label>Nome<input name="name" value="${esc(item.name||'')}" required></label><label>Nome giocatore<input name="playerName" value="${esc(item.playerName||item.player||item.giocatore||'')}" placeholder="Da associare alla scheda"></label><label>Slug<input name="slug" value="${esc(item.slug||'')}"></label><label>Ruolo permesso<input name="roleSlug" value="${esc(item.roleSlug||item.slug||'')}" readonly title="Questo valore segue lo slug: assegna questo character_slug nei permessi Supabase del giocatore."></label><label>Pagina descrizione<input name="href" value="${esc(item.href||'')}"></label><label class="wide">Descrizione breve<textarea name="desc">${esc(item.desc||'')}</textarea></label><label class="wide">Descrizione pagina<textarea name="longDesc">${esc(item.longDesc||htmlToEditText(item.longHtml)||'')}</textarea></label><label class="wide">Eventi in campagna<textarea name="events">${esc(item.events||htmlToEditText(item.eventsHtml)||'')}</textarea></label><label class="wide">Immagine<input type="file" name="imgFile" accept="image/*"><input name="img" value="${esc(item.img||'')}"></label></div><footer>${opts.isNew?'':`<button type="button" class="button ghost-button delete-personaggio">Elimina</button>`}<button type="button" class="button ghost-button ensure-sheet">Crea/Aggiorna scheda vuota</button><button type="submit" class="button save-button">Salva</button></footer></form>`; document.body.appendChild(modal); const form=$('form',modal); $('.modal-x',modal).onclick=()=>modal.remove(); const del=$('.delete-personaggio',modal); if(del)del.onclick=()=>{modal.remove(); removePersonaggio(item);}; $('.ensure-sheet',modal).onclick=()=>{const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); makeLinks(item); ensureSheet(item,false); if(!save())return; if($('#personaggiApp')){renderList();} alert('Scheda personaggio creata. Permesso da assegnare al giocatore: '+item.slug);}; $('[name="imgFile"]',form).onchange=e=>{const file=e.target.files&&e.target.files[0]; if(!file)return; const r=new FileReader(); r.onload=()=>{$('[name="img"]',form).value=r.result;}; r.readAsDataURL(file);}; form.onsubmit=e=>{e.preventDefault(); const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); if(old!==item.slug){const oldData=localStorage.getItem(sheetKey(old)); if(oldData&&!localStorage.getItem(sheetKey(item.slug))){localStorage.setItem(sheetKey(item.slug),oldData); localStorage.removeItem(sheetKey(old));}} makeLinks(item); ensureSheet(item,false); syncSheetRole(item); if(!save())return; modal.remove(); if($('#personaggiApp')){renderList();}else if($('#personaggioDetailApp')){initDetail();} };}
+  function openEditor(item,opts={}){if(!item)return; let modal=document.createElement('div'); modal.className='personaggi-modal-backdrop'; modal.innerHTML=`<form class="personaggi-modal panel"><header><h2>${opts.isNew?'Nuovo personaggio':esc(item.name||'Personaggio')}</h2><button type="button" class="modal-x">×</button></header><div class="personaggi-form-grid"><label>Tipo<select name="type"><option value="pg" ${item.type==='pg'?'selected':''}>PG</option><option value="png" ${item.type==='png'?'selected':''}>PNG</option></select></label><label>Nome<input name="name" value="${esc(item.name||'')}" required></label><label>Nome giocatore<input name="playerName" value="${esc(item.playerName||item.player||item.giocatore||'')}" placeholder="Da associare alla scheda"></label><label>Slug<input name="slug" value="${esc(item.slug||'')}"></label><label>Ruolo permesso<input name="roleSlug" value="${esc(item.roleSlug||item.slug||'')}" readonly title="Questo valore segue lo slug: assegna questo character_slug nei permessi Supabase del giocatore."></label><label>Pagina descrizione<input name="href" value="${esc(item.href||'')}"></label><label class="wide">Descrizione breve<textarea name="desc">${esc(item.desc||'')}</textarea></label><label class="wide">Descrizione pagina<textarea name="longDesc">${esc(item.longDesc||htmlToEditText(item.longHtml)||'')}</textarea></label><label class="wide">Eventi in campagna<textarea name="events">${esc(item.events||htmlToEditText(item.eventsHtml)||'')}</textarea></label><label class="wide">Immagine<input type="file" name="imgFile" accept="image/*"><input name="img" value="${esc(item.img||'')}"></label></div><footer>${opts.isNew?'':`<button type="button" class="button ghost-button delete-personaggio">Elimina</button>`}<button type="button" class="button ghost-button ensure-sheet">Crea/Aggiorna scheda vuota</button><button type="submit" class="button save-button">Salva</button></footer></form>`; document.body.appendChild(modal); const form=$('form',modal); $('.modal-x',modal).onclick=()=>modal.remove(); const del=$('.delete-personaggio',modal); if(del)del.onclick=()=>{modal.remove(); removePersonaggio(item);}; $('.ensure-sheet',modal).onclick=()=>{const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); makeLinks(item); ensureSheet(item,false); if(!save())return; if($('#personaggiApp')){renderList();} alert('Scheda personaggio creata. Permesso da assegnare al giocatore: '+item.slug);}; $('[name="imgFile"]',form).onchange=async e=>{const file=e.target.files&&e.target.files[0]; if(!file)return; const imgInput=$('[name="img"]',form); const saveBtn=$('.save-button',form); try{ if(saveBtn)saveBtn.disabled=true; imgInput.value='Ottimizzazione immagine in corso…'; imgInput.dataset.pendingImage='1'; const optimized=await thalorOptimizeImage(file,{maxSide:1200,quality:0.74,maxBytes:650000}); imgInput.value=optimized; delete imgInput.dataset.pendingImage; }catch(err){ console.warn('Ottimizzazione immagine non riuscita:',err); alert('Non riesco a preparare questa immagine per il salvataggio. Prova a convertirla in JPG/WebP o a ridurla.'); imgInput.value=''; delete imgInput.dataset.pendingImage; }finally{ if(saveBtn)saveBtn.disabled=false; }}; form.onsubmit=e=>{e.preventDefault(); const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); if(old!==item.slug){const oldData=localStorage.getItem(sheetKey(old)); if(oldData&&!localStorage.getItem(sheetKey(item.slug))){localStorage.setItem(sheetKey(item.slug),oldData); localStorage.removeItem(sheetKey(old));}} makeLinks(item); ensureSheet(item,false); syncSheetRole(item); if(!save())return; modal.remove(); if($('#personaggiApp')){renderList();}else if($('#personaggioDetailApp')){initDetail();} };}
   function upsertPersonaggio(item,oldSlug){state.items=state.items||read(); makeLinks(item); const idx=state.items.findIndex(x=>x.slug===(oldSlug||item.slug)); if(idx>=0)state.items[idx]=Object.assign({},item); else state.items.push(Object.assign({},item)); state.deleted=(state.deleted||[]).filter(x=>x!==item.slug);}
   function collectForm(form,item,oldSlug){const fd=new FormData(form); item.type=fd.get('type')||'pg'; item.name=fd.get('name')||'Nuovo personaggio'; const desired=slugify(fd.get('slug')||item.name); item.slug=(oldSlug&&desired!==oldSlug&&state.items.some(i=>i!==item&&i.slug===desired))?uniqueSlug(desired):desired; item.playerName=fd.get('playerName')||''; ensureRole(item); makeLinks(item); item.desc=fd.get('desc')||''; item.longDesc=fd.get('longDesc')||''; item.events=fd.get('events')||''; item.longHtml=''; item.eventsHtml=''; item.img=fd.get('img')||''; return item;}
   async function initList(){state.master=await canMaster(); state.items=await readFresh(); if(state.restoreDefaultContent)save(); renderList();}
@@ -248,9 +285,39 @@
   if($('#personaggioDetailApp')) canMaster().then(m=>{state.master=m; initDetail();});
 })();
 
-async function thalorOptimizeImage(file){
-  try{
-    if(!file || !file.type || !file.type.startsWith('image/')) return file;
-    return file;
-  }catch(e){ return file; }
+async function thalorOptimizeImage(file,opts={}){
+  const maxSide=opts.maxSide||1200;
+  const quality=opts.quality||0.74;
+  const maxBytes=opts.maxBytes||650000;
+  if(!file || !file.type || !file.type.startsWith('image/')) throw new Error('File immagine non valido.');
+  const readAsDataURL=f=>new Promise((res,rej)=>{const r=new FileReader();r.onerror=()=>rej(r.error||new Error('Lettura file non riuscita'));r.onload=()=>res(r.result);r.readAsDataURL(f);});
+  const source=await readAsDataURL(file);
+  // SVG/GIF animati: non usiamo canvas per non distruggerli; li accettiamo solo se piccoli.
+  if(/image\/(svg\+xml|gif)/i.test(file.type)){
+    if(String(source).length<=maxBytes) return source;
+    throw new Error('Formato non comprimibile automaticamente.');
+  }
+  const img=await new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=()=>rej(new Error('Immagine non leggibile'));im.src=source;});
+  const scale=Math.min(1,maxSide/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.max(1,Math.round((img.naturalWidth||img.width)*scale));
+  canvas.height=Math.max(1,Math.round((img.naturalHeight||img.height)*scale));
+  const ctx=canvas.getContext('2d',{alpha:true});
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  const mime='image/webp';
+  let q=quality;
+  let out=canvas.toDataURL(mime,q);
+  while(out.length>maxBytes && q>0.42){
+    q-=0.08;
+    out=canvas.toDataURL(mime,q);
+  }
+  if(out.length>maxBytes){
+    const small=document.createElement('canvas');
+    const shrink=Math.sqrt(maxBytes/out.length)*0.92;
+    small.width=Math.max(1,Math.round(canvas.width*shrink));
+    small.height=Math.max(1,Math.round(canvas.height*shrink));
+    small.getContext('2d',{alpha:true}).drawImage(canvas,0,0,small.width,small.height);
+    out=small.toDataURL(mime,0.62);
+  }
+  return out;
 }
