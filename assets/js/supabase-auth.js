@@ -525,10 +525,27 @@
   }
 
   async function loadCharacter(slug, fallback, options={}){
-    // Lettura PUBBLICA: non deve dipendere da login/sessione.
-    // Importante: le sb_publishable_* sono API key, non JWT: NON metterle in Authorization Bearer.
+    // Lettura PUBBLICA online-first: usa supabase-js senza aspettare login/auth.init().
+    // Questo evita il caso browser fresh: niente sessione, niente cache, ma dati pubblici leggibili via RLS anon.
     if(!state.configured) return fallback;
 
+    const timeoutMs = options.timeoutMs || 15000;
+    try{
+      const client = makeClient();
+      if(client){
+        const res = await withTimeout(
+          client.from('character_sheets').select('data').eq('slug', slug).limit(1).maybeSingle(),
+          timeoutMs,
+          'Lettura pubblica Supabase '+slug
+        );
+        if(!res.error && res.data && res.data.data) return res.data.data;
+        if(res.error) console.warn('Supabase loadCharacter client:', slug, res.error);
+      }
+    }catch(err){
+      console.warn('Supabase loadCharacter client exception:', slug, err);
+    }
+
+    // Fallback REST diretto: tiene apikey e lascia alla gateway Supabase la gestione anon.
     try{
       const base = restBaseUrl();
       const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
@@ -541,15 +558,15 @@
           'Pragma': 'no-cache'
         },
         cache: 'no-store'
-      }, options.timeoutMs || 15000, 'Lettura pubblica Supabase');
+      }, timeoutMs, 'Lettura pubblica REST Supabase '+slug);
       if(!response.ok){
-        console.warn('Supabase loadCharacter HTTP:', response.status, body);
+        console.warn('Supabase loadCharacter REST HTTP:', slug, response.status, body);
         return fallback;
       }
       const rows = body ? JSON.parse(body) : [];
       return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
     }catch(err){
-      console.warn('Supabase loadCharacter:', err);
+      console.warn('Supabase loadCharacter REST:', slug, err);
       return fallback;
     }
   }
@@ -558,6 +575,23 @@
   async function listCharacterSheets(options={}){
     // Lettura PUBBLICA senza auth/init: serve anche a browser fresh e visitatori anonimi.
     if(!state.configured) return [];
+    const timeoutMs = options.timeoutMs || 15000;
+
+    try{
+      const client = makeClient();
+      if(client){
+        const res = await withTimeout(
+          client.from('character_sheets').select('slug,data').neq('slug','__personaggi__').limit(500),
+          timeoutMs,
+          'Lista pubblica schede Supabase'
+        );
+        if(!res.error && Array.isArray(res.data)) return res.data;
+        if(res.error) console.warn('Supabase listCharacterSheets client:', res.error);
+      }
+    }catch(err){
+      console.warn('Supabase listCharacterSheets client exception:', err);
+    }
+
     try{
       const base = restBaseUrl();
       const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
@@ -570,15 +604,15 @@
           'Pragma': 'no-cache'
         },
         cache: 'no-store'
-      }, options.timeoutMs || 15000, 'Lista pubblica schede Supabase');
+      }, timeoutMs, 'Lista pubblica REST schede Supabase');
       if(!response.ok){
-        console.warn('Supabase listCharacterSheets HTTP:', response.status, body);
+        console.warn('Supabase listCharacterSheets REST HTTP:', response.status, body);
         return [];
       }
       const rows = body ? JSON.parse(body) : [];
       return Array.isArray(rows) ? rows : [];
     }catch(err){
-      console.warn('Supabase listCharacterSheets:', err);
+      console.warn('Supabase listCharacterSheets REST:', err);
       return [];
     }
   }
