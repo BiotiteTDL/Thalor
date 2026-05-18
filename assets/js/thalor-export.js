@@ -21,6 +21,7 @@
     documenti: 'thalor.archive.documents.v1',
     simboli: 'thalor.archive.symbols.v1'
   };
+  const PLAYABLE_SLUGS = new Set(['abraxas','igor','ralph','arolf','irven']);
   const STATIC_JSON = [
     'assets/data/xp.json',
     'assets/data/characters/abraxas.json',
@@ -105,6 +106,14 @@
     return [...bySlug.entries()].map(([slug,data])=>({ slug, data }));
   }
 
+  function normalizeCharacterType(item, slug){
+    const raw = String(item?.type || item?.kind || item?.category || item?.tag || '').toLowerCase();
+    if(PLAYABLE_SLUGS.has(slug)) return 'pg';
+    if(raw === 'pg' || raw.includes('giocante') || raw.includes('player')) return 'pg';
+    if(raw === 'png' || raw.includes('non giocante') || raw.includes('npc')) return 'png';
+    return 'png';
+  }
+
   function simplifyCharacters(registry, sheets){
     const items = normalizeRegistry(registry).items;
     const sheetMap = new Map((sheets||[]).map(s=>[s.slug, s.data]));
@@ -112,9 +121,11 @@
       const slug = String(item.slug || slugify(item.name || '')).trim();
       const sheet = sheetMap.get(slug) || null;
       const identity = sheet && typeof sheet === 'object' ? (sheet.identity || sheet.meta || {}) : {};
+      const type = normalizeCharacterType(item, slug);
       return {
         slug,
-        type: item.type || item.tag || '',
+        type,
+        typeLabel: type === 'pg' ? 'Personaggio giocante' : 'PNG',
         name: item.name || identity.name || slug,
         playerName: item.playerName || item.player || identity.player || '',
         shortDescription: item.desc || '',
@@ -179,6 +190,8 @@
     const registry = registryRes.data || { items:[] };
     const sheets = normalizeSheets(onlineRows, registry);
     const characters = simplifyCharacters(registry, sheets);
+    const playableCharacters = characters.filter(c=>c.type === 'pg');
+    const nonPlayerCharacters = characters.filter(c=>c.type !== 'pg');
 
     const unknownRows = onlineRows
       .filter(r=>r && r.slug && !isSystemSlug(r.slug) && !sheets.find(s=>s.slug===r.slug))
@@ -205,6 +218,8 @@
       },
       summary: {
         characters: characters.length,
+        playableCharacters: playableCharacters.length,
+        nonPlayerCharacters: nonPlayerCharacters.length,
         sheets: sheets.length,
         places: Array.isArray(placesRes.data?.places) ? placesRes.data.places.length : 0,
         sessions: Array.isArray(diaryRes.data?.sessions) ? diaryRes.data.sessions.length : 0,
@@ -215,6 +230,8 @@
       data: {
         registry: normalizeRegistry(registry),
         characters,
+        playableCharacters,
+        nonPlayerCharacters,
         characterSheets: sheets,
         places: placesRes.data || null,
         diary: diaryRes.data || null,
@@ -250,6 +267,8 @@
     if(stats){
       stats.innerHTML = [
         ['Personaggi', archive.summary.characters],
+        ['PG', archive.summary.playableCharacters],
+        ['PNG', archive.summary.nonPlayerCharacters],
         ['Schede', archive.summary.sheets],
         ['Luoghi', archive.summary.places],
         ['Sessioni', archive.summary.sessions],
