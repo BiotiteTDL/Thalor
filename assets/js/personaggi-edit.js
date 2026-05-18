@@ -247,3 +247,10 @@
   if($('#personaggiApp')) initList();
   if($('#personaggioDetailApp')) canMaster().then(m=>{state.master=m; initDetail();});
 })();
+
+async function thalorOptimizeImage(file){
+  try{
+    if(!file || !file.type || !file.type.startsWith('image/')) return file;
+    return file;
+  }catch(e){ return file; }
+}

@@ -8,6 +8,21 @@ const parentStorageKey=`thalor.sheet.${slug}.v5`;
 const storageKey=isCompanion?`thalor.sheet.${slug}.companion.${companionIndex}.v1`:parentStorageKey;
 const oldKeys=isCompanion?[]:[`thalor.sheet.${slug}.v4`,`thalor.sheet.${slug}.v3`,`thalor.sheet.${slug}.v2`];
 function safeJsonParse(raw){try{return raw?JSON.parse(raw):null}catch(e){return null}}
+
+function bindSafeClick(el, handler){
+  if(!el || el.__thalorBound) return;
+  el.__thalorBound = true;
+  let fired = false;
+  const run = (ev)=>{
+    if(fired) return;
+    fired = true;
+    try{ handler(ev); }finally{ setTimeout(()=>{ fired=false; }, 50); }
+  };
+  ['click','touchend','pointerup'].forEach(evt=>{
+    el.addEventListener(evt, run, {passive:false});
+  });
+}
+
 function firstValidLocal(keys){for(const k of keys){const raw=localStorage.getItem(k);const parsed=safeJsonParse(raw);if(parsed)return {key:k,data:parsed,raw};if(raw)localStorage.removeItem(k);}return null}
 let authState={configured:false,ready:false};
 function authAvailable(){return !!window.ThalorAuth;}
@@ -29,7 +44,8 @@ function sheetCanEdit(){
   return !!auth.canEdit(slug);
 }
 async function refreshEditPermission(){
-  if(!authAvailable()) return false;
+  if(!authAvailable()) { try{renderSheet&&renderSheet()}catch(e){} return false; }
+  try{ window.__thalorReadonly = !sheetCanEdit(); }catch(e){}
   if(sheetCanEdit()) return true;
   try{ await window.ThalorAuth.init(true); }catch(e){ console.warn('Auth recheck failed:', e); }
   return sheetCanEdit();
@@ -1339,3 +1355,14 @@ function registryBlankSheetFromList(slug){
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}
 })();
 })()
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  try{
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    if(isSafari){
+      document.querySelectorAll('[data-action]').forEach(btn=>{
+        btn.style.cursor='pointer';
+      });
+    }
+  }catch(e){}
+});
