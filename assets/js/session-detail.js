@@ -90,6 +90,7 @@ function bind(data,index){
 (async function start(){
   let data=fallbackData();let freshLoaded=false;
   try{
+    if(authAvailable())await window.ThalorAuth.init();
     if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
       const online=await window.ThalorAuth.loadCharacter(slug,null);
       if(online&&typeof online==='object'){

@@ -524,21 +524,9 @@
     );
   }
 
-  function publicReadHeaders(){
-    // Con le nuove chiavi Supabase sb_publishable_* la chiave va usata come apikey.
-    // NON va messa in Authorization: Bearer, perché non è un JWT e da browser anonimo
-    // fa fallire la REST API, causando il fallback statico.
-    return {
-      'apikey': cfg.anonKey,
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache, no-store, max-age=0',
-      'Pragma': 'no-cache'
-    };
-  }
-
   async function loadCharacter(slug, fallback, options={}){
-    // Lettura pubblica: non deve dipendere da login/sessione/auth init.
-    // Serve per browser fresh e visitatori anonimi.
+    // Lettura PUBBLICA: non deve dipendere da login/sessione.
+    // Importante: le sb_publishable_* sono API key, non JWT: NON metterle in Authorization Bearer.
     if(!state.configured) return fallback;
 
     try{
@@ -546,9 +534,14 @@
       const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
       const { response, body } = await timeoutFetch(url, {
         method: 'GET',
-        headers: publicReadHeaders(),
+        headers: {
+          'apikey': cfg.anonKey,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
+        },
         cache: 'no-store'
-      }, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
+      }, options.timeoutMs || 15000, 'Lettura pubblica Supabase');
       if(!response.ok){
         console.warn('Supabase loadCharacter HTTP:', response.status, body);
         return fallback;
@@ -563,16 +556,21 @@
 
 
   async function listCharacterSheets(options={}){
-    // Lettura pubblica: non deve dipendere da login/sessione/auth init.
+    // Lettura PUBBLICA senza auth/init: serve anche a browser fresh e visitatori anonimi.
     if(!state.configured) return [];
     try{
       const base = restBaseUrl();
       const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
       const { response, body } = await timeoutFetch(url, {
         method: 'GET',
-        headers: publicReadHeaders(),
+        headers: {
+          'apikey': cfg.anonKey,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
+        },
         cache: 'no-store'
-      }, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
+      }, options.timeoutMs || 15000, 'Lista pubblica schede Supabase');
       if(!response.ok){
         console.warn('Supabase listCharacterSheets HTTP:', response.status, body);
         return [];

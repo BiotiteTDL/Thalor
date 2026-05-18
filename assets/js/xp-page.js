@@ -41,6 +41,7 @@
     let data=null;
     try{data=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);}catch(e){}
     try{
+      if(window.ThalorAuth?.init) await window.ThalorAuth.init();
       if(window.ThalorAuth?.state?.configured && navigator.onLine!==false){
         const online=await window.ThalorAuth.loadCharacter('xp',null);
         if(online&&typeof online==='object') data=online;

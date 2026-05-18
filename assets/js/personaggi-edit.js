@@ -180,6 +180,14 @@
     const looksLikeSheet = data.schemaVersion || data.abilities || data.combat || data.inventorySections || data.classLevels || data.portrait;
     return !!looksLikeSheet;
   }
+
+  function normalizeListImage(src){
+    const v=String(src||'').trim();
+    if(!v)return 'assets/img/Thalor16k.jpg';
+    if(/^data:image\//i.test(v)||/^https?:\/\//i.test(v))return v;
+    return v.replace(/^\.\.\//,'').replace(/^\.\//,'');
+  }
+
   function itemFromOnlineSheet(row){
     const data=row&&row.data;
     const slug=slugify(row&&row.slug || data?.meta?.slug || data?.meta?.permissionRole || data?.identity?.name || '');
@@ -197,7 +205,7 @@
       roleSlug:slug,
       permissionRole:slug,
       desc:portrait.quote||meta.subtitle||'Personaggio salvato online.',
-      img:portrait.image||'assets/img/Thalor16k.jpg',
+      img:normalizeListImage(portrait.image||'assets/img/Thalor16k.jpg'),
       longDesc:narrative.diary||'',
       events:''
     });
@@ -206,16 +214,10 @@
     const map=new Map(sanitizePersonaggiItems(baseItems).map(x=>[x.slug,x]));
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const item=itemFromOnlineSheet(row);
-      if(!item)return;
-      const prev=map.get(item.slug)||{};
-      // La scheda online è la fonte più fresca per immagine/nome/descrizione card.
-      map.set(item.slug, makeLinks(Object.assign({}, prev, item, {
-        type: prev.type || item.type,
-        href: prev.href || item.href,
-        sheet: prev.sheet || item.sheet,
-        img: item.img || prev.img,
-        desc: item.desc || prev.desc
-      })));
+      if(item){
+        const current=map.get(item.slug)||{};
+        map.set(item.slug,Object.assign({},current,item,{img:item.img||current.img,desc:item.desc||current.desc,longDesc:item.longDesc||current.longDesc}));
+      }
     });
     return Array.from(map.values());
   }

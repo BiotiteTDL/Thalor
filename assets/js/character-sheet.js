@@ -1332,7 +1332,6 @@ function registryBlankSheetFromList(slug){
 
 (async function startSheet(){
   try{
-    // Browser fresh / visitatori anonimi: non aspettare auth init per leggere la scheda pubblica.
     let [base,xpBase,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
     let xp=await loadUnifiedXpData(xpBase);
     base=base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
@@ -1344,9 +1343,9 @@ function registryBlankSheetFromList(slug){
     window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
     let sheetData=chooseSheetData(base, localFound);
-    if(authAvailable() && window.ThalorAuth.state.configured){
+    if(authAvailable() && window.ThalorAuth.state && window.ThalorAuth.state.configured){
       const beforeRemote=sheetData;
-      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData,{publicRead:true}); }
+      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData,{publicRead:true,skipInit:true}); }
       catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
       try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     }
