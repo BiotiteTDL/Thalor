@@ -185,6 +185,45 @@
       .finally(() => clearTimeout(timer));
   }
 
+  function publicReadHeaders(){
+    const headers = {
+      'apikey': cfg.anonKey,
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      'Pragma': 'no-cache'
+    };
+    // Le nuove chiavi Supabase "sb_publishable_..." NON sono JWT: se le mettiamo
+    // in Authorization: Bearer, PostgREST può rifiutare la richiesta e il sito
+    // ricade sul contenuto statico. Per letture pubbliche basta l'apikey.
+    const key = String(cfg.anonKey || '');
+    if(key && !/^sb_publishable_/i.test(key) && key.split('.').length === 3){
+      headers['Authorization'] = 'Bearer ' + key;
+    }
+    return headers;
+  }
+
+  async function publicRestGet(url, timeoutMs, label){
+    let result = await timeoutFetch(url, {
+      method: 'GET',
+      headers: publicReadHeaders(),
+      cache: 'no-store'
+    }, timeoutMs || 12000, label || 'Lettura pubblica Supabase');
+
+    // Fallback di compatibilità: se un progetto richiede comunque Authorization con
+    // una vecchia anon JWT, ritentiamo una sola volta con Bearer. Con sb_publishable
+    // questo ramo resta spento.
+    if(!result.response.ok){
+      const key = String(cfg.anonKey || '');
+      if(key && !/^sb_publishable_/i.test(key) && !('Authorization' in publicReadHeaders())){
+        const h = publicReadHeaders();
+        h.Authorization = 'Bearer ' + key;
+        result = await timeoutFetch(url, { method:'GET', headers:h, cache:'no-store' }, timeoutMs || 12000, label || 'Lettura pubblica Supabase');
+      }
+    }
+    return result;
+  }
+
+
   async function directRestUpsertCharacter(slug, row){
     const token = state.session?.access_token || null;
     if(!token) throw new Error('Token sessione assente: rifai login e riprova.');
@@ -525,28 +564,15 @@
   }
 
   async function loadCharacter(slug, fallback, options={}){
-    // Le letture pubbliche NON devono dipendere dallo stato login/auth.
-    // Su browser fresh o mobile la chiamata auth.getSession può ritardare/fallire e far cadere
-    // il sito sulla copia statica. Per publicRead leggiamo direttamente via REST anon.
-    // Lettura online-first: non aspettare mai l'auth per leggere contenuti pubblici.
-    // L'auth serve per modificare, non per mostrare il sito ai visitatori.
-    if(options.requireAuth && !options.skipInit) await init();
+    // Lettura pubblica vera: NON deve dipendere da login/sessione.
+    // Da browser fresh non c'è nessuna sessione, ma il sito deve comunque leggere Supabase.
+    if(!options.publicRead && !options.skipInit) await init();
     if(!state.configured) return fallback;
 
     try{
       const base = restBaseUrl();
       const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
-      const { response, body } = await timeoutFetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': cfg.anonKey,
-          'Authorization': 'Bearer ' + cfg.anonKey,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          'Pragma': 'no-cache'
-        },
-        cache: 'no-store'
-      }, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
+      const { response, body } = await publicRestGet(url, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
       if(!response.ok){
         console.warn('Supabase loadCharacter HTTP:', response.status, body);
         return fallback;
@@ -561,26 +587,13 @@
 
 
   async function listCharacterSheets(options={}){
-    // Come sopra: per la lista pubblica non aspettare auth/sessione.
-    // Lista pubblica: non aspettare login/sessione.
-    if(options.requireAuth && !options.skipInit) await init();
+    // Lettura pubblica vera: non aspettare auth.getSession su utenti anonimi.
+    if(!options.publicRead && !options.skipInit) await init();
     if(!state.configured) return [];
     try{
       const base = restBaseUrl();
-      // Prendiamo solo slug + data e lasciamo al codice personaggi il filtro strutturale.
-      // Questo evita che righe archivio/simboli finiscano nell'elenco.
       const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
-      const { response, body } = await timeoutFetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': cfg.anonKey,
-          'Authorization': 'Bearer ' + cfg.anonKey,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache, no-store, max-age=0',
-          'Pragma': 'no-cache'
-        },
-        cache: 'no-store'
-      }, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
+      const { response, body } = await publicRestGet(url, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
       if(!response.ok){
         console.warn('Supabase listCharacterSheets HTTP:', response.status, body);
         return [];

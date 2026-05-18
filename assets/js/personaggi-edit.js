@@ -206,11 +206,22 @@
     const map=new Map(sanitizePersonaggiItems(baseItems).map(x=>[x.slug,x]));
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const item=itemFromOnlineSheet(row);
-      if(item){
-        // La scheda singola online è più aggiornata del registro per immagine/descrizione/nome.
-        // Prima la recovery aggiungeva solo gli assenti: per questo i PNG nuovi/restyling non comparivano.
-        const prev=map.get(item.slug)||{};
-        map.set(item.slug,Object.assign({},prev,item,{type:item.type||prev.type||'pg'}));
+      if(!item)return;
+      const prev=map.get(item.slug);
+      if(prev){
+        // La scheda online è più fresca della card del registro/statico: aggiorna soprattutto immagine e descrizione.
+        map.set(item.slug,Object.assign({},prev,{
+          name:item.name||prev.name,
+          desc:item.desc||prev.desc,
+          img:item.img||prev.img,
+          playerName:item.playerName||prev.playerName,
+          roleSlug:item.roleSlug||prev.roleSlug,
+          permissionRole:item.permissionRole||prev.permissionRole,
+          href:prev.href||item.href,
+          sheet:prev.sheet||item.sheet
+        }));
+      }else{
+        map.set(item.slug,item);
       }
     });
     return Array.from(map.values());
@@ -222,36 +233,35 @@
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(sanitizePersonaggiItems(raw.items));} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
   async function readFresh(){
-    const localItems=readLocal();
+    let localItems=readLocal();
     try{
+      if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
       if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-        // Online-first reale: non aspettare login/sessione e non usare il registro locale come fonte.
-        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true,skipInit:true,timeoutMs:15000});
-        let items=[];
+        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true});
+        let items=null;
         let deleted=[];
         let restore=false;
         if(online&&Array.isArray(online.items)){
           deleted=Array.isArray(online.deleted)?online.deleted:[];
           restore=online.contentRestoreVersion!==CONTENT_RESTORE_VERSION;
           items=sanitizePersonaggiItems(online.items);
+        }else{
+          console.warn('Registro __personaggi__ letto ma senza items validi: provo recupero da schede online.');
+          items=sanitizePersonaggiItems(localItems);
         }
         if(window.ThalorAuth.listCharacterSheets){
           try{
-            const rows=await window.ThalorAuth.listCharacterSheets({publicRead:true,skipInit:true,timeoutMs:15000});
+            const rows=await window.ThalorAuth.listCharacterSheets({publicRead:true,timeoutMs:12000});
             items=mergeOnlineSheetItems(items,rows).filter(x=>!deleted.includes(x.slug));
           }catch(recoverErr){
             console.warn('Recupero schede online non riuscito:',recoverErr);
           }
         }
-        if(items.length){
-          const cleanPayload={updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:sanitizePersonaggiItems(items),deleted};
-          state.deleted=deleted;
-          state.restoreDefaultContent=restore;
-          try{localStorage.setItem(LIST_KEY,JSON.stringify(cleanPayload));}catch(e){}
-          // Non fondere i DEFAULTS quando abbiamo dati online: il pubblico deve vedere il database, non il sito statico.
-          return sanitizePersonaggiItems(cleanPayload.items);
-        }
-        console.warn('Nessun personaggio online valido trovato: uso fallback locale/base.');
+        const cleanPayload={updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:sanitizePersonaggiItems(items),deleted};
+        state.deleted=deleted;
+        state.restoreDefaultContent=restore;
+        try{localStorage.setItem(LIST_KEY,JSON.stringify(cleanPayload));}catch(e){}
+        return applyRegistryPayload(cleanPayload);
       }
     }catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}
     return localItems;
@@ -438,7 +448,12 @@
     if(state.restoreDefaultContent)await save();
     let item=state.items.find(x=>x.slug===id);
     if(!item)item=recoverItemFromSheet(id);
-    if(!item){app.innerHTML='<section class="panel profile-text"><h1>Personaggio non trovato</h1><p>Questa scheda non risulta pubblicata online oppure il registro pubblico non è leggibile.</p><p><a class="button" href="../personaggi.html">Torna ai Personaggi</a></p></section>';return;}
+    if(!item&&id){
+      item=makeLinks({type:'pg',slug:id,name:String(id).replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),playerName:'',roleSlug:id,permissionRole:id,desc:'Pagina creata automaticamente dal collegamento.',img:'assets/img/Thalor16k.jpg',longDesc:'',events:''});
+      state.items.push(item);
+      await save();
+    }
+    if(!item){app.innerHTML='<section class="panel profile-text"><h1>Personaggio non trovato</h1><p>Il collegamento non contiene un identificativo valido.</p><p><a class="button" href="../personaggi.html">Torna ai Personaggi</a></p></section>';return;}
     document.title='Thalor — '+item.name;
     document.body.classList.add('npc-page','personaggio-dedicated-body');
     renderDetailPanel(app,item);
