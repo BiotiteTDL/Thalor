@@ -147,14 +147,21 @@ async function loadFresh(){
   if(!freshLoaded){
     try{
       const raw = localStorage.getItem(STORAGE_KEY);
-      if(raw){ const parsed = JSON.parse(raw); if(parsed && Array.isArray(parsed.places)) data = enrichData(parsed); }
-    }catch(e){}
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(parsed && Array.isArray(parsed.places)) data = enrichData(parsed);
+      }else{
+        data = enrichData(data);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      }
+    }catch(e){ data = enrichData(data); }
   }
-  CURRENT_DATA = data;
+  CURRENT_DATA = enrichData(data);
   return CURRENT_DATA;
 }
 function save(data){ CURRENT_DATA = enrichData(data); localStorage.setItem(STORAGE_KEY, JSON.stringify(CURRENT_DATA)); if(window.ThalorAuth?.state?.configured && !window.ThalorAuth.state.localMaster && navigator.onLine !== false){ window.ThalorAuth.saveCharacter(PLACES_SLUG, CURRENT_DATA).catch(e=>console.warn('Salvataggio luoghi online non riuscito:', e)); } }
 function findPlace(slug){ return load().places.find(p=>p.slug===slug) || basePlacesData().places.find(p=>p.slug===slug); }
+window.ThalorPlaces = { load:()=>load(), loadFresh, save, findPlace, basePlacesData, storageKey:STORAGE_KEY, slug:PLACES_SLUG };
 function isLocalPreview(){
   try{
     const h = String(location.hostname || '').toLowerCase();

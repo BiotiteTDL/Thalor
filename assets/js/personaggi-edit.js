@@ -4,6 +4,7 @@
   const SHEET_SUFFIX='.v5';
   const CONTENT_RESTORE_VERSION='2026-05-14-ripristino-descrizioni-eventi';
   const REGISTRY_SLUG='__personaggi__';
+  const FORCED_PG_SLUGS=new Set(['abraxas','igor','ralph','arolf','irven']);
   const DEFAULTS=[
     {
         "type": "pg",
@@ -163,7 +164,7 @@
       item.slug=slugify(item.slug||item.name);
       if(seen.has(item.slug))return null;
       seen.add(item.slug);
-      item.type=item.type==='png'?'png':'pg';
+      item.type=FORCED_PG_SLUGS.has(item.slug)?'pg':(item.type==='png'?'png':'pg');
       ensureRole(item);
       return makeLinks(item);
     }).filter(Boolean);
@@ -196,7 +197,7 @@
     const identity=data.identity||{};
     const portrait=data.portrait||{};
     const narrative=data.narrative||{};
-    const type=(String(meta.subtitle||meta.type||'').toLowerCase().includes('png') || String(meta.theme||'').toLowerCase()==='necrotic')?'png':'pg';
+    const type=FORCED_PG_SLUGS.has(slug)?'pg':((String(meta.subtitle||meta.type||'').toLowerCase().includes('png') || String(meta.theme||'').toLowerCase()==='necrotic')?'png':'pg');
     return makeLinks({
       type,
       slug,
@@ -223,7 +224,7 @@
   }
   function permissionNote(item){const role=ensureRole(item); return `Ruolo permesso scheda: ${role}`;}
   function read(){return readLocal();}
-  function mergeDefaults(saved){const deleted=new Set(state.deleted||[]); const map=new Map(saved.filter(x=>x&&!deleted.has(x.slug)).map(x=>[x.slug,x])); DEFAULTS.forEach(d=>{if(deleted.has(d.slug))return; if(!map.has(d.slug)){map.set(d.slug,Object.assign({},d));}else{const current=map.get(d.slug); const merged=Object.assign({},d,current,{type:current.type||d.type}); if(state.restoreDefaultContent){merged.desc=d.desc; merged.longHtml=d.longHtml||''; merged.eventsHtml=d.eventsHtml||''; if(!current.longDesc) merged.longDesc=''; if(!current.events) merged.events='';} map.set(d.slug,merged);}}); return Array.from(map.values()).map(x=>{ensureRole(x); return x;});}
+  function mergeDefaults(saved){const deleted=new Set(state.deleted||[]); const map=new Map(saved.filter(x=>x&&!deleted.has(x.slug)).map(x=>[x.slug,x])); DEFAULTS.forEach(d=>{if(deleted.has(d.slug))return; if(!map.has(d.slug)){map.set(d.slug,Object.assign({},d));}else{const current=map.get(d.slug); const merged=Object.assign({},d,current,{type:FORCED_PG_SLUGS.has(d.slug)?'pg':(current.type||d.type)}); if(state.restoreDefaultContent){merged.desc=d.desc; merged.longHtml=d.longHtml||''; merged.eventsHtml=d.eventsHtml||''; if(!current.longDesc) merged.longDesc=''; if(!current.events) merged.events='';} map.set(d.slug,merged);}}); return Array.from(map.values()).map(x=>{ensureRole(x); return x;});}
   function registryPayload(items=state.items,deleted=state.deleted){return {updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:sanitizePersonaggiItems(items||[]),deleted:deleted||[]};}
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(sanitizePersonaggiItems(raw.items));} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}

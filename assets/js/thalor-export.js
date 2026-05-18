@@ -55,11 +55,38 @@
 
   async function fetchJson(path){
     try{
-      const res = await fetch(ROOT + path + '?_ts=' + Date.now(), { cache:'no-store' });
+      const normalized = String(path||'').replace(/^\/+/, '');
+      const prefix = /^(assets\/|archivio\/|diario\/|luoghi\/|personaggi\/)/.test(normalized) ? ROOT : '';
+      const res = await fetch(prefix + normalized + '?_ts=' + Date.now(), { cache:'no-store' });
       if(!res.ok) return null;
       return await res.json();
     }catch(e){ return null; }
   }
+
+  async function fetchFirstJson(paths){
+    for(const path of paths){
+      const data = await fetchJson(path);
+      if(data) return data;
+    }
+    return null;
+  }
+
+  function normalizePlacesData(primary, staticPlaces){
+    const hasPlaces = (v)=>v && Array.isArray(v.places) && v.places.length;
+    let base = hasPlaces(staticPlaces) ? JSON.parse(JSON.stringify(staticPlaces)) : { version: 1, places: [] };
+    if(hasPlaces(primary)){
+      const map = new Map(base.places.map(p=>[String(p.slug||''), p]));
+      primary.places.forEach(p=>{
+        const slug = String(p.slug||'').trim();
+        if(!slug) return;
+        const current = map.get(slug) || {};
+        map.set(slug, Object.assign({}, current, p));
+      });
+      base = Object.assign({}, base, primary, { places: Array.from(map.values()) });
+    }
+    return base;
+  }
+
 
   async function loadOnlineSlug(slug){
     try{
@@ -189,7 +216,12 @@
     log('JSON statici letti', Object.keys(staticData).length + ' file');
 
     const registry = registryRes.data || { items:[] };
-    const placesData = (placesRes.data && Array.isArray(placesRes.data.places) && placesRes.data.places.length) ? placesRes.data : (staticData['assets/data/places.json'] || null);
+    let staticPlaces = staticData['assets/data/places.json'] || null;
+    if(!staticPlaces){
+      staticPlaces = await fetchFirstJson(['assets/data/places.json','../assets/data/places.json','/assets/data/places.json']);
+      if(staticPlaces) staticData['assets/data/places.json'] = staticPlaces;
+    }
+    const placesData = normalizePlacesData(placesRes.data, staticPlaces);
     const sheets = normalizeSheets(onlineRows, registry);
     const characters = simplifyCharacters(registry, sheets);
     const playableCharacters = characters.filter(c=>c.type === 'pg');
@@ -210,7 +242,7 @@
       },
       sources: {
         personaggi: registryRes.source,
-        luoghi: placesData === placesRes.data ? placesRes.source : 'static-json-fallback',
+        luoghi: (placesRes.data && Array.isArray(placesRes.data.places) && placesRes.data.places.length) ? placesRes.source + '+static-json-merge' : 'static-json-fallback',
         diario: diaryRes.source,
         xp: xpRes.source,
         documenti: documentsRes.source,
