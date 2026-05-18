@@ -90,9 +90,9 @@ function bind(data,index){
 (async function start(){
   let data=fallbackData();let freshLoaded=false;
   try{
-    if(authAvailable())await window.ThalorAuth.init();
-    if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-      const online=await window.ThalorAuth.loadCharacter(slug,null);
+    // Lettura pubblica online-first: non aspetta auth/login.
+    if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+      const online=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,skipInit:true,timeoutMs:15000});
       if(online&&typeof online==='object'){
         data=normalize(online);freshLoaded=true;
         try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){}

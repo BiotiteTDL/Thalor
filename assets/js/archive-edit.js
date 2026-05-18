@@ -42,8 +42,8 @@ function baseDocuments(){return {title:'Documenti',note:'Carte, appunti e letter
 ]};}
 function baseSymbols(){return {title:'Simboli',note:'Segni riconosciuti durante la campagna.',categories:[{title:'Simboli conosciuti',items:[
   {tag:'Casata Thorm',title:'Simbolo dei Thorm',description:'Il marchio della famiglia Thorm. La versione priva di scheletro rappresenta il volto pubblico della casata.',image:'../assets/img/SimboloThorm.jpeg',href:'simboli.html'},
-  {tag:'Varek Thorm',title:'Simbolo di Varek Thorm',description:'La variante associata a Varek, segnata dallo scheletro. Un dettaglio che lega il nome Thorm a morte, forma e trasformazione.',image:'../assets/img/SimboloVarek_thorm.jpeg',href:'../personaggi/varek.html'},
-  {tag:'Otmar Van Verschuer',title:'Simbolo del Dr. Otmar Van Verschuer',description:'Sigillo associato al direttore dell’Istituto di Biologia Ereditaria di Portogrigio e agli appunti ritrovati nei sotterranei dell’Accademia.',image:'../assets/img/Simbolo_Otmar.png',href:'../personaggi/otmar.html'}
+  {tag:'Varek Thorm',title:'Simbolo di Varek Thorm',description:'La variante associata a Varek, segnata dallo scheletro. Un dettaglio che lega il nome Thorm a morte, forma e trasformazione.',image:'../assets/img/SimboloVarek_thorm.jpeg',href:'../personaggi/dettaglio.html?id=varek'},
+  {tag:'Otmar Van Verschuer',title:'Simbolo del Dr. Otmar Van Verschuer',description:'Sigillo associato al direttore dell’Istituto di Biologia Ereditaria di Portogrigio e agli appunti ritrovati nei sotterranei dell’Accademia.',image:'../assets/img/Simbolo_Otmar.png',href:'../personaggi/dettaglio.html?id=otmar'}
 ]}]};}
 function normalize(input){
   const fb=type==='documents'?baseDocuments():baseSymbols();

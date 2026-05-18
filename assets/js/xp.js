@@ -12,7 +12,7 @@ const fmt=(v)=>v===null||v===undefined||v===''?'—':Number(v).toLocaleString('i
 const authAvailable=()=>!!(window.ThalorAuth&&typeof window.ThalorAuth.init==='function');
 function isLocalPreview(){try{const h=String(location.hostname||'').toLowerCase();const pr=String(location.protocol||'').toLowerCase();return pr==='file:'||h===''||h==='localhost'||h==='127.0.0.1'||h==='::1'||/^192\.168\./.test(h)||/^10\./.test(h)||/^172\.(1[6-9]|2\d|3[0-1])\./.test(h);}catch(e){return false;}}
 function canMasterEdit(){try{if(isLocalPreview())return true;if(authAvailable()&&window.ThalorAuth.isMaster&&window.ThalorAuth.isMaster())return true;if(authAvailable()&&window.ThalorAuth.canEdit&&window.ThalorAuth.canEdit('__archive__'))return true;}catch(e){}return false;}
-const names=[['ralph','Ralph','Alessandro','../personaggi/ralph.html'],['abraxas','Abraxas','Carlo','../personaggi/abraxas.html'],['igor','Igor','Gerry','../personaggi/igor.html'],['arolf','Arolf','Ivan','../personaggi/arolf.html'],['irven','Irven','Ettore','../personaggi/irven.html']];
+const names=[['ralph','Ralph','Alessandro','../personaggi/dettaglio.html?id=ralph'],['abraxas','Abraxas','Carlo','../personaggi/dettaglio.html?id=abraxas'],['igor','Igor','Gerry','../personaggi/dettaglio.html?id=igor'],['arolf','Arolf','Ivan','../personaggi/dettaglio.html?id=arolf'],['irven','Irven','Ettore','../personaggi/dettaglio.html?id=irven']];
 function defaultXpThreshold(level){level=Math.max(1,Number(level)||1);return Math.max(0,(level*(level-1)/2)*1000);}
 function xpThreshold(table,level){const row=(table||[]).find(r=>Number(r.livello)===Number(level));const val=num(row?.xp_minimi);return row&&val!==null?val:defaultXpThreshold(level);}
 function levelFromXp(table,xp){let lvl=1;const max=Math.max(20,...(table||[]).map(r=>Number(r.livello)||0));for(let l=1;l<=max;l++){if(Number(xp)>=xpThreshold(table,l))lvl=l;else break;}return lvl;}
@@ -117,12 +117,16 @@ function bind(data){
 }
 (async function start(){
   const fallback=staticFallback();let data=fallback;let freshLoaded=false;
-  try{const fetched=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);if(meaningful(fetched))data=fetched;}catch(e){}
-  try{if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,skipInit:true});if(meaningful(online)){data=online;freshLoaded=true;localStorage.setItem(storageKey,JSON.stringify(normalize(data)));}}}
-  catch(e){console.warn('XP load online:',e);}
+  try{
+    // Pubblico online-first: Supabase prima di JSON/statico/localStorage.
+    if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+      const online=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,skipInit:true,timeoutMs:15000});
+      if(meaningful(online)){data=online;freshLoaded=true;try{localStorage.setItem(storageKey,JSON.stringify(normalize(data)));}catch(e){}}
+    }
+  }catch(e){console.warn('XP load online:',e);}
   if(!freshLoaded){
-    try{const local=localStorage.getItem(storageKey);if(local){const parsed=JSON.parse(local);if(meaningful(parsed))data=parsed;}}
-    catch(e){}
+    try{const local=localStorage.getItem(storageKey);if(local){const parsed=JSON.parse(local);if(meaningful(parsed))data=parsed;}}catch(e){}
+    if(!meaningful(data) || data===fallback){try{const fetched=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);if(meaningful(fetched))data=fetched;}catch(e){}}
   }
   render(data,false);
 })();

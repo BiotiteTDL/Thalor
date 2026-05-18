@@ -1274,11 +1274,11 @@ async function loadUnifiedXpData(fallback){
   let data=normalizeXpSource(fallback||{});let freshLoaded=false;
   try{
     if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-      const online=await window.ThalorAuth.loadCharacter('xp', null);
+      const online=await window.ThalorAuth.loadCharacter('xp', null,{publicRead:true,skipInit:true,timeoutMs:15000});
       if(xpMeaningful(online)){
         data=chooseBestXpData(data,online,'Supabase');
         freshLoaded=true;
-        localStorage.setItem(XP_STORAGE_KEY,JSON.stringify(data));
+        try{localStorage.setItem(XP_STORAGE_KEY,JSON.stringify(data));}catch(e){}
       }
     }
   }catch(e){console.warn('Caricamento EXP online non riuscito:',e);}
@@ -1332,23 +1332,24 @@ function registryBlankSheetFromList(slug){
 
 (async function startSheet(){
   try{
-    let [base,xpBase,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
+    if(!slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
+    let [staticBase,xpBase,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
     let xp=await loadUnifiedXpData(xpBase);
-    base=base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
+    let onlineBase=null;
+    if(authAvailable() && window.ThalorAuth.state && window.ThalorAuth.state.configured && navigator.onLine!==false){
+      try{ onlineBase=await window.ThalorAuth.loadCharacter(slug, null,{publicRead:true,skipInit:true,timeoutMs:15000}); }
+      catch(e){ console.warn('Caricamento online scheda non riuscito:', e); }
+    }
+    let base=onlineBase || staticBase || (window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
     const localFound=firstValidLocal([parentStorageKey,...oldKeys]);
+    // La copia locale è solo fallback: non deve mai battere Supabase per visitatori/giocatori.
     if(!base && localFound) base=localFound.data;
     if(!base && slug) base=registryBlankSheetFromList(slug);
-    if(!base && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
     if(!base)throw new Error('Dati scheda non trovati.');
     window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
-    let sheetData=chooseSheetData(base, localFound);
-    if(authAvailable() && window.ThalorAuth.state && window.ThalorAuth.state.configured){
-      const beforeRemote=sheetData;
-      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData,{publicRead:true,skipInit:true}); }
-      catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
-      try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
-    }
+    let sheetData=onlineBase ? normalize(onlineBase) : chooseSheetData(base, localFound);
+    try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}
 })();

@@ -21,7 +21,7 @@
     const people=data.personaggi||{};
     body.innerHTML=slugs.map(slug=>{
       const p=people[slug]||{};
-      return `<tr><td>${richText(p.giocatore||'')}</td><td><a class="lore-link" href="../personaggi/${slug}.html">${richText(p.personaggio||names[slug]||slug)}</a></td><td class="num">${fmt(p.xp_totali)}</td><td class="num">${fmt(p.livello)}</td><td class="num">${fmt(p.xp_mancanti)}</td></tr>`;
+      return `<tr><td>${richText(p.giocatore||'')}</td><td><a class="lore-link" href="../personaggi/dettaglio.html?id=${encodeURIComponent(slug)}">${richText(p.personaggio||names[slug]||slug)}</a></td><td class="num">${fmt(p.xp_totali)}</td><td class="num">${fmt(p.livello)}</td><td class="num">${fmt(p.xp_mancanti)}</td></tr>`;
     }).join('');
   }
 
@@ -41,9 +41,8 @@
     let data=null;
     try{data=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);}catch(e){}
     try{
-      if(window.ThalorAuth?.init) await window.ThalorAuth.init();
       if(window.ThalorAuth?.state?.configured && navigator.onLine!==false){
-        const online=await window.ThalorAuth.loadCharacter('xp',null);
+        const online=await window.ThalorAuth.loadCharacter('xp',null,{publicRead:true,skipInit:true,timeoutMs:15000});
         if(online&&typeof online==='object') data=online;
       }
     }catch(err){console.warn('Registro XP online non aggiornato:',err);}

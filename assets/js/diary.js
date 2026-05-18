@@ -24,12 +24,12 @@ function fallbackData(){return {
   months:['Genor','Febrion','Marveth','Apryss','Majora','Juneth','Lugras','Aurest','Sether','Ottaryn','Novaris','Decemor'],
   weekdays:['Lunor','Martar','Mercor','Giovar','Veneris','Satur','Solaris'],
   sessions:[
-    {tag:'Sessione I',title:'La Veglia del Mercante',href:'diario/sessione1.html',description:'Il funerale di Varek Thorm, il furto del Libro Mastro, la cappella abbandonata e il segreto del Mausoleo dei Thorm.'},
-    {tag:'Sessione II',title:'Il Mare della Pioggia Nera',href:'diario/sessione2.html',description:'La trattativa con Lyria, il sacrificio dell’alchimista, il viaggio in mare e l’arrivo a Portogrigio.'},
-    {tag:'Sessione III',title:'Il Laboratorio dell’Innesto',href:'diario/sessione3.html',description:'L’Accademia di Medicina, i laboratori di Otmar, la Crucimigrazione e l’incontro con Abdul Alhazred.'}
+    {tag:'Sessione I',title:'La Veglia del Mercante',href:sessionDetailHref('sessione-1'),description:'Il funerale di Varek Thorm, il furto del Libro Mastro, la cappella abbandonata e il segreto del Mausoleo dei Thorm.'},
+    {tag:'Sessione II',title:'Il Mare della Pioggia Nera',href:sessionDetailHref('sessione-2'),description:'La trattativa con Lyria, il sacrificio dell’alchimista, il viaggio in mare e l’arrivo a Portogrigio.'},
+    {tag:'Sessione III',title:'Il Laboratorio dell’Innesto',href:sessionDetailHref('sessione-3'),description:'L’Accademia di Medicina, i laboratori di Otmar, la Crucimigrazione e l’incontro con Abdul Alhazred.'}
   ],
   dreamSections:[
-    {character:'Irven Till',characterUrl:'personaggi/irven.html',title:'La quiete della piaga',body:`Non c’è cielo.
+    {character:'Irven Till',characterUrl:'personaggi/dettaglio.html?id=irven',title:'La quiete della piaga',body:`Non c’è cielo.
 Non c’è terra.
 Solo una distesa infinita, grigia… immobile.
 
@@ -56,7 +56,7 @@ Non c’è fuga.
 Non c’è vergogna.
 
 Sei… uguale a loro.`},
-    {character:'Ralph Mengele',characterUrl:'personaggi/ralph.html',title:'Il perfezionamento',body:`Vedi la stessa distesa.
+    {character:'Ralph Mengele',characterUrl:'personaggi/dettaglio.html?id=ralph',title:'Il perfezionamento',body:`Vedi la stessa distesa.
 Le stesse fiammelle.
 Lo stesso lento morire del bianco.
 
@@ -92,7 +92,7 @@ E per un istante… capisci:
 questo non è un errore.
 
 È un perfezionamento.`},
-    {character:'Abraxas',characterUrl:'personaggi/abraxas.html',title:'Ciò che raccoglie',body:`Il rosso riempie ogni cosa.
+    {character:'Abraxas',characterUrl:'personaggi/dettaglio.html?id=abraxas',title:'Ciò che raccoglie',body:`Il rosso riempie ogni cosa.
 
 Le fiammelle non sono più luce…
 sono ferite che bruciano senza consumarsi.
@@ -334,9 +334,9 @@ function bind(data){
 (async function start(){
   let data=fallbackData();let freshLoaded=false;
   try{
-    if(authAvailable())await window.ThalorAuth.init();
-    if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-      const online=await window.ThalorAuth.loadCharacter(slug,null);
+    // Lettura pubblica online-first: non aspetta auth/login.
+    if(authAvailable()&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
+      const online=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,skipInit:true,timeoutMs:15000});
       if(online&&typeof online==='object'){
         data=normalize(online);freshLoaded=true;
         try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){}
