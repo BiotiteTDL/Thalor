@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Thalor — Accesso</title>
-  <link href="assets/css/style.css?v=161" rel="stylesheet"/>
+  <link href="assets/css/style.css?v=162" rel="stylesheet"/>
 
 <style>
 .auth-actions-clean .button{
@@ -66,6 +66,14 @@
           <button class="button ghost-button danger-action" id="disableLocalMasterBtn" type="button">Disattiva Master offline</button>
         </div>
         <p class="auth-mini-note local-master-tools" id="localMasterNote" hidden>Disponibile in locale/offline. Non modifica ruoli, permessi o login online.</p>
+        <div class="auth-master-json-tools" id="masterJsonTools" hidden>
+          <h3>Strumenti Master JSON</h3>
+          <p>Esporta o importa l’archivio completo di Thalor. Questi strumenti sono visibili solo al Master.</p>
+          <div class="auth-actions-clean">
+            <a class="button ghost-button" href="archivio/esporta-json.html">Esporta JSON</a>
+            <a class="button ghost-button" href="archivio/importa-json.html">Importa JSON</a>
+          </div>
+        </div>
       </form>
     </section>
   </main>
@@ -80,6 +88,7 @@
     const form=document.getElementById('authForm');
     const localTools=document.getElementById('localMasterTools');
     const localNote=document.getElementById('localMasterNote');
+    const masterJsonTools=document.getElementById('masterJsonTools');
     const shouldShowOfflineMasterTools=()=>{try{return !!window.ThalorAuth?.isLocalPreview?.();}catch(e){return location.protocol==='file:';}};
     const applyOfflineMasterVisibility=()=>{
       const showOfflineTools=shouldShowOfflineMasterTools();
@@ -87,6 +96,8 @@
       document.body.classList.toggle('offline-master-available', showOfflineTools);
       if(localTools)localTools.hidden=!showOfflineTools;
       if(localNote)localNote.hidden=!showOfflineTools;
+      const showJsonTools=!!(window.ThalorAuth && typeof window.ThalorAuth.isMaster==='function' && window.ThalorAuth.isMaster());
+      if(masterJsonTools) masterJsonTools.hidden=!showJsonTools;
     };
     const refresh=()=>{
       applyOfflineMasterVisibility();

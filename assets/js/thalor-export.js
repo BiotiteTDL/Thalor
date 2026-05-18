@@ -368,6 +368,29 @@
     }
   }
 
+
+  async function ensureMasterAccess(){
+    if(!window.ThalorAuth || typeof window.ThalorAuth.init !== 'function') return false;
+    try{ await window.ThalorAuth.init(); }catch(e){}
+    try{ return !!window.ThalorAuth.isMaster(); }catch(e){ return false; }
+  }
+
+  function renderLocked(){
+    app.innerHTML = `
+      <section class="hero export-hero">
+        <div class="hero-box export-hero-box">
+          <p class="eyebrow">Strumenti Master</p>
+          <h1>Esporta JSON</h1>
+          <p class="subtitle">Questa sezione è riservata al Master. Accedi con un account Master da Auth per esportare l’archivio completo.</p>
+          <div class="actions export-actions">
+            <a class="button ghost-button" href="../auth.html">Vai ad Auth</a>
+            <a class="button ghost-button" href="../archivio.html">Torna all’Archivio</a>
+          </div>
+        </div>
+      </section>
+      <footer>Thalor</footer>`;
+  }
+
   function render(){
     app.innerHTML = `
       <section class="hero export-hero">
@@ -403,5 +426,9 @@
     document.getElementById('copyArchiveBtn').onclick = copyArchive;
   }
 
-  render();
+  (async()=>{
+    const ok = await ensureMasterAccess();
+    if(!ok){ renderLocked(); return; }
+    render();
+  })();
 })();
