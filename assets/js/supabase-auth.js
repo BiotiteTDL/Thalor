@@ -524,37 +524,57 @@
     );
   }
 
-  async function loadCharacter(slug, fallback){
+  async function loadCharacter(slug, fallback, options={}){
     await init();
     if(!state.configured) return fallback;
 
-    // Lettura sempre fresca: la cache del browser/localStorage deve essere solo un fallback offline.
-    // Usiamo PostgREST diretto con cache:no-store, così anche da mobile un refresh rilegge Supabase.
-    try{
-      const base = restBaseUrl();
-      const token = state.session?.access_token || cfg.anonKey;
-      const url = base + '/character_sheets?select=data,updated_at&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_thalor_no_cache=' + Date.now();
-      const { response, body } = await timeoutFetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': cfg.anonKey,
-          'Authorization': 'Bearer ' + token,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        },
-        cache: 'no-store'
-      }, 12000, 'Lettura Supabase');
-      if(!response.ok){
-        console.warn('Supabase loadCharacter HTTP:', response.status, body);
-        return fallback;
+    // Lettura pubblica robusta: l'elenco personaggi e le schede devono potersi leggere
+    // anche senza poteri. Alcune policy Supabase distinguono tra ruolo authenticated e anon:
+    // se un utente è loggato ma non ha permessi, il token authenticated può vedere meno
+    // dell'anon pubblico. Per questo proviamo sempre anche con la chiave anon.
+    const base = restBaseUrl();
+    const url = base + '/character_sheets?select=data,updated_at&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
+    const tokens = [];
+    const anonToken = cfg.anonKey;
+    if(options.publicFirst !== false && anonToken) tokens.push({ label:'anon', token:anonToken });
+    if(state.session?.access_token) tokens.push({ label:'session', token:state.session.access_token });
+    if(options.publicFirst === false && anonToken) tokens.push({ label:'anon', token:anonToken });
+
+    const seen = new Set();
+    let lastProblem = null;
+    for(const candidate of tokens){
+      if(!candidate.token || seen.has(candidate.token)) continue;
+      seen.add(candidate.token);
+      try{
+        const { response, body } = await timeoutFetch(url, {
+          method: 'GET',
+          headers: {
+            'apikey': cfg.anonKey,
+            'Authorization': 'Bearer ' + candidate.token,
+            'Accept': 'application/json',
+            'Cache-Control': 'no-cache, no-store, max-age=0',
+            'Pragma': 'no-cache'
+          },
+          cache: 'no-store'
+        }, options.timeoutMs || 14000, 'Lettura Supabase ' + candidate.label);
+        if(!response.ok){
+          lastProblem = 'HTTP ' + response.status + ' ' + (body || '');
+          console.warn('Supabase loadCharacter HTTP (' + candidate.label + '):', response.status, body);
+          continue;
+        }
+        const rows = body ? JSON.parse(body) : [];
+        if(rows && rows[0] && rows[0].data) return rows[0].data;
+        lastProblem = 'nessuna riga per slug ' + slug + ' con token ' + candidate.label;
+      }catch(err){
+        lastProblem = err;
+        console.warn('Supabase loadCharacter (' + candidate.label + '):', err);
       }
-      const rows = body ? JSON.parse(body) : [];
-      return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
-    }catch(err){
-      console.warn('Supabase loadCharacter:', err);
-      return fallback;
     }
+
+    if(options.strict){
+      throw new Error('Dati online non leggibili per "' + slug + '". ' + (lastProblem && lastProblem.message ? lastProblem.message : (lastProblem || '')));
+    }
+    return fallback;
   }
 
   async function saveCharacter(slug, data){
