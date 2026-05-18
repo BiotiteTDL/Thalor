@@ -10549,3 +10549,73 @@ body.tabletop-display-mode .tabletop-master-workspace{
     padding:24px 18px!important;
   }
 }
+
+/* v252 — Display Tavolo: elimina barra/spazio nero superiore senza alterare ratio */
+html.tabletop-display-mode,
+html.tabletop-display-mode body,
+body.tabletop-display-mode{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  width:100dvw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+body.tabletop-display-mode::before,
+body.tabletop-display-mode::after{
+  display:none!important;
+  content:none!important;
+}
+body.tabletop-display-mode .topbar,
+html.tabletop-display-mode .topbar{
+  display:none!important;
+  height:0!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+body.tabletop-display-mode #tabletopApp,
+body.tabletop-display-mode .page,
+body.tabletop-display-mode .tabletop-page,
+body.tabletop-display-mode .tabletop-master-workspace,
+body.tabletop-display-mode .tabletop-shell,
+body.tabletop-display-mode .tabletop-stage-card{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  width:100dvw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  max-width:none!important;
+  max-height:none!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+  box-shadow:none!important;
+}
+body.tabletop-display-mode .tabletop-stage{
+  position:absolute!important;
+  left:50%!important;
+  top:50%!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:0!important;
+  outline:0!important;
+  transform:translate3d(-50%,-50%,0) scale(var(--stage-fit,1))!important;
+  transform-origin:center center!important;
+  backface-visibility:hidden!important;
+}
+body.tabletop-display-mode .tabletop-display-fullscreen{
+  left:14px!important;
+  right:auto!important;
+  bottom:14px!important;
+  top:auto!important;
+}
