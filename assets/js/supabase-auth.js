@@ -524,63 +524,65 @@
     );
   }
 
-  async function loadCharacter(slug, fallback, options={}){
-    // LETTURA PUBBLICA ONLINE-FIRST.
-    // Non deve dipendere da login, sessione, profilo o permessi: un browser fresh deve poter
-    // leggere i contenuti pubblici prima di qualsiasi fallback statico/localStorage.
-    if(!state.configured) return fallback;
-
-    const base = restBaseUrl();
-    const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
-    const headersBase = {
+  function publicReadHeaders(){
+    // Con le nuove chiavi Supabase sb_publishable_* la chiave va usata come apikey.
+    // NON va messa in Authorization: Bearer, perché non è un JWT e da browser anonimo
+    // fa fallire la REST API, causando il fallback statico.
+    return {
       'apikey': cfg.anonKey,
       'Accept': 'application/json',
       'Cache-Control': 'no-cache, no-store, max-age=0',
       'Pragma': 'no-cache'
     };
-    const attempts = [headersBase, Object.assign({}, headersBase, {'Authorization':'Bearer ' + cfg.anonKey})];
+  }
 
-    for(const headers of attempts){
-      try{
-        const { response, body } = await timeoutFetch(url, { method:'GET', headers, cache:'no-store' }, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
-        if(response.ok){
-          const rows = body ? JSON.parse(body) : [];
-          return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
-        }
+  async function loadCharacter(slug, fallback, options={}){
+    // Lettura pubblica: non deve dipendere da login/sessione/auth init.
+    // Serve per browser fresh e visitatori anonimi.
+    if(!state.configured) return fallback;
+
+    try{
+      const base = restBaseUrl();
+      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
+      const { response, body } = await timeoutFetch(url, {
+        method: 'GET',
+        headers: publicReadHeaders(),
+        cache: 'no-store'
+      }, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
+      if(!response.ok){
         console.warn('Supabase loadCharacter HTTP:', response.status, body);
-      }catch(err){
-        console.warn('Supabase loadCharacter:', err);
+        return fallback;
       }
+      const rows = body ? JSON.parse(body) : [];
+      return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
+    }catch(err){
+      console.warn('Supabase loadCharacter:', err);
+      return fallback;
     }
-    return fallback;
   }
 
 
   async function listCharacterSheets(options={}){
-    // Lista pubblica online-first: niente init/sessione prima della SELECT.
+    // Lettura pubblica: non deve dipendere da login/sessione/auth init.
     if(!state.configured) return [];
-    const base = restBaseUrl();
-    const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
-    const headersBase = {
-      'apikey': cfg.anonKey,
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache, no-store, max-age=0',
-      'Pragma': 'no-cache'
-    };
-    const attempts = [headersBase, Object.assign({}, headersBase, {'Authorization':'Bearer ' + cfg.anonKey})];
-    for(const headers of attempts){
-      try{
-        const { response, body } = await timeoutFetch(url, { method:'GET', headers, cache:'no-store' }, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
-        if(response.ok){
-          const rows = body ? JSON.parse(body) : [];
-          return Array.isArray(rows) ? rows : [];
-        }
+    try{
+      const base = restBaseUrl();
+      const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
+      const { response, body } = await timeoutFetch(url, {
+        method: 'GET',
+        headers: publicReadHeaders(),
+        cache: 'no-store'
+      }, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
+      if(!response.ok){
         console.warn('Supabase listCharacterSheets HTTP:', response.status, body);
-      }catch(err){
-        console.warn('Supabase listCharacterSheets:', err);
+        return [];
       }
+      const rows = body ? JSON.parse(body) : [];
+      return Array.isArray(rows) ? rows : [];
+    }catch(err){
+      console.warn('Supabase listCharacterSheets:', err);
+      return [];
     }
-    return [];
   }
 
 

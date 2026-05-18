@@ -335,7 +335,7 @@ function bind(data){
   let data=fallbackData();let freshLoaded=false;
   try{
     if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-      const online=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true});
+      const online=await window.ThalorAuth.loadCharacter(slug,null);
       if(online&&typeof online==='object'){
         data=normalize(online);freshLoaded=true;
         try{localStorage.setItem(storageKey,JSON.stringify(data));}catch(e){}

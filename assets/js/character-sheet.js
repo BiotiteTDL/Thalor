@@ -1332,40 +1332,27 @@ function registryBlankSheetFromList(slug){
 
 (async function startSheet(){
   try{
-    if(authAvailable()) await window.ThalorAuth.init();
+    // Browser fresh / visitatori anonimi: non aspettare auth init per leggere la scheda pubblica.
     let [base,xpBase,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
     let xp=await loadUnifiedXpData(xpBase);
     base=base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
-
-    let remoteData=null;
-    if(slug && authAvailable() && window.ThalorAuth.state && window.ThalorAuth.state.configured && navigator.onLine!==false){
-      try{
-        // Lettura pubblica vera: prima Supabase, poi eventualmente statico/locale.
-        remoteData=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,skipInit:true,timeoutMs:15000});
-      }catch(e){
-        console.warn('Caricamento pubblico scheda online non riuscito:', e);
-      }
-    }
-
     const localFound=firstValidLocal([parentStorageKey,...oldKeys]);
     if(!base && localFound) base=localFound.data;
-    if(!base && !remoteData && slug) base=registryBlankSheetFromList(slug);
-    if(!base && !remoteData && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
-    if(!base && !remoteData)throw new Error('Dati scheda non trovati.');
-
-    window.__thalorParentBase=normalize(remoteData||base);
+    if(!base && slug) base=registryBlankSheetFromList(slug);
+    if(!base && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
+    if(!base)throw new Error('Dati scheda non trovati.');
+    window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
-    let sheetData=remoteData ? normalize(remoteData) : chooseSheetData(base, localFound);
-
-    // Cache solo dopo una lettura online riuscita; non far mai vincere una scheda base vecchia su browser fresh.
-    if(remoteData){
+    let sheetData=chooseSheetData(base, localFound);
+    if(authAvailable() && window.ThalorAuth.state.configured){
+      const beforeRemote=sheetData;
+      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData,{publicRead:true}); }
+      catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
       try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     }
-
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}
 })();
-
 })()
 
 document.addEventListener('DOMContentLoaded', ()=>{

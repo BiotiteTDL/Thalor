@@ -42,7 +42,7 @@
     try{data=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);}catch(e){}
     try{
       if(window.ThalorAuth?.state?.configured && navigator.onLine!==false){
-        const online=await window.ThalorAuth.loadCharacter('xp',null,{publicRead:true});
+        const online=await window.ThalorAuth.loadCharacter('xp',null);
         if(online&&typeof online==='object') data=online;
       }
     }catch(err){console.warn('Registro XP online non aggiornato:',err);}

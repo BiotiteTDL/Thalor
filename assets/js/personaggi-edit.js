@@ -206,7 +206,16 @@
     const map=new Map(sanitizePersonaggiItems(baseItems).map(x=>[x.slug,x]));
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const item=itemFromOnlineSheet(row);
-      if(item&&!map.has(item.slug))map.set(item.slug,item);
+      if(!item)return;
+      const prev=map.get(item.slug)||{};
+      // La scheda online è la fonte più fresca per immagine/nome/descrizione card.
+      map.set(item.slug, makeLinks(Object.assign({}, prev, item, {
+        type: prev.type || item.type,
+        href: prev.href || item.href,
+        sheet: prev.sheet || item.sheet,
+        img: item.img || prev.img,
+        desc: item.desc || prev.desc
+      })));
     });
     return Array.from(map.values());
   }
@@ -217,8 +226,7 @@
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(sanitizePersonaggiItems(raw.items));} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
   async function readFresh(){
-    // Online-first pubblico: un visitatore mai loggato deve vedere Supabase, non la copia base/statica.
-    let localItems=null;
+    let localItems=readLocal();
     try{
       if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
         const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true});
@@ -231,7 +239,7 @@
           items=sanitizePersonaggiItems(online.items);
         }else{
           console.warn('Registro __personaggi__ letto ma senza items validi: provo recupero da schede online.');
-          items=[];
+          items=sanitizePersonaggiItems(localItems);
         }
         if(window.ThalorAuth.listCharacterSheets){
           try{
@@ -248,7 +256,6 @@
         return applyRegistryPayload(cleanPayload);
       }
     }catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}
-    localItems=readLocal();
     return localItems;
   }
   function isDataImage(v){return /^data:image\//i.test(String(v||''));}
@@ -462,7 +469,7 @@
     $('#detailEditPersonaggio').onclick=()=>openEditor(item);
   }
   if($('#personaggiApp')){bindAutoRefresh(); initList();}
-  if($('#personaggioDetailApp')){ initDetail().then(()=>canMaster().then(m=>{state.master=m; const app=$('#personaggioDetailApp'); const qs=new URLSearchParams(location.search); const id=qs.get('id')||qs.get('character')||qs.get('slug')||''; const item=(state.items||[]).find(x=>x.slug===id); if(m&&item)renderDetailDock(item,app); }).catch(()=>{})); }
+  if($('#personaggioDetailApp')) canMaster().then(m=>{state.master=m; initDetail();});
 })();
 
 async function thalorOptimizeImage(file,opts={}){
