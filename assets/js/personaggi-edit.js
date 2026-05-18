@@ -140,11 +140,18 @@
   function richText(v){return esc(v).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g,(_,label,href)=>`<a class="lore-link" href="${esc(internalHref(href))}">${esc(label)}</a>`);}
   function slugify(s){return String(s||'personaggio').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,42)||('personaggio-'+Date.now());}
   function ensureRole(item){if(!item)return ''; if(!item.slug)item.slug=slugify(item.name); item.roleSlug=item.slug; item.permissionRole=item.slug; return item.slug;}
-  const NON_PERSONAGGI_SLUGS=new Set(['diario','diary','xp','tabella-exp','archive','archivio','symbols','simboli','documents','documenti','archive-documents','archyve-documents','loot','info-utili','sogni-visioni','extractum-ex-tenebris','__personaggi__']);
+  const NON_PERSONAGGI_SLUGS=new Set(['diario','diary','xp','tabella-exp','registro-xp','archive','archivio','archives','archivio-documenti','symbols','simboli','archive-symbols','archivio-simboli','documents','documenti','archive-documents','archyve-documents','archivio-documents','documenti-archivio','loot','info-utili','sogni-visioni','extractum-ex-tenebris','__personaggi__']);
+  function isBlockedPersonaggioSlug(slug,name){
+    const s=slugify(slug||name||'');
+    const n=slugify(name||slug||'');
+    if(!s||NON_PERSONAGGI_SLUGS.has(s)||NON_PERSONAGGI_SLUGS.has(n))return true;
+    // Protezione larga: non far entrare pagine di sistema recuperate da character_sheets.
+    return /(^|-)(archive|archivio|symbols|simboli|documents|documenti|diario|xp|loot)(-|$)/.test(s) || /(^|-)(archive|archivio|symbols|simboli|documents|documenti|diario|xp|loot)(-|$)/.test(n);
+  }
   function isValidPersonaggioItem(item){
     if(!item||typeof item!=='object')return false;
     const slug=slugify(item.slug||item.name||'');
-    if(!slug||NON_PERSONAGGI_SLUGS.has(slug))return false;
+    if(isBlockedPersonaggioSlug(slug,item.name))return false;
     if(item.type!=='pg'&&item.type!=='png')return false;
     if(!String(item.name||'').trim())return false;
     return true;
@@ -161,6 +168,48 @@
       return makeLinks(item);
     }).filter(Boolean);
   }
+  function isCharacterSheetData(data,slug){
+    if(!data||typeof data!=='object')return false;
+    const meta=data.meta||{};
+    const identity=data.identity||{};
+    const s=slugify(slug||meta.slug||meta.permissionRole||identity.name||'');
+    if(isBlockedPersonaggioSlug(s,identity.name||meta.name))return false;
+    // Le pagine archivio/simboli/diario hanno strutture diverse: una vera scheda ha identity
+    // e almeno uno tra blocchi numerici o narrativi della scheda personaggio.
+    if(!identity||typeof identity!=='object'||!String(identity.name||'').trim())return false;
+    const looksLikeSheet = data.schemaVersion || data.abilities || data.combat || data.inventorySections || data.classLevels || data.portrait;
+    return !!looksLikeSheet;
+  }
+  function itemFromOnlineSheet(row){
+    const data=row&&row.data;
+    const slug=slugify(row&&row.slug || data?.meta?.slug || data?.meta?.permissionRole || data?.identity?.name || '');
+    if(!isCharacterSheetData(data,slug))return null;
+    const meta=data.meta||{};
+    const identity=data.identity||{};
+    const portrait=data.portrait||{};
+    const narrative=data.narrative||{};
+    const type=(String(meta.subtitle||meta.type||'').toLowerCase().includes('png') || String(meta.theme||'').toLowerCase()==='necrotic')?'png':'pg';
+    return makeLinks({
+      type,
+      slug,
+      name:identity.name||slug,
+      playerName:identity.player||'',
+      roleSlug:slug,
+      permissionRole:slug,
+      desc:portrait.quote||meta.subtitle||'Personaggio salvato online.',
+      img:portrait.image||'assets/img/Thalor16k.jpg',
+      longDesc:narrative.diary||'',
+      events:''
+    });
+  }
+  function mergeOnlineSheetItems(baseItems,rows){
+    const map=new Map(sanitizePersonaggiItems(baseItems).map(x=>[x.slug,x]));
+    (Array.isArray(rows)?rows:[]).forEach(row=>{
+      const item=itemFromOnlineSheet(row);
+      if(item&&!map.has(item.slug))map.set(item.slug,item);
+    });
+    return Array.from(map.values());
+  }
   function permissionNote(item){const role=ensureRole(item); return `Ruolo permesso scheda: ${role}`;}
   function read(){return readLocal();}
   function mergeDefaults(saved){const deleted=new Set(state.deleted||[]); const map=new Map(saved.filter(x=>x&&!deleted.has(x.slug)).map(x=>[x.slug,x])); DEFAULTS.forEach(d=>{if(deleted.has(d.slug))return; if(!map.has(d.slug)){map.set(d.slug,Object.assign({},d));}else{const current=map.get(d.slug); const merged=Object.assign({},d,current,{type:current.type||d.type}); if(state.restoreDefaultContent){merged.desc=d.desc; merged.longHtml=d.longHtml||''; merged.eventsHtml=d.eventsHtml||''; if(!current.longDesc) merged.longDesc=''; if(!current.events) merged.events='';} map.set(d.slug,merged);}}); return Array.from(map.values()).map(x=>{ensureRole(x); return x;});}
@@ -173,12 +222,30 @@
       if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
       if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
         const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true});
+        let items=null;
+        let deleted=[];
+        let restore=false;
         if(online&&Array.isArray(online.items)){
-          const cleanPayload=Object.assign({},online,{items:sanitizePersonaggiItems(online.items)});
-          try{localStorage.setItem(LIST_KEY,JSON.stringify(cleanPayload));}catch(e){}
-          return applyRegistryPayload(cleanPayload);
+          deleted=Array.isArray(online.deleted)?online.deleted:[];
+          restore=online.contentRestoreVersion!==CONTENT_RESTORE_VERSION;
+          items=sanitizePersonaggiItems(online.items);
+        }else{
+          console.warn('Registro __personaggi__ letto ma senza items validi: provo recupero da schede online.');
+          items=sanitizePersonaggiItems(localItems);
         }
-        console.warn('Registro __personaggi__ letto ma senza items validi: uso fallback locale/base.');
+        if(window.ThalorAuth.listCharacterSheets){
+          try{
+            const rows=await window.ThalorAuth.listCharacterSheets({publicRead:true,timeoutMs:12000});
+            items=mergeOnlineSheetItems(items,rows).filter(x=>!deleted.includes(x.slug));
+          }catch(recoverErr){
+            console.warn('Recupero schede online non riuscito:',recoverErr);
+          }
+        }
+        const cleanPayload={updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:sanitizePersonaggiItems(items),deleted};
+        state.deleted=deleted;
+        state.restoreDefaultContent=restore;
+        try{localStorage.setItem(LIST_KEY,JSON.stringify(cleanPayload));}catch(e){}
+        return applyRegistryPayload(cleanPayload);
       }
     }catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}
     return localItems;
@@ -220,6 +287,7 @@
     }
   }
   async function save(){
+    state.items=sanitizePersonaggiItems(state.items||[]);
     (state.items||[]).forEach(ensureRole);
     const payload=registryPayload();
     state.restoreDefaultContent=false;

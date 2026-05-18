@@ -557,6 +557,39 @@
     }
   }
 
+
+  async function listCharacterSheets(options={}){
+    if(!options.skipInit) await init();
+    if(!state.configured) return [];
+    try{
+      const base = restBaseUrl();
+      // Prendiamo solo slug + data e lasciamo al codice personaggi il filtro strutturale.
+      // Questo evita che righe archivio/simboli finiscano nell'elenco.
+      const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
+      const { response, body } = await timeoutFetch(url, {
+        method: 'GET',
+        headers: {
+          'apikey': cfg.anonKey,
+          'Authorization': 'Bearer ' + cfg.anonKey,
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
+        },
+        cache: 'no-store'
+      }, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
+      if(!response.ok){
+        console.warn('Supabase listCharacterSheets HTTP:', response.status, body);
+        return [];
+      }
+      const rows = body ? JSON.parse(body) : [];
+      return Array.isArray(rows) ? rows : [];
+    }catch(err){
+      console.warn('Supabase listCharacterSheets:', err);
+      return [];
+    }
+  }
+
+
   async function saveCharacter(slug, data){
     const client = makeClient();
     if(isLocalPreview()) { saveDebug('save:local-preview', { slug }); return { mode:'local-preview' }; }
@@ -670,6 +703,7 @@
     isMaster,
     canEdit,
     loadCharacter,
+    listCharacterSheets,
     saveCharacter,
     debugLog: () => { try{return JSON.parse(localStorage.getItem('thalor.lastSaveDebug')||'[]')}catch(e){return []} },
     enableDebug: () => { try{localStorage.setItem('thalor.debug.save','1')}catch(e){} },
