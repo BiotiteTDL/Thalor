@@ -1,0 +1,213 @@
+{
+  "version": 2,
+  "places": [
+    {
+      "slug": "valkren",
+      "type": "city",
+      "title": "L’Insenno di Valkren",
+      "tag": "Villaggio costiero",
+      "subtitle": "Dove la nebbia salmastra copre i moli, e le cripte ricordano ciò che il villaggio preferirebbe dimenticare.",
+      "image": "assets/img/valkren_mappa.png",
+      "summary": "Piccolo villaggio marittimo avvolto dalla nebbia salmastra, dove ha avuto inizio la campagna.",
+      "description": "Un piccolo villaggio marittimo aggrappato alle coste fredde dell’Insenno di Valkren. Nebbia salmastra, moli umidi e case di pietra annerite dal vento ne fanno un luogo apparentemente tranquillo… ma sotto la superficie, il villaggio è già stato contaminato da qualcosa di antico.\n\nÈ qui che ha avuto inizio la campagna. Tra funerali mai avvenuti davvero, cripte dimenticate, simboli incisi nella pietra e rituali incomprensibili, l’Insenno è diventato il primo tassello della discesa verso ciò che Varek Thorm sta tentando di costruire.",
+      "interests": [
+        {
+          "title": "Villa Thorm",
+          "image": "assets/img/villa_thorm.png",
+          "text": "Una grande magione marmorea affacciata sul mare, circondata da un giardino vasto e innaturalmente perfetto. Statue, sentieri bianchi e alberi provenienti da terre lontane testimoniano l’enorme ricchezza accumulata dalla famiglia Thorm attraverso il commercio navale.\n\nQui si è tenuta la veglia funebre di Varek Thorm. O almeno… così sembrava.\n\nDurante quella notte il Libro Mastro venne trafugato, il caos travolse la villa, Abraxas incendiò il falso cadavere di Varek con una bottiglia incendiaria e Lyria Thorm rimase gravemente ustionata.\n\nQuando la ragazza riapparve giorni dopo, parte del suo volto e del suo corpo erano stati sostituiti da sottili venature e placche dorate, come se l’oro fosse cresciuto sopra la carne distrutta."
+        },
+        {
+          "title": "Mausoleo dei Thorm",
+          "image": "assets/img/valkren_mausoleo.png",
+          "text": "Situato nel vecchio cimitero del villaggio, il Mausoleo dei Thorm è molto più antico della famiglia stessa. L’ingresso conduce a cripte in marmo nero e bianco ornate da incisioni dorate ormai annerite dal tempo.\n\nNel cuore del complesso si trova la sala delle statue gemelle: una figura umana inginocchiata e uno scheletro nella stessa posa. Le mani delle statue restavano leggermente aperte, come in attesa.\n\nI personaggi riuscirono a risolvere l’enigma delle pietre nere e del rituale incompleto, comprendendo che il mausoleo non celebrava la morte… ma la trasformazione."
+        },
+        {
+          "title": "Cappella Abbandonata",
+          "image": "assets/img/valkren_cappella.png",
+          "text": "Poco fuori dal villaggio, oltre i campi e le scogliere, sorge una cappella dimenticata che nessuno utilizza più da anni.\n\nL’interno era stato trasformato in un luogo rituale. I personaggi vi trovarono il cadavere mutilato del fioraio del villaggio, simboli rituali incisi nella pietra, tracce di esperimenti necromantici e i primi segni concreti dell’opera di Thorm."
+        },
+        {
+          "title": "Porto di Valkren",
+          "image": "",
+          "text": "Un porto piccolo ma molto attivo, costruito attorno al commercio marittimo controllato dai Thorm. Tra le strutture principali si trovano magazzini mercantili, banchine da carico, reti da pesca, gru arrugginite ed edifici abitativi per marinai e lavoratori."
+        },
+        {
+          "title": "Casa di Arolf Thelir",
+          "image": "",
+          "text": "Una dimora isolata piena di strumenti medici, disegni anatomici e odore di reagenti."
+        },
+        {
+          "title": "Casa di Ralph",
+          "image": "",
+          "text": "Più simile a uno studio clandestino che a una vera abitazione. Bende sporche, strumenti metallici e testi proibiti occupano quasi ogni superficie."
+        },
+        {
+          "title": "La Taverna",
+          "image": "",
+          "text": "Piccola, rumorosa e sempre piena di marinai."
+        },
+        {
+          "title": "L’Alchimista",
+          "image": "",
+          "text": "Una minuscola bottega di reagenti e veleni.\n\nLa notte prima della partenza verso Portogrigio, Abraxas decapitò l’alchimista all’interno del suo stesso negozio, lasciando il villaggio in uno stato di silenziosa tensione."
+        }
+      ],
+      "conclusionTitle": "Atmosfera del Villaggio",
+      "conclusion": "L’Insenno di Valkren vive sospeso tra decadenza e ricchezza. Da lontano appare come un semplice villaggio costiero. Ma chi vi rimane abbastanza a lungo inizia a notare che troppe persone evitano certi simboli. Che alcune porte restano chiuse anche durante il giorno. Che la nebbia sembra fermarsi troppo a lungo sopra il vecchio cimitero. E che, dopo il tramonto, il mare restituisce a riva cose che nessuno osa reclamare."
+    },
+    {
+      "slug": "portogrigio",
+      "type": "city",
+      "title": "Portogrigio",
+      "tag": "Città portuale",
+      "subtitle": "Dove il mare incontra il ferro, e ogni nave porta con sé una storia.",
+      "image": "assets/img/portogrigio_mappa.png",
+      "summary": "Il più grande porto della costa occidentale di Thalor, avvolto dalla nebbia marina e dominato dal commercio.",
+      "description": "Portogrigio è una delle città portuali più grandi e importanti di Thalor. Costruita attorno a un’enorme baia naturale, nel corso dei secoli è diventata il cuore commerciale della costa occidentale.\n\nLa città prende il nome dalla costante foschia marina che avvolge il porto per gran parte dell’anno, tingendo pietra, tetti e moli di sfumature grigie.\n\nOgni giorno centinaia di navi attraccano ai suoi moli, mentre mercanti, marinai e carovane provenienti dall’interno riempiono le sue strade.",
+      "interests": [
+        {
+          "title": "Il Grande Porto",
+          "image": "",
+          "text": "Il cuore della città. Navi mercantili, flotte da pesca e imbarcazioni militari attraccano giorno e notte."
+        },
+        {
+          "title": "Mercato delle Maree",
+          "image": "",
+          "text": "Uno dei mercati più grandi di Thalor, pieno di spezie, mappe, gioielli e merci provenienti da terre lontane."
+        },
+        {
+          "title": "Distretto Accademico",
+          "image": "",
+          "text": "Zona elegante della città che ospita biblioteche, laboratori e l’Accademia di Medicina."
+        },
+        {
+          "title": "Il Faro di Portogrigio",
+          "image": "",
+          "text": "Simbolo della città. La sua luce guida le navi attraverso le tempeste da secoli."
+        },
+        {
+          "title": "I Canali Interni",
+          "image": "",
+          "text": "Una fitta rete di canali attraversa la città, usata per il trasporto merci e i collegamenti tra quartieri."
+        }
+      ],
+      "sections": [
+        {
+          "title": "Atmosfera",
+          "cards": [
+            {
+              "title": "Di giorno",
+              "text": "Urla di marinai e mercanti riempiono il porto.\nI mercati traboccano di spezie, stoffe e pesce fresco.\nLe accademie attirano studenti da tutta Thalor."
+            },
+            {
+              "title": "Di notte",
+              "text": "Lanterne illuminano i canali interni.\nTaverne e moli restano vivi fino all’alba.\nLa città si riflette sull’acqua tra nebbia e pioggia."
+            }
+          ],
+          "text": "A Portogrigio conta più ciò che sai fare… che da dove provieni."
+        },
+        {
+          "title": "Fazioni principali",
+          "cards": [
+            {
+              "title": "I Becchini della Pioggia",
+              "text": "Organizzazione incaricata di funerali, recupero dei corpi e manutenzione dei cimiteri. Sono riconoscibili dai lunghi mantelli impermeabili grigi e dalle lanterne schermate."
+            },
+            {
+              "title": "Accademia di Medicina",
+              "text": "La più importante istituzione medica della regione. Forma medici, anatomisti e chirurghi provenienti da tutto il continente."
+            },
+            {
+              "title": "Gilda dei Mercanti",
+              "text": "La forza economica dominante della città. Controlla commercio navale, tasse portuali e magazzini."
+            },
+            {
+              "title": "Gilda dei Marinai",
+              "text": "La voce del porto. Rappresenta capitani, pescatori, navigatori ed equipaggi mercantili."
+            }
+          ]
+        },
+        {
+          "title": "Cultura cittadina",
+          "text": "Portogrigio è abituata al cambiamento. Qui convivono culture, lingue e religioni provenienti da tutto il continente.\n\nI cittadini tendono a rispettare abilità, esperienza e reputazione più del sangue o della nobiltà."
+        },
+        {
+          "title": "Taverne famose",
+          "list": [
+            "La Sirena Spezzata — Frequentata da marinai e capitani.",
+            "Il Nodo Salato — Ritrovo della Gilda dei Marinai.",
+            "L’Ultima Marea — Taverna elegante vicina al porto privato."
+          ]
+        },
+        {
+          "title": "Curiosità",
+          "list": [
+            "A Portogrigio piove molto più spesso rispetto ad altre città costiere.",
+            "I bambini del porto imparano a nuotare prima ancora di leggere.",
+            "Campane sparse per la città segnalano tempeste e incendi navali.",
+            "Il pesce speziato locale è famoso in tutta Thalor.",
+            "Le gare di navigazione attirano equipaggi da ogni regione."
+          ]
+        }
+      ],
+      "conclusionTitle": "Portogrigio nella campagna",
+      "conclusion": "Il porto non dorme mai davvero, e ogni vicolo sembra custodire un accordo, un segreto o una promessa non mantenuta."
+    },
+    {
+      "slug": "accademia-medicina",
+      "type": "dungeon",
+      "title": "Accademia di Medicina",
+      "tag": "Portogrigio · Distretto Accademico",
+      "subtitle": "L’istituzione medica più prestigiosa della costa occidentale di Thalor. Dietro le sue aule illuminate e le immense biblioteche, qualcosa continua ancora a respirare sotto la pietra.",
+      "image": "assets/img/stanze-otmar.png",
+      "summary": "I laboratori proibiti di Otmar Van Verschuer nascosti sotto il distretto accademico di Portogrigio.",
+      "description": "L’Accademia di Medicina domina il distretto accademico di Portogrigio con alte finestre gotiche, cortili interni e lunghi corridoi illuminati da lampade a olio. Ogni anno studenti provenienti da tutto Thalor attraversano le sue porte per studiare anatomia, chirurgia e le arti della guarigione.\n\nPer la città rappresenta progresso, conoscenza e prestigio. Per alcuni, invece, è soltanto una facciata.\n\nNei registri ufficiali il nome di Otmar Van Verschuer compare ancora accanto a decenni di ricerche mediche e studi sulle malattie ereditarie. Ma nei sotterranei dimenticati sotto l’istituto esistono tracce di qualcosa di diverso.\n\nPorte murate. Sale anatomiche non segnate sulle planimetrie. Strumenti chirurgici lasciati arrugginire accanto a tavoli ancora macchiati di sangue secco. E simboli che nessun insegnante dell’Accademia osa riconoscere apertamente.\n\nI documenti recuperati nei laboratori nascosti parlano di innesti necrotici, sostituzione dei tessuti vivi e di un concetto ricorrente chiamato soltanto: La Forma Finale.\n\nSecondo alcuni membri dei Becchini della Pioggia, durante le notti di tempesta si possono ancora udire rumori provenire dalle profondità dell’istituto. Catene. Metallo trascinato sulla pietra. E qualcosa che sembra tentare lentamente di rialzarsi.",
+      "interests": [
+        {
+          "title": "Laboratori Proibiti",
+          "image": "",
+          "text": "Sale di preparazione, vivisezione e conservazione dei tessuti utilizzate per gli esperimenti sugli innesti necrotici."
+        },
+        {
+          "title": "Camera del Frammento",
+          "image": "",
+          "text": "Una sala quasi vuota dominata da un grande spazio rituale centrale. Catene spezzate giacciono sparse sul pavimento mentre sottili incisioni attraversano la pietra come vene disseccate. L’ambiente trasmette una sensazione innaturale di silenzio, come se qualcosa fosse stato rimosso… o liberato."
+        },
+        {
+          "title": "Sala degli Esperimenti",
+          "image": "",
+          "text": "Una vasta sala adibita agli esperimenti sui soggetti dell’Accademia. Lunghi tavoli operatori occupano la stanza, circondati da strumenti chirurgici, contenitori anatomici e resti di dissezioni mai completate. I corpi catalogati giacciono ancora sui letti metallici, marchiati con sigle e annotazioni lasciate dagli studiosi di Otmar."
+        },
+        {
+          "title": "Deposito Organi e Tessuti",
+          "image": "",
+          "text": "Barattoli sigillati, campioni immersi in soluzioni sconosciute e registri ormai quasi illeggibili."
+        }
+      ],
+      "sections": [
+        {
+          "title": "Sale Principali",
+          "cards": [
+            {
+              "title": "Sala degli Esperimenti",
+              "image": "assets/img/otmar_camera_frammento.png",
+              "text": "Una vasta sala adibita agli esperimenti sui soggetti dell’Accademia. Lunghi tavoli operatori occupano la stanza, circondati da strumenti chirurgici, contenitori anatomici e resti di dissezioni mai completate. I corpi catalogati giacciono ancora sui letti metallici, marchiati con sigle e annotazioni lasciate dagli studiosi di Otmar."
+            },
+            {
+              "title": "Laboratorio di Vivisezione",
+              "image": "assets/img/otmar_vivisezione.png",
+              "text": "Il cuore chirurgico dei sotterranei. Tavoli operatori disposti con precisione quasi accademica occupano la sala, circondati da scaffali, campioni anatomici e strumenti metallici. Al centro, un corpo è ancora fissato al banco principale, come se l’ultima procedura fosse stata interrotta solo pochi istanti prima."
+            },
+            {
+              "title": "Camera del Frammento",
+              "image": "assets/img/otmar_celle.png",
+              "text": "Una sala quasi vuota dominata da un grande spazio rituale centrale. Catene spezzate giacciono sparse sul pavimento mentre sottili incisioni attraversano la pietra come vene disseccate. L’ambiente trasmette una sensazione innaturale di silenzio, come se qualcosa fosse stato rimosso… o liberato."
+            }
+          ]
+        }
+      ],
+      "conclusionTitle": "Presenza nella campagna",
+      "conclusion": "L’Accademia è il volto pubblico della conoscenza medica di Portogrigio, ma i suoi sotterranei hanno mostrato al gruppo una verità molto più oscura."
+    }
+  ]
+}

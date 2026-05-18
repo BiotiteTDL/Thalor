@@ -23,6 +23,7 @@
   };
   const PLAYABLE_SLUGS = new Set(['abraxas','igor','ralph','arolf','irven']);
   const STATIC_JSON = [
+    'assets/data/places.json',
     'assets/data/xp.json',
     'assets/data/characters/abraxas.json',
     'assets/data/characters/arolf.json',
@@ -188,6 +189,7 @@
     log('JSON statici letti', Object.keys(staticData).length + ' file');
 
     const registry = registryRes.data || { items:[] };
+    const placesData = (placesRes.data && Array.isArray(placesRes.data.places) && placesRes.data.places.length) ? placesRes.data : (staticData['assets/data/places.json'] || null);
     const sheets = normalizeSheets(onlineRows, registry);
     const characters = simplifyCharacters(registry, sheets);
     const playableCharacters = characters.filter(c=>c.type === 'pg');
@@ -208,7 +210,7 @@
       },
       sources: {
         personaggi: registryRes.source,
-        luoghi: placesRes.source,
+        luoghi: placesData === placesRes.data ? placesRes.source : 'static-json-fallback',
         diario: diaryRes.source,
         xp: xpRes.source,
         documenti: documentsRes.source,
@@ -221,7 +223,7 @@
         playableCharacters: playableCharacters.length,
         nonPlayerCharacters: nonPlayerCharacters.length,
         sheets: sheets.length,
-        places: Array.isArray(placesRes.data?.places) ? placesRes.data.places.length : 0,
+        places: Array.isArray(placesData?.places) ? placesData.places.length : 0,
         sessions: Array.isArray(diaryRes.data?.sessions) ? diaryRes.data.sessions.length : 0,
         xpEvents: Array.isArray(xpRes.data?.registro_xp) ? xpRes.data.registro_xp.length : 0,
         documentsCategories: Array.isArray(documentsRes.data?.categories) ? documentsRes.data.categories.length : 0,
@@ -233,7 +235,7 @@
         playableCharacters,
         nonPlayerCharacters,
         characterSheets: sheets,
-        places: placesRes.data || null,
+        places: placesData,
         diary: diaryRes.data || null,
         xp: xpRes.data || staticData['assets/data/xp.json'] || null,
         archiveDocuments: documentsRes.data || null,

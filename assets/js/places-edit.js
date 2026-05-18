@@ -4,6 +4,8 @@
 const STORAGE_KEY = 'thalor.places.v1';
 const PLACES_SLUG = '__places__';
 let CURRENT_DATA = null;
+let STATIC_PLACES = null;
+const PLACES_DATA_PATH = 'assets/data/places.json';
 const FALLBACK = {
   version: 2,
   places: [
@@ -97,9 +99,23 @@ const asset = (url)=>{ if(!url) return ''; if(/^data:|^https?:|^\.\.?\//.test(ur
 const detailHref = (p)=> p.href || `luoghi/dettaglio-luogo.html?slug=${encodeURIComponent(p.slug)}`;
 const localDetailHref = (p)=> p.href || `dettaglio-luogo.html?slug=${encodeURIComponent(p.slug)}`;
 
+const basePlacesData = ()=> STATIC_PLACES && Array.isArray(STATIC_PLACES.places) ? STATIC_PLACES : FALLBACK;
+async function loadStaticPlaces(){
+  if(STATIC_PLACES) return STATIC_PLACES;
+  try{
+    const res = await fetch(rootPrefix()+PLACES_DATA_PATH+'?_ts='+Date.now(), {cache:'no-store'});
+    if(res.ok){
+      const json = await res.json();
+      if(json && Array.isArray(json.places)){ STATIC_PLACES = json; return STATIC_PLACES; }
+    }
+  }catch(e){ console.warn('Dati luoghi statici non disponibili, uso fallback interno:', e); }
+  STATIC_PLACES = FALLBACK;
+  return STATIC_PLACES;
+}
 function enrichData(data){
-  const copy = data && Array.isArray(data.places) ? JSON.parse(JSON.stringify(data)) : JSON.parse(JSON.stringify(FALLBACK));
-  FALLBACK.places.forEach(fb=>{
+  const base = basePlacesData();
+  const copy = data && Array.isArray(data.places) ? JSON.parse(JSON.stringify(data)) : JSON.parse(JSON.stringify(base));
+  base.places.forEach(fb=>{
     const idx = copy.places.findIndex(p=>p.slug===fb.slug);
     if(idx < 0){ copy.places.push(JSON.parse(JSON.stringify(fb))); return; }
     const cur = copy.places[idx] || {};
@@ -111,12 +127,13 @@ function enrichData(data){
     if(!Array.isArray(cur.sections) || cur.sections.length < (fb.sections||[]).length) merged.sections = JSON.parse(JSON.stringify(fb.sections||[]));
     copy.places[idx] = merged;
   });
-  copy.version = Math.max(Number(copy.version||1), Number(FALLBACK.version||1));
+  copy.version = Math.max(Number(copy.version||1), Number(base.version||1));
   return copy;
 }
-function load(){ return CURRENT_DATA || JSON.parse(JSON.stringify(FALLBACK)); }
+function load(){ return CURRENT_DATA || JSON.parse(JSON.stringify(basePlacesData())); }
 async function loadFresh(){
-  let data = JSON.parse(JSON.stringify(FALLBACK));
+  await loadStaticPlaces();
+  let data = JSON.parse(JSON.stringify(basePlacesData()));
   let freshLoaded = false;
   try{
     if(window.ThalorAuth?.state?.configured && navigator.onLine !== false){
@@ -137,7 +154,7 @@ async function loadFresh(){
   return CURRENT_DATA;
 }
 function save(data){ CURRENT_DATA = enrichData(data); localStorage.setItem(STORAGE_KEY, JSON.stringify(CURRENT_DATA)); if(window.ThalorAuth?.state?.configured && !window.ThalorAuth.state.localMaster && navigator.onLine !== false){ window.ThalorAuth.saveCharacter(PLACES_SLUG, CURRENT_DATA).catch(e=>console.warn('Salvataggio luoghi online non riuscito:', e)); } }
-function findPlace(slug){ return load().places.find(p=>p.slug===slug) || FALLBACK.places.find(p=>p.slug===slug); }
+function findPlace(slug){ return load().places.find(p=>p.slug===slug) || basePlacesData().places.find(p=>p.slug===slug); }
 function isLocalPreview(){
   try{
     const h = String(location.hostname || '').toLowerCase();
