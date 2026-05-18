@@ -524,26 +524,27 @@
     );
   }
 
-  async function loadCharacter(slug, fallback){
-    await init();
+  async function loadCharacter(slug, fallback, options={}){
+    // Le letture delle schede devono essere pubbliche e sempre fresche.
+    // Se un utente è loggato ma non ha poteri, alcune policy possono limitare il token authenticated:
+    // per la sola lettura usiamo quindi sempre l'anon key, che è quella coperta dalla policy SELECT pubblica.
+    if(!options.skipInit) await init();
     if(!state.configured) return fallback;
 
-    // Lettura sempre fresca: la cache del browser/localStorage deve essere solo un fallback offline.
-    // Per la lettura pubblica usiamo SEMPRE la anon key: così un utente loggato senza poteri
-    // non rischia di leggere meno dati per colpa di policy diverse su authenticated.
     try{
       const base = restBaseUrl();
-      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1';
+      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
       const { response, body } = await timeoutFetch(url, {
         method: 'GET',
         headers: {
           'apikey': cfg.anonKey,
           'Authorization': 'Bearer ' + cfg.anonKey,
           'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache, no-store, max-age=0',
+          'Pragma': 'no-cache'
         },
         cache: 'no-store'
-      }, 12000, 'Lettura Supabase');
+      }, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
       if(!response.ok){
         console.warn('Supabase loadCharacter HTTP:', response.status, body);
         return fallback;
@@ -553,37 +554,6 @@
     }catch(err){
       console.warn('Supabase loadCharacter:', err);
       return fallback;
-    }
-  }
-
-  async function loadCharacterRows(){
-    await init();
-    if(!state.configured) return [];
-
-    // Recovery pubblico dell'elenco: serve quando __personaggi__ esiste ma non contiene
-    // ancora una scheda nuova già salvata come riga singola in character_sheets.
-    try{
-      const base = restBaseUrl();
-      const url = base + '/character_sheets?select=slug,data,updated_at&order=updated_at.desc&limit=1000';
-      const { response, body } = await timeoutFetch(url, {
-        method: 'GET',
-        headers: {
-          'apikey': cfg.anonKey,
-          'Authorization': 'Bearer ' + cfg.anonKey,
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        cache: 'no-store'
-      }, 12000, 'Lettura elenco schede Supabase');
-      if(!response.ok){
-        console.warn('Supabase loadCharacterRows HTTP:', response.status, body);
-        return [];
-      }
-      const rows = body ? JSON.parse(body) : [];
-      return Array.isArray(rows) ? rows : [];
-    }catch(err){
-      console.warn('Supabase loadCharacterRows:', err);
-      return [];
     }
   }
 
@@ -700,7 +670,6 @@
     isMaster,
     canEdit,
     loadCharacter,
-    loadCharacterRows,
     saveCharacter,
     debugLog: () => { try{return JSON.parse(localStorage.getItem('thalor.lastSaveDebug')||'[]')}catch(e){return []} },
     enableDebug: () => { try{localStorage.setItem('thalor.debug.save','1')}catch(e){} },

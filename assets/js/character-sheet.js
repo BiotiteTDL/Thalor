@@ -1346,7 +1346,7 @@ function registryBlankSheetFromList(slug){
     let sheetData=chooseSheetData(base, localFound);
     if(authAvailable() && window.ThalorAuth.state.configured){
       const beforeRemote=sheetData;
-      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData); }
+      try{ sheetData=await window.ThalorAuth.loadCharacter(slug, sheetData,{publicRead:true}); }
       catch(e){ console.warn('Caricamento online scheda non riuscito, uso copia locale/base:', e); sheetData=beforeRemote; }
       try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     }
