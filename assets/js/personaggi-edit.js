@@ -140,19 +140,6 @@
   function richText(v){return esc(v).replace(/\[\[([^|\]]+)\|([^\]]+)\]\]/g,(_,label,href)=>`<a class="lore-link" href="${esc(internalHref(href))}">${esc(label)}</a>`);}
   function slugify(s){return String(s||'personaggio').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,42)||('personaggio-'+Date.now());}
   function ensureRole(item){if(!item)return ''; if(!item.slug)item.slug=slugify(item.name); item.roleSlug=item.slug; item.permissionRole=item.slug; return item.slug;}
-  function rootImageSrc(src){
-    const raw=String(src||'').trim();
-    if(!raw)return 'assets/img/Thalor16k.jpg';
-    if(/^data:image\//i.test(raw)||/^https?:\/\//i.test(raw)||/^\/\//.test(raw))return raw;
-    return raw.replace(/^\.\//,'').replace(/^\.\.\//,'');
-  }
-  function detailImageSrc(src){
-    const raw=String(src||'').trim();
-    if(!raw)return '../assets/img/Thalor16k.jpg';
-    if(/^data:image\//i.test(raw)||/^https?:\/\//i.test(raw)||/^\/\//.test(raw))return raw;
-    const cleaned=raw.replace(/^\.\//,'').replace(/^\.\.\//,'');
-    return '../'+cleaned;
-  }
   const NON_PERSONAGGI_SLUGS=new Set(['diario','diary','xp','tabella-exp','registro-xp','archive','archivio','archives','archivio-documenti','symbols','simboli','archive-symbols','archivio-simboli','documents','documenti','archive-documents','archyve-documents','archivio-documents','documenti-archivio','loot','info-utili','sogni-visioni','extractum-ex-tenebris','__personaggi__']);
   function isBlockedPersonaggioSlug(slug,name){
     const s=slugify(slug||name||'');
@@ -177,7 +164,6 @@
       if(seen.has(item.slug))return null;
       seen.add(item.slug);
       item.type=item.type==='png'?'png':'pg';
-      item.img=rootImageSrc(item.img);
       ensureRole(item);
       return makeLinks(item);
     }).filter(Boolean);
@@ -191,9 +177,8 @@
     // Le pagine archivio/simboli/diario hanno strutture diverse: una vera scheda ha identity
     // e almeno uno tra blocchi numerici o narrativi della scheda personaggio.
     if(!identity||typeof identity!=='object'||!String(identity.name||'').trim())return false;
-    const abilitiesOk=data.abilities&&typeof data.abilities==='object'&&('FOR' in data.abilities || 'STR' in data.abilities || 'DES' in data.abilities);
-    const sheetBlocksOk=abilitiesOk || (data.combat&&typeof data.combat==='object') || Array.isArray(data.inventorySections) || Array.isArray(data.classLevels) || (data.portrait&&typeof data.portrait==='object');
-    return !!sheetBlocksOk;
+    const looksLikeSheet = data.schemaVersion || data.abilities || data.combat || data.inventorySections || data.classLevels || data.portrait;
+    return !!looksLikeSheet;
   }
   function itemFromOnlineSheet(row){
     const data=row&&row.data;
@@ -212,7 +197,7 @@
       roleSlug:slug,
       permissionRole:slug,
       desc:portrait.quote||meta.subtitle||'Personaggio salvato online.',
-      img:rootImageSrc(portrait.image||'assets/img/Thalor16k.jpg'),
+      img:portrait.image||'assets/img/Thalor16k.jpg',
       longDesc:narrative.diary||'',
       events:''
     });
@@ -221,20 +206,11 @@
     const map=new Map(sanitizePersonaggiItems(baseItems).map(x=>[x.slug,x]));
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const item=itemFromOnlineSheet(row);
-      if(!item)return;
-      const current=map.get(item.slug);
-      if(current){
-        map.set(item.slug,Object.assign({},current,{
-          type:item.type||current.type,
-          name:item.name||current.name,
-          playerName:item.playerName||current.playerName||'',
-          desc:item.desc||current.desc||'',
-          img:item.img||current.img||'assets/img/Thalor16k.jpg',
-          longDesc:item.longDesc||current.longDesc||'',
-          events:current.events||''
-        }));
-      }else{
-        map.set(item.slug,item);
+      if(item){
+        // La scheda singola online è più aggiornata del registro per immagine/descrizione/nome.
+        // Prima la recovery aggiungeva solo gli assenti: per questo i PNG nuovi/restyling non comparivano.
+        const prev=map.get(item.slug)||{};
+        map.set(item.slug,Object.assign({},prev,item,{type:item.type||prev.type||'pg'}));
       }
     });
     return Array.from(map.values());
@@ -246,35 +222,36 @@
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(sanitizePersonaggiItems(raw.items));} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
   async function readFresh(){
-    let localItems=readLocal();
+    const localItems=readLocal();
     try{
-      if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
       if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
-        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true});
-        let items=null;
+        // Online-first reale: non aspettare login/sessione e non usare il registro locale come fonte.
+        const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true,skipInit:true,timeoutMs:15000});
+        let items=[];
         let deleted=[];
         let restore=false;
         if(online&&Array.isArray(online.items)){
           deleted=Array.isArray(online.deleted)?online.deleted:[];
           restore=online.contentRestoreVersion!==CONTENT_RESTORE_VERSION;
           items=sanitizePersonaggiItems(online.items);
-        }else{
-          console.warn('Registro __personaggi__ letto ma senza items validi: provo recupero da schede online.');
-          items=sanitizePersonaggiItems(localItems);
         }
         if(window.ThalorAuth.listCharacterSheets){
           try{
-            const rows=await window.ThalorAuth.listCharacterSheets({publicRead:true,timeoutMs:12000});
+            const rows=await window.ThalorAuth.listCharacterSheets({publicRead:true,skipInit:true,timeoutMs:15000});
             items=mergeOnlineSheetItems(items,rows).filter(x=>!deleted.includes(x.slug));
           }catch(recoverErr){
             console.warn('Recupero schede online non riuscito:',recoverErr);
           }
         }
-        const cleanPayload={updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:sanitizePersonaggiItems(items),deleted};
-        state.deleted=deleted;
-        state.restoreDefaultContent=restore;
-        try{localStorage.setItem(LIST_KEY,JSON.stringify(cleanPayload));}catch(e){}
-        return applyRegistryPayload(cleanPayload);
+        if(items.length){
+          const cleanPayload={updatedAt:new Date().toISOString(),contentRestoreVersion:CONTENT_RESTORE_VERSION,items:sanitizePersonaggiItems(items),deleted};
+          state.deleted=deleted;
+          state.restoreDefaultContent=restore;
+          try{localStorage.setItem(LIST_KEY,JSON.stringify(cleanPayload));}catch(e){}
+          // Non fondere i DEFAULTS quando abbiamo dati online: il pubblico deve vedere il database, non il sito statico.
+          return sanitizePersonaggiItems(cleanPayload.items);
+        }
+        console.warn('Nessun personaggio online valido trovato: uso fallback locale/base.');
       }
     }catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}
     return localItems;
@@ -345,7 +322,7 @@
   async function canMaster(){try{if(window.ThalorAuth){await window.ThalorAuth.init(true); return !!(window.ThalorAuth.isMaster&&window.ThalorAuth.isMaster());}}catch(e){} return !window.ThalorAuth;}
   function sheetKey(slug){return SHEET_PREFIX+slug+SHEET_SUFFIX;}
   function blankSheet(item){return {schemaVersion:9,meta:{slug:item.slug,permissionRole:ensureRole(item),characterRole:item.slug,theme:item.type==='png'?'necrotic':'default',crest:item.type==='png'?'☽':'✦',subtitle:item.type==='png'?'PNG':'Personaggio',profileUrl:`dettaglio.html?id=${item.slug}`},identity:{name:item.name||'Nuovo personaggio',player:item.playerName||item.player||item.giocatore||(item.type==='png'?'Master':''),race:'',classLevel:'',alignment:'',deity:'',xp:0,level:1},appearance:{size:'',age:'',sex:'',height:'',weight:'',eyes:'',hair:'',skin:'',marks:''},portrait:{image:toSheetImg(item.img),alt:item.name||'',quote:item.desc||''},abilities:{FOR:{score:10,base:10,temp:0,bonuses:[]},DES:{score:10,base:10,temp:0,bonuses:[]},COS:{score:10,base:10,temp:0,bonuses:[]},INT:{score:10,base:10,temp:0,bonuses:[]},SAG:{score:10,base:10,temp:0,bonuses:[]},CAR:{score:10,base:10,temp:0,bonuses:[]}},combat:{hpMax:1,hpCurrent:1,hpTemp:0,nonlethal:0,stable:'No',speed:'',bab:0,grappleMisc:0,initiativeMisc:0,tempBonuses:[]},armorClass:{base:10},saves:{fortitude:{base:0,magic:0,misc:0,ability:'COS'},reflex:{base:0,magic:0,misc:0,ability:'DES'},will:{base:0,magic:0,misc:0,ability:'SAG'}},attacks:[],defenses:[],skills:[],feats:[],features:[],languages:[],conditions:[],spellcasting:{defaultAbility:'',casterLevel:1,srMisc:0,groups:[]},inventorySections:[{name:'Inventario',notes:'',items:[]}],money:{MP:0,MO:0,MA:0,MR:0},narrative:{diary:item.longDesc||item.desc||'',bonds:''},secrets:{playerVisible:'',dmNotes:'',loginRequired:true},classLevels:[{name:item.type==='png'?'PNG':'Classe',level:1,notes:''}],companions:[],changeLog:[]};}
-  function toSheetImg(src){return detailImageSrc(src).replace(/^\.\.\/assets\/img\/Thalor16k\.jpg$/,'');}
+  function toSheetImg(src){if(!src)return ''; if(src.startsWith('data:')||src.startsWith('../'))return src; return '../'+src.replace(/^\.\//,'');}
   function readSheetForItem(item){
     try{
       const raw=localStorage.getItem(sheetKey(item.slug));
@@ -375,7 +352,7 @@
   function detailHref(item){return `personaggi/dettaglio.html?id=${encodeURIComponent(item.slug)}`;}
   function renderList(){const app=$('#personaggiApp'); if(!app)return; state.items=state.items||read(); const groups={pg:state.items.filter(i=>i.type==='pg'),png:state.items.filter(i=>i.type==='png')}; app.innerHTML=`<h2 class="section-title">Personaggi</h2><p class="section-note">Ogni scheda raccoglie immagine, descrizione e background pubblico del personaggio.</p>${groupHtml('Giocanti',groups.pg)}${groupHtml('PNG',groups.png)}`; bindList(); renderPanel();}
   function groupHtml(title,items){return `<h2 class="section-title personaggi-group-title">${esc(title)}</h2><div class="character-list personaggi-list">${items.map(cardHtml).join('')||'<article class="card empty-row">Nessun personaggio.</article>'}</div>`;}
-  function cardHtml(item){const hasSheet=!!(item.sheet||localStorage.getItem(sheetKey(item.slug))); const showSheet=item.type==='pg'||state.master; return `<article class="card character-card personaggi-card ${item.slug==='abraxas'?'abraxas':''}" data-personaggio="${esc(item.slug)}"><div class="personaggi-card-main"><img alt="${esc(item.name)}" src="${esc(rootImageSrc(item.img))}" loading="lazy" decoding="async"><div class="content"><span class="tag" title="${esc(permissionNote(item))}">${item.type==='png'?'PNG':'PG'}</span><h3>${richText(item.name)}</h3><p>${richText(item.desc||'')}</p></div></div><a class="card-overlay-link personaggi-card-overlay" href="${esc(detailHref(item))}" aria-label="Apri ${esc(item.name)}"></a><div class="personaggi-card-actions">${showSheet?(hasSheet?`<a class="button mini-sheet-link" href="${esc(sheetHref(item))}">Apri scheda</a>`:`<button class="button mini-sheet-link create-png-sheet" type="button" data-create-sheet="${esc(item.slug)}">Crea scheda</button>`):''}${state.master?`<button class="button ghost-button edit-personaggio" type="button" data-edit-personaggio="${esc(item.slug)}">Modifica</button><button class="button ghost-button delete-sheet-card" type="button" data-delete-sheet="${esc(item.slug)}">Elimina scheda</button><button class="button ghost-button delete-personaggio-card" type="button" data-delete-personaggio="${esc(item.slug)}">Elimina</button>`:''}</div></article>`;}
+  function cardHtml(item){const hasSheet=!!(item.sheet||localStorage.getItem(sheetKey(item.slug))); const showSheet=item.type==='pg'||state.master; return `<article class="card character-card personaggi-card ${item.slug==='abraxas'?'abraxas':''}" data-personaggio="${esc(item.slug)}"><div class="personaggi-card-main"><img alt="${esc(item.name)}" src="${esc(item.img||'assets/img/Thalor16k.jpg')}" loading="lazy" decoding="async"><div class="content"><span class="tag" title="${esc(permissionNote(item))}">${item.type==='png'?'PNG':'PG'}</span><h3>${richText(item.name)}</h3><p>${richText(item.desc||'')}</p></div></div><a class="card-overlay-link personaggi-card-overlay" href="${esc(detailHref(item))}" aria-label="Apri ${esc(item.name)}"></a><div class="personaggi-card-actions">${showSheet?(hasSheet?`<a class="button mini-sheet-link" href="${esc(sheetHref(item))}">Apri scheda</a>`:`<button class="button mini-sheet-link create-png-sheet" type="button" data-create-sheet="${esc(item.slug)}">Crea scheda</button>`):''}${state.master?`<button class="button ghost-button edit-personaggio" type="button" data-edit-personaggio="${esc(item.slug)}">Modifica</button><button class="button ghost-button delete-sheet-card" type="button" data-delete-sheet="${esc(item.slug)}">Elimina scheda</button><button class="button ghost-button delete-personaggio-card" type="button" data-delete-personaggio="${esc(item.slug)}">Elimina</button>`:''}</div></article>`;}
   function bindList(){ $$('.create-png-sheet').forEach(b=>b.onclick=async()=>{const item=state.items.find(x=>x.slug===b.dataset.createSheet); if(!item)return; const sheetData=ensureSheet(item,false); if(!(await saveOnlineSheet(item,sheetData)))return; if(!(await save()))return; renderList();}); $$('.edit-personaggio').forEach(b=>b.onclick=()=>openEditor(state.items.find(x=>x.slug===b.dataset.editPersonaggio))); $$('.delete-personaggio-card').forEach(b=>b.onclick=()=>removePersonaggio(state.items.find(x=>x.slug===b.dataset.deletePersonaggio))); $$('.delete-sheet-card').forEach(b=>b.onclick=()=>deleteSheetOnly(state.items.find(x=>x.slug===b.dataset.deleteSheet)));  }
   function renderPanel(){if(!state.master)return; if($('#personaggiMasterDock'))return; const dock=document.createElement('nav'); dock.id='personaggiMasterDock'; dock.className='personaggi-master-dock places-floating-actions'; dock.innerHTML=`<button type="button" class="places-float-toggle" id="personaggiToggleEdit" aria-expanded="false">✦</button><div class="places-float-menu personaggi-master-tools"><button type="button" id="addPg">+ PG</button><button type="button" id="addPng">+ PNG</button></div>`; document.body.appendChild(dock); const toggle=$('#personaggiToggleEdit'); toggle.onclick=()=>{const open=!dock.classList.contains('open'); dock.classList.toggle('open',open); toggle.setAttribute('aria-expanded',open?'true':'false'); state.editing=open; document.body.classList.toggle('personaggi-editing',open);}; $('#addPg').onclick=()=>newItem('pg'); $('#addPng').onclick=()=>newItem('png');}
   function uniqueSlug(base){let slug=slugify(base); let n=2; while(state.items.some(i=>i.slug===slug)){slug=slugify(base)+'-'+n++;} return slug;}
@@ -383,7 +360,7 @@
   function newItem(type){state.items=state.items||read(); const name=type==='pg'?'Nuovo personaggio':'Nuovo PNG'; const slug=uniqueSlug(name); const item=makeLinks({type,slug,name,playerName:'',roleSlug:slug,permissionRole:slug,desc:'Nuova descrizione breve.',img:'assets/img/Thalor16k.jpg',longDesc:'',events:''}); openEditor(item,{isNew:true});}
   function openEditor(item,opts={}){if(!item)return; let modal=document.createElement('div'); modal.className='personaggi-modal-backdrop'; modal.innerHTML=`<form class="personaggi-modal panel"><header><h2>${opts.isNew?'Nuovo personaggio':esc(item.name||'Personaggio')}</h2><button type="button" class="modal-x">×</button></header><div class="personaggi-form-grid"><label>Tipo<select name="type"><option value="pg" ${item.type==='pg'?'selected':''}>PG</option><option value="png" ${item.type==='png'?'selected':''}>PNG</option></select></label><label>Nome<input name="name" value="${esc(item.name||'')}" required></label><label>Nome giocatore<input name="playerName" value="${esc(item.playerName||item.player||item.giocatore||'')}" placeholder="Da associare alla scheda"></label><label>Slug<input name="slug" value="${esc(item.slug||'')}"></label><label>Ruolo permesso<input name="roleSlug" value="${esc(item.roleSlug||item.slug||'')}" readonly title="Questo valore segue lo slug: assegna questo character_slug nei permessi Supabase del giocatore."></label><label>Pagina descrizione<input name="href" value="${esc(item.href||'')}"></label><label class="wide">Descrizione breve<textarea name="desc">${esc(item.desc||'')}</textarea></label><label class="wide">Descrizione pagina<textarea name="longDesc">${esc(item.longDesc||htmlToEditText(item.longHtml)||'')}</textarea></label><label class="wide">Eventi in campagna<textarea name="events">${esc(item.events||htmlToEditText(item.eventsHtml)||'')}</textarea></label><label class="wide">Immagine<input type="file" name="imgFile" accept="image/*"><input name="img" value="${esc(item.img||'')}"></label></div><footer>${opts.isNew?'':`<button type="button" class="button ghost-button delete-personaggio">Elimina</button>`}<button type="button" class="button ghost-button ensure-sheet">Crea/Aggiorna scheda vuota</button><button type="submit" class="button save-button">Salva</button></footer></form>`; document.body.appendChild(modal); const form=$('form',modal); $('.modal-x',modal).onclick=()=>modal.remove(); const del=$('.delete-personaggio',modal); if(del)del.onclick=()=>{modal.remove(); removePersonaggio(item);}; $('.ensure-sheet',modal).onclick=async()=>{const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); makeLinks(item); const sheetData=ensureSheet(item,false); if(!(await saveOnlineSheet(item,sheetData)))return; if(!(await save()))return; if($('#personaggiApp')){renderList();} alert('Scheda personaggio creata e salvata online. Permesso da assegnare al giocatore: '+item.slug);}; $('[name="imgFile"]',form).onchange=async e=>{const file=e.target.files&&e.target.files[0]; if(!file)return; const imgInput=$('[name="img"]',form); const saveBtn=$('.save-button',form); try{ if(saveBtn)saveBtn.disabled=true; imgInput.value='Ottimizzazione immagine in corso…'; imgInput.dataset.pendingImage='1'; const optimized=await thalorOptimizeImage(file,{maxSide:1200,quality:0.74,maxBytes:650000}); imgInput.value=optimized; delete imgInput.dataset.pendingImage; }catch(err){ console.warn('Ottimizzazione immagine non riuscita:',err); alert('Non riesco a preparare questa immagine per il salvataggio. Prova a convertirla in JPG/WebP o a ridurla.'); imgInput.value=''; delete imgInput.dataset.pendingImage; }finally{ if(saveBtn)saveBtn.disabled=false; }}; form.onsubmit=async e=>{e.preventDefault(); const old=item.slug; collectForm(form,item,old); upsertPersonaggio(item,old); if(old!==item.slug){const oldData=localStorage.getItem(sheetKey(old)); if(oldData&&!localStorage.getItem(sheetKey(item.slug))){localStorage.setItem(sheetKey(item.slug),oldData); localStorage.removeItem(sheetKey(old));}} makeLinks(item); const sheetData=ensureSheet(item,false); syncSheetRole(item); if(!(await saveOnlineSheet(item,readSheetForItem(item)||sheetData)))return; if(!(await save()))return; modal.remove(); if($('#personaggiApp')){renderList();}else if($('#personaggioDetailApp')){initDetail();} };}
   function upsertPersonaggio(item,oldSlug){state.items=state.items||read(); makeLinks(item); const idx=state.items.findIndex(x=>x.slug===(oldSlug||item.slug)); if(idx>=0)state.items[idx]=Object.assign({},item); else state.items.push(Object.assign({},item)); state.deleted=(state.deleted||[]).filter(x=>x!==item.slug);}
-  function collectForm(form,item,oldSlug){const fd=new FormData(form); item.type=fd.get('type')||'pg'; item.name=fd.get('name')||'Nuovo personaggio'; const desired=slugify(fd.get('slug')||item.name); item.slug=(oldSlug&&desired!==oldSlug&&state.items.some(i=>i!==item&&i.slug===desired))?uniqueSlug(desired):desired; item.playerName=fd.get('playerName')||''; ensureRole(item); makeLinks(item); item.desc=fd.get('desc')||''; item.longDesc=fd.get('longDesc')||''; item.events=fd.get('events')||''; item.longHtml=''; item.eventsHtml=''; item.img=rootImageSrc(fd.get('img')||''); return item;}
+  function collectForm(form,item,oldSlug){const fd=new FormData(form); item.type=fd.get('type')||'pg'; item.name=fd.get('name')||'Nuovo personaggio'; const desired=slugify(fd.get('slug')||item.name); item.slug=(oldSlug&&desired!==oldSlug&&state.items.some(i=>i!==item&&i.slug===desired))?uniqueSlug(desired):desired; item.playerName=fd.get('playerName')||''; ensureRole(item); makeLinks(item); item.desc=fd.get('desc')||''; item.longDesc=fd.get('longDesc')||''; item.events=fd.get('events')||''; item.longHtml=''; item.eventsHtml=''; item.img=fd.get('img')||''; return item;}
   let personaggiRefreshBusy=false;
   let personaggiLastRefresh=0;
   async function refreshPersonaggiList(force=false){
@@ -397,7 +374,7 @@
       state.master=await canMaster();
       state.items=await readFresh();
       personaggiLastRefresh=Date.now();
-      if(state.restoreDefaultContent&&state.master)await save();
+      if(state.restoreDefaultContent)await save();
       renderList();
       if(wasMaster!==state.master){document.body.classList.toggle('personaggi-editing',false);}
     }catch(e){
@@ -418,7 +395,7 @@
   function paragraphs(text){return String(text||'').split(/\n{2,}/).map(x=>x.trim()).filter(Boolean).map(p=>`<p>${richText(p)}</p>`).join('');}
   function htmlToEditText(html){const d=document.createElement('div'); d.innerHTML=String(html||''); return Array.from(d.children).map(el=>el.textContent.trim()).filter(Boolean).join('\n\n');}
   function richBlock(html,text){return html ? String(html) : paragraphs(text||'');}
-  function detailImage(item){return detailImageSrc(item&&item.img);}
+  function detailImage(item){const src=item.img||'assets/img/Thalor16k.jpg'; if(src.startsWith('data:'))return src; if(src.startsWith('../'))return src; return '../'+src.replace(/^\.\//,'');}
   function renderDetailPanel(app,item){
     const tag=item.tag || (item.type==='png'?'PNG':'Personaggio giocante');
     const sheetButton=(item.type==='pg'||state.master)?`<a class="button" href="${esc('scheda.html?character='+encodeURIComponent(item.slug))}">Accedi alla scheda</a>`:'';
@@ -426,17 +403,6 @@
     app.innerHTML=`<section class="hero character-hero personaggio-dedicated-hero"><span class="tag">${richText(tag)}</span><h1 class="hero-title">${richText(item.name)}</h1><p class="hero-subtitle">${richText(item.desc||'')}</p></section><p class="personaggio-detail-actions personaggio-detail-actions-top">${sheetButton}<a class="button" href="../personaggi.html">Torna ai personaggi</a></p><section class="character-layout personaggio-dedicated-layout"><aside class="panel character-portrait personaggio-dedicated-portrait ${item.slug==='abraxas'?'abraxas':''}"><img src="${esc(detailImage(item))}" alt="${esc(item.name)}" loading="lazy" decoding="async"></aside><article class="panel lore-section character-text personaggio-dedicated-text">${richBlock(item.longHtml||'', item.longDesc||item.desc||'')}</article></section><section class="panel campaign-events personaggio-dedicated-events"><h2>Eventi in campagna</h2>${eventsHtml}</section><footer>Thalor</footer>`;
   }
 
-  async function recoverItemFromOnlineSheet(id){
-    if(!id||!window.ThalorAuth||!window.ThalorAuth.loadCharacter)return null;
-    try{
-      const data=await window.ThalorAuth.loadCharacter(id,null,{publicRead:true,timeoutMs:12000});
-      const item=itemFromOnlineSheet({slug:id,data});
-      return item;
-    }catch(e){
-      console.warn('Recupero dettaglio da scheda online non riuscito:',e);
-      return null;
-    }
-  }
   function recoverItemFromSheet(id){
     if(!id)return null;
     const raw=localStorage.getItem(sheetKey(id));
@@ -453,7 +419,7 @@
         roleSlug:id,
         permissionRole:id,
         desc:data.portrait?.quote||'Personaggio creato dal menu Master.',
-        img:rootImageSrc(data.portrait?.image||'assets/img/Thalor16k.jpg'),
+        img:data.portrait?.image||'assets/img/Thalor16k.jpg',
         href:`personaggi/dettaglio.html?id=${id}`,
         sheet:`personaggi/scheda.html?character=${encodeURIComponent(id)}`,
         longDesc:data.narrative?.diary||'',
@@ -469,16 +435,10 @@
     const qs=new URLSearchParams(location.search);
     const id=qs.get('id')||qs.get('character')||qs.get('slug')||'';
     state.items=await readFresh();
-    if(state.restoreDefaultContent&&state.master)await save();
+    if(state.restoreDefaultContent)await save();
     let item=state.items.find(x=>x.slug===id);
-    if(!item)item=await recoverItemFromOnlineSheet(id);
-    if(!item&&state.master)item=recoverItemFromSheet(id);
-    if(!item&&id&&state.master){
-      item=makeLinks({type:'pg',slug:id,name:String(id).replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase()),playerName:'',roleSlug:id,permissionRole:id,desc:'Pagina creata automaticamente dal collegamento.',img:'assets/img/Thalor16k.jpg',longDesc:'',events:''});
-      state.items.push(item);
-      await save();
-    }
-    if(!item){app.innerHTML='<section class="panel profile-text"><h1>Personaggio non trovato</h1><p>Non ho trovato una scheda pubblica online per questo personaggio. Controlla che sia stata salvata su Supabase.</p><p><a class="button" href="../personaggi.html">Torna ai Personaggi</a></p></section>';return;}
+    if(!item)item=recoverItemFromSheet(id);
+    if(!item){app.innerHTML='<section class="panel profile-text"><h1>Personaggio non trovato</h1><p>Questa scheda non risulta pubblicata online oppure il registro pubblico non è leggibile.</p><p><a class="button" href="../personaggi.html">Torna ai Personaggi</a></p></section>';return;}
     document.title='Thalor — '+item.name;
     document.body.classList.add('npc-page','personaggio-dedicated-body');
     renderDetailPanel(app,item);

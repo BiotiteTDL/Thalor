@@ -1318,6 +1318,7 @@ function registryBlankSheetFromList(slug){
     const fallbackName=String(slug||'Nuovo personaggio').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
     const safeItem=item||{type:'pg',slug,name:fallbackName,playerName:'',desc:'Scheda creata automaticamente dal collegamento.',img:'',longDesc:''};
     const data={schemaVersion:9,meta:{slug,permissionRole:slug,characterRole:slug,theme:safeItem.type==='png'?'necrotic':'default',crest:safeItem.type==='png'?'☽':'✦',subtitle:safeItem.type==='png'?'PNG':'Personaggio',profileUrl:`dettaglio.html?id=${slug}`},identity:{name:safeItem.name||'Nuovo personaggio',player:safeItem.playerName||safeItem.player||safeItem.giocatore||'',race:'',classLevel:'',alignment:'',deity:'',xp:0,level:1},appearance:{size:'',age:'',sex:'',height:'',weight:'',eyes:'',hair:'',skin:'',marks:''},portrait:{image:safeItem.img&&String(safeItem.img).startsWith('data:')?safeItem.img:(safeItem.img?('../'+String(safeItem.img).replace(/^\.\//,'')):''),alt:safeItem.name||'',quote:safeItem.desc||''},abilities:{FOR:{score:10,base:10,temp:0,bonuses:[]},DES:{score:10,base:10,temp:0,bonuses:[]},COS:{score:10,base:10,temp:0,bonuses:[]},INT:{score:10,base:10,temp:0,bonuses:[]},SAG:{score:10,base:10,temp:0,bonuses:[]},CAR:{score:10,base:10,temp:0,bonuses:[]}},combat:{hpMax:1,hpCurrent:1,hpTemp:0,nonlethal:0,stable:'No',speed:'',bab:0,grappleMisc:0,initiativeMisc:0,tempBonuses:[]},armorClass:{base:10},saves:{fortitude:{base:0,magic:0,misc:0,ability:'COS'},reflex:{base:0,magic:0,misc:0,ability:'DES'},will:{base:0,magic:0,misc:0,ability:'SAG'}},attacks:[],defenses:[],skills:[],feats:[],features:[],languages:[],conditions:[],spellcasting:{defaultAbility:'',casterLevel:1,srMisc:0,groups:[]},inventorySections:[{name:'Inventario',notes:'',items:[]}],money:{MP:0,MO:0,MA:0,MR:0},narrative:{diary:safeItem.longDesc||safeItem.desc||'',bonds:''},secrets:{playerVisible:'',dmNotes:'',loginRequired:true},classLevels:[{name:safeItem.type==='png'?'PNG':'Classe',level:1,notes:''}],companions:[],changeLog:[]};
+    localStorage.setItem(`thalor.sheet.${slug}.v5`,JSON.stringify(data));
     return data;
   }catch(e){return null;}
 }
@@ -1332,28 +1333,39 @@ function registryBlankSheetFromList(slug){
 (async function startSheet(){
   try{
     if(authAvailable()) await window.ThalorAuth.init();
-    let remoteSheet=null;
-    if(authAvailable() && window.ThalorAuth.state && window.ThalorAuth.state.configured && slug && navigator.onLine!==false){
-      try{ remoteSheet=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,timeoutMs:12000}); }
-      catch(e){ console.warn('Caricamento online scheda non riuscito:', e); remoteSheet=null; }
-    }
     let [base,xpBase,spells,feats,features]=await Promise.all([loadJson(`../assets/data/characters/${slug}.json`),loadJson(`../assets/data/xp.json`),loadJson(`../assets/data/compendium/spells.json`),loadJson(`../assets/data/compendium/feats.json`),loadJson(`../assets/data/compendium/features.json`)]);
     let xp=await loadUnifiedXpData(xpBase);
-    base=remoteSheet||base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
+    base=base||(window.THALOR_CHARACTER_DATA&&window.THALOR_CHARACTER_DATA[slug]);
+
+    let remoteData=null;
+    if(slug && authAvailable() && window.ThalorAuth.state && window.ThalorAuth.state.configured && navigator.onLine!==false){
+      try{
+        // Lettura pubblica vera: prima Supabase, poi eventualmente statico/locale.
+        remoteData=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true,skipInit:true,timeoutMs:15000});
+      }catch(e){
+        console.warn('Caricamento pubblico scheda online non riuscito:', e);
+      }
+    }
+
     const localFound=firstValidLocal([parentStorageKey,...oldKeys]);
-    if(!base && sheetCanEdit() && localFound) base=localFound.data;
-    if(!base && slug) base=registryBlankSheetFromList(slug);
-    if(!base && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
-    if(!base)throw new Error('Dati scheda non trovati.');
-    window.__thalorParentBase=normalize(base);
+    if(!base && localFound) base=localFound.data;
+    if(!base && !remoteData && slug) base=registryBlankSheetFromList(slug);
+    if(!base && !remoteData && !slug)throw new Error('Slug scheda mancante. Apri la scheda dal menu Personaggi.');
+    if(!base && !remoteData)throw new Error('Dati scheda non trovati.');
+
+    window.__thalorParentBase=normalize(remoteData||base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
-    let sheetData=remoteSheet?normalize(remoteSheet):chooseSheetData(base, localFound);
-    if(remoteSheet){
+    let sheetData=remoteData ? normalize(remoteData) : chooseSheetData(base, localFound);
+
+    // Cache solo dopo una lettura online riuscita; non far mai vincere una scheda base vecchia su browser fresh.
+    if(remoteData){
       try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     }
+
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}
 })();
+
 })()
 
 document.addEventListener('DOMContentLoaded', ()=>{

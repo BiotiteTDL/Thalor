@@ -525,10 +525,12 @@
   }
 
   async function loadCharacter(slug, fallback, options={}){
-    // Le letture delle schede devono essere pubbliche e sempre fresche.
-    // Se un utente è loggato ma non ha poteri, alcune policy possono limitare il token authenticated:
-    // per la sola lettura usiamo quindi sempre l'anon key, che è quella coperta dalla policy SELECT pubblica.
-    if(!options.skipInit) await init();
+    // Le letture pubbliche NON devono dipendere dallo stato login/auth.
+    // Su browser fresh o mobile la chiamata auth.getSession può ritardare/fallire e far cadere
+    // il sito sulla copia statica. Per publicRead leggiamo direttamente via REST anon.
+    // Lettura online-first: non aspettare mai l'auth per leggere contenuti pubblici.
+    // L'auth serve per modificare, non per mostrare il sito ai visitatori.
+    if(options.requireAuth && !options.skipInit) await init();
     if(!state.configured) return fallback;
 
     try{
@@ -559,7 +561,9 @@
 
 
   async function listCharacterSheets(options={}){
-    if(!options.skipInit) await init();
+    // Come sopra: per la lista pubblica non aspettare auth/sessione.
+    // Lista pubblica: non aspettare login/sessione.
+    if(options.requireAuth && !options.skipInit) await init();
     if(!state.configured) return [];
     try{
       const base = restBaseUrl();
