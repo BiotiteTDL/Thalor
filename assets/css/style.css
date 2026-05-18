@@ -10549,3 +10549,45 @@ body.tabletop-display-mode .tabletop-master-workspace{
     padding:24px 18px!important;
   }
 }
+
+
+/* v241 — Tavolo Master: Display pulito + fullscreen controllabile dal Master */
+html.tabletop-display-mode,
+body.tabletop-display-mode{
+  width:100vw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  min-height:100dvh!important;
+  margin:0!important;
+  padding:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+}
+body.tabletop-display-mode #tabletopApp,
+body.tabletop-display-mode .tabletop-page,
+body.tabletop-display-mode .tabletop-shell,
+body.tabletop-display-mode .tabletop-master-workspace,
+body.tabletop-display-mode .tabletop-stage-card{
+  position:fixed!important;
+  inset:0!important;
+  width:100vw!important;
+  height:100vh!important;
+  height:100dvh!important;
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  outline:0!important;
+  overflow:hidden!important;
+  background:#000!important;
+  box-shadow:none!important;
+}
+body.tabletop-display-mode .tabletop-stage{
+  left:50%!important;
+  top:50%!important;
+  transform:translate(-50%,-50%) scale(var(--stage-fit,1))!important;
+}
+body.tabletop-display-mode .topbar,
+body.tabletop-display-mode .tabletop-hero,
+body.tabletop-display-mode .tabletop-controls{
+  display:none!important;
+}
