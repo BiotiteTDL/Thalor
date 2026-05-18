@@ -118,7 +118,7 @@ function bind(data){
 (async function start(){
   const fallback=staticFallback();let data=fallback;let freshLoaded=false;
   try{const fetched=await fetch('../assets/data/xp.json',{cache:'no-store'}).then(r=>r.ok?r.json():null);if(meaningful(fetched))data=fetched;}catch(e){}
-  try{if(authAvailable())await window.ThalorAuth.init();if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await window.ThalorAuth.loadCharacter(slug,null);if(meaningful(online)){data=online;freshLoaded=true;localStorage.setItem(storageKey,JSON.stringify(normalize(data)));}}}
+  try{if(authAvailable()&&window.ThalorAuth.state.configured&&navigator.onLine!==false){const online=await window.ThalorAuth.loadCharacter(slug,null,{publicRead:true});if(meaningful(online)){data=online;freshLoaded=true;localStorage.setItem(storageKey,JSON.stringify(normalize(data)));}}}
   catch(e){console.warn('XP load online:',e);}
   if(!freshLoaded){
     try{const local=localStorage.getItem(storageKey);if(local){const parsed=JSON.parse(local);if(meaningful(parsed))data=parsed;}}

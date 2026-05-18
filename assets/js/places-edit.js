@@ -119,9 +119,8 @@ async function loadFresh(){
   let data = JSON.parse(JSON.stringify(FALLBACK));
   let freshLoaded = false;
   try{
-    if(window.ThalorAuth?.init) await window.ThalorAuth.init();
     if(window.ThalorAuth?.state?.configured && navigator.onLine !== false){
-      const online = await window.ThalorAuth.loadCharacter(PLACES_SLUG, null);
+      const online = await window.ThalorAuth.loadCharacter(PLACES_SLUG, null,{publicRead:true});
       if(online && Array.isArray(online.places)){
         data = enrichData(online); freshLoaded = true;
         try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }catch(e){}

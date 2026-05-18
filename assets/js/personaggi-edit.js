@@ -206,23 +206,7 @@
     const map=new Map(sanitizePersonaggiItems(baseItems).map(x=>[x.slug,x]));
     (Array.isArray(rows)?rows:[]).forEach(row=>{
       const item=itemFromOnlineSheet(row);
-      if(!item)return;
-      const prev=map.get(item.slug);
-      if(prev){
-        // La scheda online è più fresca della card del registro/statico: aggiorna soprattutto immagine e descrizione.
-        map.set(item.slug,Object.assign({},prev,{
-          name:item.name||prev.name,
-          desc:item.desc||prev.desc,
-          img:item.img||prev.img,
-          playerName:item.playerName||prev.playerName,
-          roleSlug:item.roleSlug||prev.roleSlug,
-          permissionRole:item.permissionRole||prev.permissionRole,
-          href:prev.href||item.href,
-          sheet:prev.sheet||item.sheet
-        }));
-      }else{
-        map.set(item.slug,item);
-      }
+      if(item&&!map.has(item.slug))map.set(item.slug,item);
     });
     return Array.from(map.values());
   }
@@ -233,9 +217,9 @@
   function applyRegistryPayload(raw){if(raw&&Array.isArray(raw.items)){state.deleted=Array.isArray(raw.deleted)?raw.deleted:[]; state.restoreDefaultContent=raw.contentRestoreVersion!==CONTENT_RESTORE_VERSION; return mergeDefaults(sanitizePersonaggiItems(raw.items));} state.deleted=[]; state.restoreDefaultContent=false; return mergeDefaults([]);}
   function readLocal(){try{return applyRegistryPayload(JSON.parse(localStorage.getItem(LIST_KEY)||'null'));}catch(e){return applyRegistryPayload(null);}}
   async function readFresh(){
-    let localItems=readLocal();
+    // Online-first pubblico: un visitatore mai loggato deve vedere Supabase, non la copia base/statica.
+    let localItems=null;
     try{
-      if(window.ThalorAuth&&window.ThalorAuth.init){await window.ThalorAuth.init();}
       if(window.ThalorAuth&&window.ThalorAuth.state&&window.ThalorAuth.state.configured&&navigator.onLine!==false){
         const online=await window.ThalorAuth.loadCharacter(REGISTRY_SLUG,null,{publicRead:true});
         let items=null;
@@ -247,7 +231,7 @@
           items=sanitizePersonaggiItems(online.items);
         }else{
           console.warn('Registro __personaggi__ letto ma senza items validi: provo recupero da schede online.');
-          items=sanitizePersonaggiItems(localItems);
+          items=[];
         }
         if(window.ThalorAuth.listCharacterSheets){
           try{
@@ -264,6 +248,7 @@
         return applyRegistryPayload(cleanPayload);
       }
     }catch(e){console.warn('Registro personaggi online non disponibile, uso fallback locale:',e);}
+    localItems=readLocal();
     return localItems;
   }
   function isDataImage(v){return /^data:image\//i.test(String(v||''));}
@@ -477,7 +462,7 @@
     $('#detailEditPersonaggio').onclick=()=>openEditor(item);
   }
   if($('#personaggiApp')){bindAutoRefresh(); initList();}
-  if($('#personaggioDetailApp')) canMaster().then(m=>{state.master=m; initDetail();});
+  if($('#personaggioDetailApp')){ initDetail().then(()=>canMaster().then(m=>{state.master=m; const app=$('#personaggioDetailApp'); const qs=new URLSearchParams(location.search); const id=qs.get('id')||qs.get('character')||qs.get('slug')||''; const item=(state.items||[]).find(x=>x.slug===id); if(m&&item)renderDetailDock(item,app); }).catch(()=>{})); }
 })();
 
 async function thalorOptimizeImage(file,opts={}){

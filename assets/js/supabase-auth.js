@@ -185,45 +185,6 @@
       .finally(() => clearTimeout(timer));
   }
 
-  function publicReadHeaders(){
-    const headers = {
-      'apikey': cfg.anonKey,
-      'Accept': 'application/json',
-      'Cache-Control': 'no-cache, no-store, max-age=0',
-      'Pragma': 'no-cache'
-    };
-    // Le nuove chiavi Supabase "sb_publishable_..." NON sono JWT: se le mettiamo
-    // in Authorization: Bearer, PostgREST può rifiutare la richiesta e il sito
-    // ricade sul contenuto statico. Per letture pubbliche basta l'apikey.
-    const key = String(cfg.anonKey || '');
-    if(key && !/^sb_publishable_/i.test(key) && key.split('.').length === 3){
-      headers['Authorization'] = 'Bearer ' + key;
-    }
-    return headers;
-  }
-
-  async function publicRestGet(url, timeoutMs, label){
-    let result = await timeoutFetch(url, {
-      method: 'GET',
-      headers: publicReadHeaders(),
-      cache: 'no-store'
-    }, timeoutMs || 12000, label || 'Lettura pubblica Supabase');
-
-    // Fallback di compatibilità: se un progetto richiede comunque Authorization con
-    // una vecchia anon JWT, ritentiamo una sola volta con Bearer. Con sb_publishable
-    // questo ramo resta spento.
-    if(!result.response.ok){
-      const key = String(cfg.anonKey || '');
-      if(key && !/^sb_publishable_/i.test(key) && !('Authorization' in publicReadHeaders())){
-        const h = publicReadHeaders();
-        h.Authorization = 'Bearer ' + key;
-        result = await timeoutFetch(url, { method:'GET', headers:h, cache:'no-store' }, timeoutMs || 12000, label || 'Lettura pubblica Supabase');
-      }
-    }
-    return result;
-  }
-
-
   async function directRestUpsertCharacter(slug, row){
     const token = state.session?.access_token || null;
     if(!token) throw new Error('Token sessione assente: rifai login e riprova.');
@@ -564,46 +525,62 @@
   }
 
   async function loadCharacter(slug, fallback, options={}){
-    // Lettura pubblica vera: NON deve dipendere da login/sessione.
-    // Da browser fresh non c'è nessuna sessione, ma il sito deve comunque leggere Supabase.
-    if(!options.publicRead && !options.skipInit) await init();
+    // LETTURA PUBBLICA ONLINE-FIRST.
+    // Non deve dipendere da login, sessione, profilo o permessi: un browser fresh deve poter
+    // leggere i contenuti pubblici prima di qualsiasi fallback statico/localStorage.
     if(!state.configured) return fallback;
 
-    try{
-      const base = restBaseUrl();
-      const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
-      const { response, body } = await publicRestGet(url, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
-      if(!response.ok){
+    const base = restBaseUrl();
+    const url = base + '/character_sheets?select=data&slug=eq.' + encodeURIComponent(slug) + '&limit=1&_ts=' + Date.now();
+    const headersBase = {
+      'apikey': cfg.anonKey,
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      'Pragma': 'no-cache'
+    };
+    const attempts = [headersBase, Object.assign({}, headersBase, {'Authorization':'Bearer ' + cfg.anonKey})];
+
+    for(const headers of attempts){
+      try{
+        const { response, body } = await timeoutFetch(url, { method:'GET', headers, cache:'no-store' }, options.timeoutMs || 12000, 'Lettura pubblica Supabase');
+        if(response.ok){
+          const rows = body ? JSON.parse(body) : [];
+          return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
+        }
         console.warn('Supabase loadCharacter HTTP:', response.status, body);
-        return fallback;
+      }catch(err){
+        console.warn('Supabase loadCharacter:', err);
       }
-      const rows = body ? JSON.parse(body) : [];
-      return rows && rows[0] && rows[0].data ? rows[0].data : fallback;
-    }catch(err){
-      console.warn('Supabase loadCharacter:', err);
-      return fallback;
     }
+    return fallback;
   }
 
 
   async function listCharacterSheets(options={}){
-    // Lettura pubblica vera: non aspettare auth.getSession su utenti anonimi.
-    if(!options.publicRead && !options.skipInit) await init();
+    // Lista pubblica online-first: niente init/sessione prima della SELECT.
     if(!state.configured) return [];
-    try{
-      const base = restBaseUrl();
-      const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
-      const { response, body } = await publicRestGet(url, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
-      if(!response.ok){
+    const base = restBaseUrl();
+    const url = base + '/character_sheets?select=slug,data&slug=neq.__personaggi__&limit=500&_ts=' + Date.now();
+    const headersBase = {
+      'apikey': cfg.anonKey,
+      'Accept': 'application/json',
+      'Cache-Control': 'no-cache, no-store, max-age=0',
+      'Pragma': 'no-cache'
+    };
+    const attempts = [headersBase, Object.assign({}, headersBase, {'Authorization':'Bearer ' + cfg.anonKey})];
+    for(const headers of attempts){
+      try{
+        const { response, body } = await timeoutFetch(url, { method:'GET', headers, cache:'no-store' }, options.timeoutMs || 12000, 'Lista pubblica schede Supabase');
+        if(response.ok){
+          const rows = body ? JSON.parse(body) : [];
+          return Array.isArray(rows) ? rows : [];
+        }
         console.warn('Supabase listCharacterSheets HTTP:', response.status, body);
-        return [];
+      }catch(err){
+        console.warn('Supabase listCharacterSheets:', err);
       }
-      const rows = body ? JSON.parse(body) : [];
-      return Array.isArray(rows) ? rows : [];
-    }catch(err){
-      console.warn('Supabase listCharacterSheets:', err);
-      return [];
     }
+    return [];
   }
 
 
