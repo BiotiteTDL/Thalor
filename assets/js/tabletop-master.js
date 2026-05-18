@@ -4,7 +4,6 @@
   const params=new URLSearchParams(location.search);
   const isDisplay=params.get('display')==='1';
   const channel=('BroadcastChannel' in window)?new BroadcastChannel('thalor-tabletop-display'):null;
-  let displayWindow=null;
   const STORAGE='thalor.tabletop.workspace.v3';
   const OLD_STORAGE='thalor.tabletop.workspace.v2';
   const LEGACY='thalor.tabletop.scene.v1';
@@ -207,7 +206,7 @@
     app.innerHTML=`
       <section class="tabletop-hero sheet-theme-panel">
         <div><span class="tag">Area riservata Master</span><h1 class="section-title">Tavolo Master</h1><p class="section-note">Mappe, griglia, nebbia, token, barriere visive ed effetti scenici. Il Display è pensato per secondo monitor/TV.</p></div>
-        <div class="tabletop-hero-actions"><button class="button" data-open-display>Apri Display</button><button class="button ghost-button" data-display-fullscreen-master>Fullscreen Display</button><button class="button ghost-button" data-save-group>Salva gruppo</button><button class="button ghost-button" data-save-group-as>Salva come gruppo</button><label class="button ghost-button tabletop-import-btn">Carica gruppo<input type="file" accept="application/json,.json" data-import-scenes hidden></label><button class="button ghost-button" data-save>Salva locale</button><button class="button danger-button" data-reset>Reset totale</button></div>
+        <div class="tabletop-hero-actions"><button class="button" data-open-display>Apri Display</button><button class="button ghost-button" data-save-group>Salva gruppo</button><button class="button ghost-button" data-save-group-as>Salva come gruppo</button><label class="button ghost-button tabletop-import-btn">Carica gruppo<input type="file" accept="application/json,.json" data-import-scenes hidden></label><button class="button ghost-button" data-save>Salva locale</button><button class="button danger-button" data-reset>Reset totale</button></div>
       </section>
       <section class="tabletop-shell">
         <aside class="tabletop-controls sheet-theme-panel">
@@ -485,9 +484,8 @@
     const s=currentScene();const stage=app.querySelector('[data-stage]');
     app.querySelectorAll('[data-accordion]').forEach(d=>d.addEventListener('toggle',()=>{accordionState[d.dataset.accordion]=d.open;try{sessionStorage.setItem('thalor.tabletop.accordions',JSON.stringify(accordionState));}catch(e){}}));
     app.querySelector('.tabletop-controls')?.addEventListener('scroll',ev=>{ev.currentTarget.dataset.scrollTop=String(ev.currentTarget.scrollTop);},{passive:true});
-    app.querySelector('[data-open-display]')?.addEventListener('click',()=>{displayWindow=window.open(location.pathname+'?display=1','thalor-display','popup=yes,width=1280,height=720');resendWorkspaceToDisplay();});
-    app.querySelector('[data-display-fullscreen-master]')?.addEventListener('click',()=>requestDisplayFullscreenFromMaster());
-    app.querySelector('[data-display-fullscreen]')?.addEventListener('click',()=>requestFullscreenSafe());
+    app.querySelector('[data-open-display]')?.addEventListener('click',()=>{window.open(location.pathname+'?display=1','thalor-display','popup=yes,width=1280,height=720');resendWorkspaceToDisplay();});
+    if(isDisplay)app.querySelector('[data-display-fullscreen]')?.addEventListener('click',()=>requestFullscreenSafe());
     app.querySelector('[data-save]')?.addEventListener('click',()=>{save();noticeInPage('Tavolo salvato in locale.',{title:'Salva locale'});});
     app.querySelector('[data-reset]')?.addEventListener('click',()=>{confirmInPage('Resettare tutto il Tavolo Master?',()=>{workspace={currentSceneId:null,displaySceneId:null,scenes:[freshScene('Scena 1')]};normalize();save();render();},{title:'Reset Tavolo Master',okText:'Resetta'});});
     app.querySelector('[data-save-group]')?.addEventListener('click',()=>saveScenesFile(false));
@@ -665,29 +663,7 @@
   const confirmInPage=dialogInPage;
   function noticeInPage(message,opts={}){dialogInPage(message,null,{title:opts.title||'Avviso',okText:opts.okText||'Ok',cancelText:''});const modal=document.querySelector('.tabletop-confirm-backdrop');if(modal){const cancel=modal.querySelector('[data-confirm-cancel]');if(cancel)cancel.style.display='none';}}
 
-  function requestFullscreenSafe(targetDocument){
-    const doc=targetDocument||document;
-    const el=doc.documentElement;
-    if(!doc.fullscreenElement&&!doc.webkitFullscreenElement&&!doc.msFullscreenElement){
-      (el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen)?.call(el);
-    }else{
-      (doc.exitFullscreen||doc.webkitExitFullscreen||doc.msExitFullscreen)?.call(doc);
-    }
-  }
-  function requestDisplayFullscreenFromMaster(){
-    if(isDisplay){requestFullscreenSafe();return;}
-    let requested=false;
-    try{
-      if(displayWindow&&!displayWindow.closed&&displayWindow.document){
-        requestFullscreenSafe(displayWindow.document);
-        requested=true;
-      }
-    }catch(e){}
-    if(channel)channel.postMessage({type:'display-fullscreen'});
-    if(!requested&&!displayWindow){
-      noticeInPage('Apri prima il Display, poi premi di nuovo Fullscreen Display.',{title:'Fullscreen Display'});
-    }
-  }
+  function requestFullscreenSafe(){const el=document.documentElement;if(!document.fullscreenElement){(el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen)?.call(el);}else{(document.exitFullscreen||document.webkitExitFullscreen||document.msExitFullscreen)?.call(document);}}
   async function saveScenesFile(saveAs=true){normalize();const data=JSON.stringify(workspace,null,2);const name=`thalor-scene-${new Date().toISOString().slice(0,10)}.json`;if(window.showSaveFilePicker){try{const handle=await window.showSaveFilePicker({suggestedName:name,types:[{description:'Gruppo scene Thalor',accept:{'application/json':['.json']}}]});const writable=await handle.createWritable();await writable.write(data);await writable.close();return;}catch(e){if(e&&e.name==='AbortError')return;}}const blob=new Blob([data],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},0);}
   function importScenesFile(ev){const file=ev.target.files&&ev.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(data&&Array.isArray(data.scenes)){workspace=data;}else if(data&&typeof data==='object'){workspace={currentSceneId:null,displaySceneId:null,scenes:[Object.assign(freshScene('Scena importata'),data)]};}normalize();save();render();}catch(e){noticeInPage('File scene non valido.',{title:'Carica gruppo'});}};reader.readAsText(file);ev.target.value='';}
 
@@ -991,7 +967,6 @@
   if(channel)channel.onmessage=ev=>{
     if(!ev.data)return;
     if(ev.data.type==='display-ready'&&!isDisplay){resendWorkspaceToDisplay();return;}
-    if(ev.data.type==='display-fullscreen'&&isDisplay){requestFullscreenSafe();return;}
     if(isDisplay&&ev.data.type==='workspace'){workspace=ev.data.workspace;normalize();const stage=app.querySelector('[data-stage]');const ds=displayScene();if(stage&&stage.dataset.mediaKey===stageMediaKey(ds))softRefreshStage(ds,{fit:true});else renderDisplayOnly();}
   };
   window.addEventListener('resize',()=>requestAnimationFrame(()=>{fitDisplayStage();refreshBarrierOverlay(app.querySelector('[data-stage]'),stageScene());drawFog();}));
