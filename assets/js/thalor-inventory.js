@@ -17,7 +17,7 @@
 
   const blankItem = {
     id:'', name:'Nuovo oggetto', type:'generic', rarity:'', value:'', weight:'', image:'', page:'',
-    identified:true, identification:{ status:'identified', dc:'', method:'', notes:'' },
+    identified:false, unidentifiedName:'Oggetto non identificato', identification:{ status:'unidentified', dc:'', method:'', notes:'' },
     unique:false, uniqueId:'', description:'', publicNotes:'', gmNotes:'', tags:[], bonuses:[], history:[]
   };
 
@@ -61,7 +61,7 @@
       const id = String(val.id || key || newId()).trim();
       out[id] = Object.assign({}, blankItem, val, {
         id,
-        identified: val.identified !== false,
+        identified: val.identified === true || val.identification?.status === 'identified',
         identification: Object.assign({}, blankItem.identification, isObject(val.identification) ? val.identification : {}),
         tags: safeArray(val.tags),
         bonuses: safeArray(val.bonuses),
@@ -127,19 +127,33 @@
     return d;
   }
 
+  function itemPageUrl(ref){
+    const id = String(ref || '').trim();
+    if(!id) return '';
+    return '../archivio/item.html?id=' + encodeURIComponent(id);
+  }
+
+  function itemIdentified(refItem, stack){
+    const ref = isObject(refItem) ? refItem : null;
+    if(ref) return ref.identified === true || ref.identification?.status === 'identified';
+    return String(stack?.identified || '').toLowerCase().startsWith('s');
+  }
+
   function effectiveItem(stack, db){
     const s = normalizeStack(stack);
     const database = normalizeDatabase(db);
     const ref = s.itemRef ? database.items[s.itemRef] : null;
     if(!ref) return s;
-    const identified = String(s.identified || '').toLowerCase().startsWith('s') || ref.identified === true || ref.identification?.status === 'identified';
+    const identified = itemIdentified(ref, s);
     const merged = Object.assign({}, ref, s, {
-      name: s.name || (identified ? ref.name : (ref.unidentifiedName || 'Oggetto non identificato')),
+      displayName: identified ? (ref.name || s.name || 'Oggetto') : (ref.unidentifiedName || s.name || 'Oggetto non identificato'),
+      name: s.name || ref.name || 'Oggetto',
       image: s.image || ref.image || '',
-      page: s.page || ref.page || '',
+      page: s.page || ref.page || itemPageUrl(s.itemRef),
       weight: s.weight || ref.weight || '',
-      notes: [identified ? ref.publicNotes : '', s.notes].filter(Boolean).join('\n\n'),
-      bonuses: safeArray(ref.bonuses).concat(safeArray(s.bonuses)),
+      notes: identified ? [ref.publicNotes || '', s.notes || ''].filter(Boolean).join('\n\n') : (ref.publicNotes || s.notes || ''),
+      fullDescription: ref.description || '',
+      bonuses: identified ? safeArray(ref.bonuses).concat(safeArray(s.bonuses)) : safeArray(s.bonuses),
       identified: identified ? 'Sì' : 'No'
     });
     return merged;
@@ -246,7 +260,7 @@
     let staticSheet = null;
     try{ staticSheet = await fetchStaticSheet(slug); }catch(e){}
     try{
-      if(window.ThalorAuth && window.ThalorAuth.loadCharacter && navigator.onLine !== false){
+      if(shouldUseOnline() && window.ThalorAuth && window.ThalorAuth.loadCharacter){
         const online = await window.ThalorAuth.loadCharacter(slug, local || staticSheet, { publicRead:true, skipInit:true, timeoutMs:15000 });
         if(online) return normalizeSheetInventory(online);
       }
@@ -259,6 +273,7 @@
 
   async function saveSheet(slug, sheet){
     const data = writeLocalSheet(slug, sheet);
+    if(!shouldUseOnline()) return data;
     try{
       if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
         await window.ThalorAuth.saveCharacter(slug, data, { timeoutMs:20000 });
@@ -288,6 +303,26 @@
     return st.profile?.display_name || st.user?.user_metadata?.full_name || st.user?.email || 'Giocatore';
   }
 
+  function isLocalPreview(){
+    try{
+      if(window.ThalorAuth?.isLocalPreview?.()) return true;
+      const h = String(location.hostname || '').toLowerCase();
+      const p = String(location.protocol || '').toLowerCase();
+      return p === 'file:' || h === '' || h === 'localhost' || h === '127.0.0.1' || h === '::1' ||
+        /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(h);
+    }catch(e){ return false; }
+  }
+
+  function isOfflineMaster(){
+    try{
+      return !!(window.ThalorAuth?.state?.localMaster || window.ThalorAuth?.localMasterEnabled?.() ||
+        localStorage.getItem('thalor.offlineMaster') === '1' || sessionStorage.getItem('thalor.offlineMaster') === '1');
+    }catch(e){ return false; }
+  }
+
+  function shouldUseOnline(){
+    return !isLocalPreview() && !isOfflineMaster() && navigator.onLine !== false;
+  }
 
   function lootPendingKey(slug){ return 'thalor.loot.pending.' + String(slug||'').trim(); }
   function lootAppliedKey(op){ return String(op || '').trim(); }
@@ -343,8 +378,37 @@
     return d;
   }
 
-  function addStackToSheet(sheet, item, qty, actor, meta={}){
+  function normalizeDatabaseItemFromLoot(item){
+    const ref = String(item?.itemRef || item?.itemId || item?.ref || '').trim();
+    if(!ref) return null;
+    const identified = item?.identified === true || item?.identification?.status === 'identified' || String(item?.identified||'').toLowerCase().startsWith('s');
+    return Object.assign({}, blankItem, item.databaseItem || {}, {
+      id: ref,
+      name: item.name || item.databaseItem?.name || 'Oggetto',
+      image: item.image || item.databaseItem?.image || '',
+      page: item.page || item.databaseItem?.page || itemPageUrl(ref),
+      publicNotes: item.publicNotes || item.notes || item.databaseItem?.publicNotes || '',
+      description: item.description || item.databaseItem?.description || '',
+      unique: !!item.unique,
+      identified,
+      identification: Object.assign({}, blankItem.identification, item.identification || {}, { status: identified ? 'identified' : 'unidentified' })
+    });
+  }
+
+  function mergeDatabaseItemIntoSheet(sheet, item){
     const d = normalizeSheetInventory(sheet || {});
+    const dbItem = normalizeDatabaseItemFromLoot(item);
+    if(!dbItem) return d;
+    d.inventoryDatabase = normalizeDatabase(d.inventoryDatabase);
+    const old = d.inventoryDatabase.items[dbItem.id] || {};
+    d.inventoryDatabase.items[dbItem.id] = Object.assign({}, old, dbItem, {
+      history: safeArray(old.history).concat(safeArray(dbItem.history))
+    });
+    return d;
+  }
+
+  function addStackToSheet(sheet, item, qty, actor, meta={}){
+    let d = mergeDatabaseItemIntoSheet(sheet || {}, item);
     if(meta && meta.opId && isLootApplied(d, meta.opId)) return { sheet:d, mode:'already-applied' };
     const n = Math.max(1, Number(qty)||1);
     const currency = lootCurrency(item);
@@ -368,7 +432,8 @@
       section.items.unshift(normalizeStack({
         entryType: ref ? 'complex' : 'simple', itemType: ref ? 'complex' : 'simple', itemRef: ref,
         sourceLootItemId: item.id || '', sourceLootName: item.name || '',
-        name: item.name || item.itemRef || 'Oggetto', qty:n, image:item.image||'', page:item.page||'', notes:item.notes||item.publicNotes||'',
+        name: item.name || item.itemRef || 'Oggetto', qty:n, image:item.image||'', page:item.page || (ref ? itemPageUrl(ref) : ''), notes:item.notes||item.publicNotes||'',
+        identified: ref ? ((item.identified === true || item.identification?.status === 'identified') ? 'Sì' : 'No') : 'Sì',
         instanceId: item.unique ? newId('instance') : '', history:[{ when:new Date().toISOString(), action:'loot-add', actor, qty:n }]
       }));
     }
@@ -408,11 +473,11 @@
   window.ThalorInventory = {
     SYSTEM_SLUG, STORAGE_KEY, CURRENCY_KEYS, blankItem, blankStack, blankLootItem,
     esc, slugify, newId, norm,
-    normalizeDatabase, normalizeStack, normalizeLootItem, normalizeSheetInventory, effectiveItem,
+    normalizeDatabase, normalizeStack, normalizeLootItem, normalizeSheetInventory, effectiveItem, itemPageUrl, itemIdentified, normalizeDatabaseItemFromLoot, mergeDatabaseItemIntoSheet,
     currencyFrom, lootCurrency, isCurrencyItem,
     readLocal, writeLocal, loadOnline, saveOnline,
     sheetStorageKey, sheetStorageKeys, readLocalSheet, writeLocalSheet, loadSheet, saveSheet,
-    fetchStaticSheet, primaryAuthCharacter, currentActorLabel, addStackToSheet, removeStackFromSheet,
+    fetchStaticSheet, primaryAuthCharacter, currentActorLabel, isLocalPreview, isOfflineMaster, shouldUseOnline, addStackToSheet, removeStackFromSheet,
     lootPendingKey, readPendingLoot, writePendingLoot, queuePendingLoot, consumePendingLootUpdates, isLootApplied
   };
 })();

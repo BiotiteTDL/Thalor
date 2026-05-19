@@ -104,11 +104,14 @@
     const img = item.image ? `<img class="loot-mini-img" src="${esc(item.image)}" alt="${esc(itemTitle(item))}" loading="lazy">` : `<div class="loot-mini-placeholder">${c?'¤':'💎'}</div>`;
     const disabled = state.busy || !canTake() || !item.qty || item.qty <= 0;
     const max = Math.max(0, Number(item.qty)||0);
+    const pageUrl = item.itemRef ? inv.itemPageUrl(item.itemRef) : '';
     const typeBadge = c ? `<span class="loot-badge money">Valuta ${c}</span>` : (item.itemRef ? '<span class="loot-badge complex">Oggetto complesso</span>' : '<span class="loot-badge simple">Item semplice</span>');
+    const itemNameHtml = item.itemRef ? `<a class="loot-item-page-link" href="${esc(pageUrl)}">${esc(itemTitle(item))}</a>` : esc(itemTitle(item));
+    const itemPageAction = item.itemRef ? `<a class="button ghost-button loot-item-page-action" href="${esc(pageUrl)}">Pagina oggetto</a>` : '';
     return `<article class="loot-take-card" data-section-index="${si}" data-item-index="${ii}">
       ${img}
       <div class="loot-take-body">
-        <div class="loot-card-top"><h3>${esc(itemTitle(item))}</h3><div class="loot-badges">${typeBadge}${item.unique?'<span class="loot-badge unique">Unico</span>':''}</div></div>
+        <div class="loot-card-top"><h3>${itemNameHtml}</h3><div class="loot-badges">${typeBadge}${item.unique?'<span class="loot-badge unique">Unico</span>':''}</div></div>
         <p class="loot-item-note">${esc(item.publicNotes || item.notes || (c ? 'Valuta: viene aggiunta al riquadro denaro della scheda.' : 'Oggetto: entra subito nell’inventario normale del personaggio, nella sezione Loot.'))}</p>
         <div class="loot-remaining">${esc(remainingLabel(item))}</div>
         <details class="loot-taken-details"><summary>Chi ha preso questo loot</summary><div class="loot-taken-list">${takenSummary(item, si, ii)}</div></details>
@@ -116,7 +119,7 @@
           <div class="loot-qty-control"><button type="button" class="loot-minus" ${disabled?'disabled':''}>−</button><input class="loot-qty" type="number" min="1" max="${max}" value="${Math.min(1,max)||0}" ${disabled?'disabled':''}><button type="button" class="loot-plus" ${disabled?'disabled':''}>+</button></div>
           ${targetOptions()}
           <button type="button" class="button loot-take-btn" ${disabled?'disabled':''}>Prendi</button>
-          ${isMaster()?`<button type="button" class="button ghost-button loot-remove-btn" title="Toglie l’oggetto dal loot condiviso, senza modificare inventari già assegnati">Togli dal loot</button>`:''}
+          ${itemPageAction}${isMaster()?`<button type="button" class="button ghost-button loot-remove-btn" title="Toglie l’oggetto dal loot condiviso, senza modificare inventari già assegnati">Togli dal loot</button>`:''}
         </div>
       </div>
     </article>`;
@@ -146,8 +149,8 @@
         <label>Nome oggetto <input id="lootNewName" placeholder="Pugnale d’Osso Nero"></label>
         <label>Valuta <select id="lootNewCurrency"><option value="MO">MO - oro</option><option value="MA">MA - argento</option><option value="MP">MP - platino</option><option value="MR">MR - rame</option></select></label>
         <label>Quantità <input id="lootNewQty" type="number" min="1" value="1"></label>
-        <label>Ref oggetto complesso <input id="lootNewRef" placeholder="opzionale"></label>
-        <label>Immagine <input id="lootNewImage" placeholder="assets/img/... opzionale"></label>
+        <label><span>Oggetto complesso</span><span class="loot-inline-check"><input id="lootNewComplex" type="checkbox"> crea pagina item</span></label><label>Ref oggetto complesso <input id="lootNewRef" placeholder="auto se vuoto"></label>
+        <label>Immagine <input id="lootNewImageFile" type="file" accept="image/*"></label>
         <label class="loot-wide">Note pubbliche <input id="lootNewNotes" placeholder="Descrizione breve visibile ai giocatori"></label>
         <label><input id="lootNewUnique" type="checkbox"> Oggetto unico</label>
       </div>
@@ -164,8 +167,13 @@
 
   async function saveDb(msg='Loot salvato.'){
     state.db = inv.writeLocal(state.db);
-    try{ await inv.saveOnline(state.db); notify(msg,'ok'); }
+    if(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false){
+      notify(msg + ' (locale)', 'ok');
+      return state.db;
+    }
+    try{ state.db = await inv.saveOnline(state.db); notify(msg,'ok'); }
     catch(e){ notify('Salvato in locale, ma non online: '+(e.message||e),'warn'); }
+    return state.db;
   }
 
   function getOrCreateSection(){
@@ -180,6 +188,41 @@
       sec.notes = document.getElementById('lootNewSectionNotes').value.trim();
     }
     return sec;
+  }
+
+  function readImageFileInput(){
+    return new Promise(resolve=>{
+      const file = document.getElementById('lootNewImageFile')?.files?.[0];
+      if(!file){ resolve(''); return; }
+      const reader = new FileReader();
+      reader.onload = ()=>resolve(String(reader.result || ''));
+      reader.onerror = ()=>resolve('');
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function createOrUpdateDatabaseItem(db, item){
+    const ref = String(item.itemRef || '').trim();
+    if(!ref) return item;
+    db.items = db.items || {};
+    const old = db.items[ref] || {};
+    const identified = old.identified === true || old.identification?.status === 'identified';
+    db.items[ref] = Object.assign({}, inv.blankItem, old, {
+      id: ref,
+      name: item.name || old.name || 'Oggetto',
+      image: item.image || old.image || '',
+      page: old.page || inv.itemPageUrl(ref),
+      publicNotes: item.publicNotes || old.publicNotes || '',
+      description: old.description || '',
+      unique: !!item.unique || !!old.unique,
+      identified,
+      identification: Object.assign({}, inv.blankItem.identification, old.identification || {}, { status: identified ? 'identified' : 'unidentified' })
+    });
+    item.page = db.items[ref].page;
+    item.identified = identified;
+    item.identification = db.items[ref].identification;
+    item.databaseItem = db.items[ref];
+    return item;
   }
 
   function bind(){
@@ -201,16 +244,23 @@
       const kind = document.getElementById('lootNewKind')?.value || 'item';
       const qty = Math.max(1, Number(document.getElementById('lootNewQty')?.value)||1);
       const currency = document.getElementById('lootNewCurrency')?.value || 'MO';
+      const itemName = kind==='money' ? moneyNames[currency] : (document.getElementById('lootNewName')?.value?.trim() || 'Nuovo oggetto');
+      const imageData = await readImageFileInput();
+      const isComplex = kind==='item' && !!document.getElementById('lootNewComplex')?.checked;
+      const refInput = document.getElementById('lootNewRef')?.value?.trim() || '';
       const item = inv.normalizeLootItem({
         id:inv.newId('lootitem'),
-        name: kind==='money' ? moneyNames[currency] : (document.getElementById('lootNewName')?.value?.trim() || 'Nuovo oggetto'),
+        name: itemName,
         qty,
         currency: kind==='money' ? currency : '',
-        itemRef: kind==='item' ? (document.getElementById('lootNewRef')?.value?.trim() || '') : '',
-        image: document.getElementById('lootNewImage')?.value?.trim() || '',
+        itemRef: kind==='item' ? (refInput || (isComplex ? inv.slugify(itemName) : '')) : '',
+        image: imageData,
         publicNotes: document.getElementById('lootNewNotes')?.value?.trim() || '',
-        unique: !!document.getElementById('lootNewUnique')?.checked
+        unique: !!document.getElementById('lootNewUnique')?.checked,
+        identified: false,
+        identification: { status:'unidentified' }
       });
+      if(item.itemRef) createOrUpdateDatabaseItem(state.db, item);
       sec.items.push(item);
       await saveDb('Loot aggiornato.');
       render();
@@ -257,7 +307,7 @@
         const base = await inv.loadSheet(target);
         if(!base) throw new Error('Scheda non trovata: '+target);
         const actor = isMaster() ? (state.characters.find(c=>c.slug===target)?.name || target) : inv.currentActorLabel();
-        const opId = inv.queuePendingLoot(target, { action:'take', item:inv.normalizeLootItem(item), qty, actor, lootSectionId:sec.id||'', lootItemId:item.id||'' });
+        const opId = inv.newId('lootop');
         const applied = inv.addStackToSheet(base, item, qty, actor, { opId });
         await inv.saveSheet(target, applied.sheet);
         item.qty = Math.max(0, (Number(item.qty)||0) - qty);
@@ -286,7 +336,7 @@
       try{
         const base = await inv.loadSheet(target);
         const actor = isMaster() ? inv.currentActorLabel() : (entry.actor || inv.currentActorLabel());
-        const opId = inv.queuePendingLoot(target, { action:'return', item:inv.normalizeLootItem(item), qty, actor, lootSectionId:sec.id||'', lootItemId:item.id||'' });
+        const opId = inv.newId('lootop');
         const applied = inv.removeStackFromSheet(base, item, qty, actor, { opId });
         await inv.saveSheet(target, applied.sheet);
         item.qty = (Number(item.qty)||0) + qty;
@@ -344,10 +394,15 @@
     }catch(e){ forceOfflineMasterState(); }
     state.db = inv.readLocal();
     state.source = 'localStorage';
-    try{
-      const online = await inv.loadOnline();
-      if(online){ state.db = inv.writeLocal(online); state.source = 'Supabase'; }
-    }catch(e){ console.warn('Loot globale: lettura online non riuscita', e); }
+    if(!isLocalPreview() && !inv.isOfflineMaster?.() && navigator.onLine !== false){
+      try{
+        const online = await inv.loadOnline();
+        if(online && Array.isArray(online.sharedLoot?.sections) && online.sharedLoot.sections.length){
+          state.db = inv.writeLocal(online);
+          state.source = 'Supabase';
+        }
+      }catch(e){ console.warn('Loot globale: lettura online non riuscita', e); }
+    }
     try{ await loadCharacters(); }catch(e){ console.warn('Lista personaggi non disponibile', e); }
     render();
   }
