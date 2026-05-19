@@ -302,6 +302,8 @@
     const sheets = normalizeSheets(onlineRows, registry);
     const inventoryData = compactInventoryForArchive(inventoryRes.data);
     const inventoryItems = inventoryItemsArray(inventoryData);
+    const inventoryItemCategories = inventoryCategories(inventoryItems);
+    if(inventoryData) inventoryData.categories = inventoryItemCategories;
     const characterSpells = extractCharacterSpells(sheets);
     const characters = simplifyCharacters(registry, sheets);
     const playableCharacters = characters.filter(c=>c.type === 'pg');
@@ -345,6 +347,7 @@
         symbolsCategories: Array.isArray(symbolsRes.data?.categories) ? symbolsRes.data.categories.length : 0,
         inventoryItems: inventoryItems.length,
         complexItems: inventoryItems.length,
+        inventoryItemCategories: inventoryItemCategories.length,
         characterSpellEntries: characterSpells.total
       },
       data: {
@@ -361,6 +364,7 @@
         inventory: inventoryData,
         inventoryDatabase: inventoryData,
         complexItems: inventoryItems,
+        inventoryItemCategories,
         spells: characterSpells,
         compendium: {
           feats: staticData['assets/data/compendium/feats.json'] || null,

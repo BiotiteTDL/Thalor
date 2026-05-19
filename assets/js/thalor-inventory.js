@@ -269,12 +269,47 @@
     return null;
   }
 
+  function stripHeavyInventoryPayload(value){
+    if(Array.isArray(value)) return value.map(stripHeavyInventoryPayload);
+    if(!isObject(value)) return value;
+    const out = {};
+    Object.entries(value).forEach(([key,val])=>{
+      const k = String(key || '');
+      if(k === 'databaseItem' || k === 'inventoryDatabase' || k === 'fullDescription') return;
+      if((k === 'image' || k === 'img' || k === 'imageData' || k === 'dataUrl') && typeof val === 'string' && /^data:image\//i.test(val)) return;
+      out[key] = stripHeavyInventoryPayload(val);
+    });
+    return out;
+  }
+
+  function stripSheetForSave(sheet){
+    const data = normalizeSheetInventory(stripHeavyInventoryPayload(sheet || {}));
+    data.inventoryDatabase = Object.assign({}, blankDatabase, { items:{}, sharedLoot:{ sections:[] } });
+    data.inventorySections = safeArray(data.inventorySections).map(sec=>Object.assign({}, sec, {
+      items: safeArray(sec.items).map(it=>{
+        const row = stripHeavyInventoryPayload(it || {});
+        delete row.databaseItem;
+        delete row.fullDescription;
+        if(typeof row.image === 'string' && /^data:image\//i.test(row.image)) row.image = '';
+        if(row.itemRef){
+          row.entryType = row.itemType = 'complex';
+          row.page = row.page || itemPageUrl(row.itemRef);
+        }
+        return normalizeStack(row);
+      })
+    }));
+    data.inventory = safeArray(data.inventory).map(it=>normalizeStack(stripHeavyInventoryPayload(it || {})));
+    return data;
+  }
+
   function writeLocalSheet(slug, sheet){
-    const data = normalizeSheetInventory(sheet || {});
+    const data = stripSheetForSave(sheet || {});
     try{
       localStorage.setItem(sheetStorageKey(slug), JSON.stringify(data));
       ['v4','v3','v2','v1'].forEach(v=>localStorage.removeItem('thalor.sheet.' + String(slug||'').trim() + '.' + v));
-    }catch(e){}
+    }catch(e){
+      console.warn('Impossibile salvare la scheda in cache locale:', slug, e);
+    }
     return data;
   }
 
@@ -496,7 +531,7 @@
   window.ThalorInventory = {
     SYSTEM_SLUG, STORAGE_KEY, CURRENCY_KEYS, blankItem, blankStack, blankLootItem,
     esc, slugify, newId, norm,
-    normalizeDatabase, normalizeStack, normalizeLootItem, normalizeSheetInventory, effectiveItem, itemPageUrl, itemIdentified, normalizeDatabaseItemFromLoot, mergeDatabaseItemIntoSheet,
+    normalizeDatabase, normalizeStack, normalizeLootItem, normalizeSheetInventory, stripSheetForSave, effectiveItem, itemPageUrl, itemIdentified, normalizeDatabaseItemFromLoot, mergeDatabaseItemIntoSheet,
     currencyFrom, lootCurrency, isCurrencyItem,
     readLocal, writeLocal, loadOnline, saveOnline,
     sheetStorageKey, sheetStorageKeys, readLocalSheet, writeLocalSheet, loadSheet, saveSheet,

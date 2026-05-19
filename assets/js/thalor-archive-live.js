@@ -318,7 +318,8 @@
       ['Sessioni', c.sessions || 0],
       ['Relazioni', c.relations || 0],
       ['Timeline', c.timeline || 0],
-      ['Oggetti', archive?.summary?.complexItems || 0]
+      ['Oggetti', archive?.summary?.complexItems || 0],
+      ['Categorie oggetti', itemCategories().length]
     ].map(([k,v])=>`<div class="export-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
   }
 
@@ -373,6 +374,22 @@
   }
 
 
+  function itemCategoryLabel(item){
+    const raw = item?.category || item?.type || (Array.isArray(item?.tags) && item.tags[0]) || 'Senza categoria';
+    const value = String(raw || 'Senza categoria').trim() || 'Senza categoria';
+    const labels = { generic:'Generico', weapon:'Arma', armor:'Armatura', wondrous:'Oggetto meraviglioso', consumable:'Consumabile', quest:'Oggetto missione', relic:'Reliquia', key:'Chiave', document:'Documento', tool:'Strumento' };
+    return labels[value.toLowerCase()] || value;
+  }
+
+  function itemCategories(){
+    const map = new Map();
+    complexItems().forEach(item=>{
+      const label = itemCategoryLabel(item);
+      map.set(label, (map.get(label)||0)+1);
+    });
+    return [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0], 'it')).map(([name,count])=>({ name, count }));
+  }
+
   function complexItems(){
     const db = archive?.data?.inventory;
     const items = db && db.items && typeof db.items === 'object' ? Object.values(db.items) : [];
@@ -408,7 +425,10 @@
 
   function renderInventoryItems(){
     const box = document.getElementById('liveItems');
+    const catBox = document.getElementById('liveItemCategories');
     if(!box) return;
+    const cats = itemCategories();
+    if(catBox) catBox.innerHTML = cats.length ? cats.map(c=>`<span>${esc(c.name)}: ${esc(c.count)}</span>`).join('') : '<span>Nessuna categoria</span>';
     const items = complexItems();
     const master = isMaster();
     const pgs = playableOptions();
@@ -419,6 +439,7 @@
       const ownerText = owners.length ? owners.map(o=>`${esc(o.name)}${o.qty>1?' × '+esc(o.qty):''}`).join(', ') : 'Nessuno';
       const img = item.image ? `<img class="live-item-thumb" src="${esc(item.image)}" alt="">` : '<div class="live-item-placeholder">◆</div>';
       const identified = item.identified === true || item.identification?.status === 'identified';
+      const category = itemCategoryLabel(item);
       const page = `item.html?id=${encodeURIComponent(id)}`;
       const select = master ? `<select class="live-item-owner-select" data-owner-select="${esc(id)}"><option value="">Nessuno</option>${pgs.map(pg=>`<option value="${esc(pg.slug)}" ${owners.some(o=>o.slug===pg.slug)?'selected':''}>${esc(pg.name)}</option>`).join('')}</select>` : '';
       return `<article class="live-item-card" data-item-id="${esc(id)}">
@@ -427,7 +448,7 @@
           <div class="live-pill">Oggetto complesso</div>
           <h3><a href="${esc(page)}">${esc(item.name || id)}</a></h3>
           <p class="section-note">Possessore: <strong>${ownerText}</strong></p>
-          <div class="live-tags"><span>${identified?'Identificato':'Non identificato'}</span>${item.unique?'<span>Unico</span>':''}<span>Ref: '+esc(id)+'</span></div>
+          <div class="live-tags"><span>${esc(category)}</span><span>${identified?'Identificato':'Non identificato'}</span>${item.unique?'<span>Unico</span>':''}<span>Ref: '+esc(id)+'</span></div>
           ${master?`<div class="live-item-actions"><label>Dai a ${select}</label><button class="button mini-action" type="button" data-assign-item="${esc(id)}">Assegna</button><button class="button ghost-button mini-action" type="button" data-delete-item="${esc(id)}">Elimina definitivamente</button></div>`:''}
         </div>
       </article>`;
@@ -443,8 +464,9 @@
 
   async function saveSheetForArchive(slug, sheet){
     const inv = invApi();
-    if(inv && inv.saveSheet) return await inv.saveSheet(slug, sheet);
-    if(window.ThalorAuth?.saveCharacter) return await window.ThalorAuth.saveCharacter(slug, sheet, { timeoutMs:20000 });
+    const clean = inv?.stripSheetForSave ? inv.stripSheetForSave(sheet || {}) : (sheet || {});
+    if(inv && inv.saveSheet) return await inv.saveSheet(slug, clean);
+    if(window.ThalorAuth?.saveCharacter) return await window.ThalorAuth.saveCharacter(slug, clean, { timeoutMs:20000 });
     try{ localStorage.setItem('thalor.sheet.'+slug+'.v5', JSON.stringify(sheet)); }catch(e){}
     return sheet;
   }
