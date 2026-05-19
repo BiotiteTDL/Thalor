@@ -187,6 +187,66 @@
     });
   }
 
+
+  function spellName(spell){
+    if(typeof spell === 'string') return spell;
+    if(!spell || typeof spell !== 'object') return '';
+    return spell.name || spell.title || spell.spell || spell.id || '';
+  }
+
+  function extractCharacterSpells(sheets){
+    const flat = [];
+    (sheets || []).forEach(row=>{
+      const slug = String(row?.slug || '').trim();
+      const sheet = row?.data && typeof row.data === 'object' ? row.data : {};
+      const identity = sheet.identity || sheet.meta || {};
+      const groups = Array.isArray(sheet.spellcasting?.groups) ? sheet.spellcasting.groups : [];
+      groups.forEach((group, groupIndex)=>{
+        const spells = Array.isArray(group?.spells) ? group.spells : [];
+        spells.forEach((spell, spellIndex)=>{
+          const name = spellName(spell);
+          if(!name) return;
+          flat.push({
+            category:'spell',
+            type:'spell',
+            tag:'Incantesimo',
+            slug:`spell-${slug}-${groupIndex}-${spellIndex}`,
+            name,
+            title:name,
+            characterSlug: slug,
+            characterName: identity.name || identity.displayName || slug,
+            level: group?.level ?? group?.circle ?? '',
+            className: group?.className || group?.class || '',
+            summary: (spell && typeof spell === 'object') ? (spell.description || spell.desc || spell.notes || '') : '',
+            text: [name, slug, identity.name || '', group?.level ?? '', group?.className || group?.class || ''].join(' '),
+            tags:['Incantesimo', identity.name || slug].filter(Boolean)
+          });
+        });
+      });
+    });
+    return { flat, total: flat.length };
+  }
+
+  function inventorySearchItems(){
+    const items = complexItems();
+    return items.map(item=>{
+      const id = String(item.id || '').trim();
+      return {
+        category:'object',
+        type:'object',
+        tag:'Oggetto',
+        slug:id,
+        name:item.name || id,
+        title:item.name || id,
+        href:`item.html?id=${encodeURIComponent(id)}`,
+        image:item.image || '',
+        summary:item.publicDescription || item.descriptionPublic || item.description || item.notes || '',
+        text:[item.name, item.title, item.category, item.type, item.rarity, item.tags, id].flat().join(' '),
+        tags:['Oggetto', item.unique?'Unico':'', (item.identified===true || item.identification?.status==='identified')?'Identificato':'Non identificato'].filter(Boolean)
+      };
+    });
+  }
+
   async function collectArchive(){
     log('Aggiorno Archivio Vivo', 'Leggo Supabase, cache locale e JSON statici.');
     if(window.ThalorAuth && window.ThalorAuth.init){
@@ -220,6 +280,7 @@
     const inventoryDb = invApi()?.normalizeDatabase ? invApi().normalizeDatabase(inventoryRes.data) : (inventoryRes.data || { items:{} });
     const placesData = normalizePlacesData(placesRes.data, staticData['assets/data/places.json'] || null);
     const sheets = normalizeSheets(onlineRows, registry);
+    const characterSpells = extractCharacterSpells(sheets);
     const characters = simplifyCharacters(registry, sheets);
     const playableCharacters = characters.filter(c=>c.type === 'pg');
     const nonPlayerCharacters = characters.filter(c=>c.type !== 'pg');
@@ -244,7 +305,8 @@
         places: Array.isArray(placesData?.places) ? placesData.places.length : 0,
         sessions: Array.isArray(diaryRes.data?.sessions) ? diaryRes.data.sessions.length : 0,
         xpEvents: Array.isArray(xpRes.data?.registro_xp) ? xpRes.data.registro_xp.length : 0,
-        complexItems: inventoryDb && inventoryDb.items ? Object.keys(inventoryDb.items).length : 0
+        complexItems: inventoryDb && inventoryDb.items ? Object.keys(inventoryDb.items).length : 0,
+        characterSpellEntries: characterSpells.total || 0
       },
       data: {
         registry: normalizeRegistry(registry),
@@ -258,6 +320,7 @@
         archiveDocuments: documentsRes.data || null,
         archiveSymbols: symbolsRes.data || null,
         inventory: inventoryDb,
+        spells: characterSpells,
         staticCharacters: {
           abraxas: staticData['assets/data/characters/abraxas.json'] || null,
           arolf: staticData['assets/data/characters/arolf.json'] || null,
@@ -284,12 +347,12 @@
   }
 
   function itemText(item){
-    return [item?.name, item?.title, item?.summary, item?.text, item?.type, item?.category, ...(item?.tags||[])].join(' ').toLowerCase();
+    return [item?.name, item?.title, item?.summary, item?.text, item?.type, item?.category, item?.tag, ...(item?.tags||[])].join(' ').toLowerCase();
   }
 
   function allItems(){
     if(!normalized) return [];
-    return [...(normalized.characters||[]), ...(normalized.places||[]), ...(normalized.sessions||[])];
+    return [...(normalized.characters||[]), ...(normalized.places||[]), ...(normalized.sessions||[]), ...inventorySearchItems(), ...(archive?.data?.spells?.flat || [])];
   }
 
   function filteredItems(){
@@ -300,6 +363,8 @@
         if(activeFilter === 'png' && !(item.category === 'character' && item.type === 'png')) return false;
         if(activeFilter === 'places' && item.category !== 'place') return false;
         if(activeFilter === 'sessions' && item.category !== 'session') return false;
+        if(activeFilter === 'objects' && item.category !== 'object') return false;
+        if(activeFilter === 'spells' && item.category !== 'spell') return false;
       }
       if(q && !itemText(item).includes(q)) return false;
       return true;
@@ -319,13 +384,13 @@
       ['Relazioni', c.relations || 0],
       ['Timeline', c.timeline || 0],
       ['Oggetti', archive?.summary?.complexItems || 0],
-      ['Categorie oggetti', itemCategories().length]
+      ['Incantesimi', archive?.summary?.characterSpellEntries || 0]
     ].map(([k,v])=>`<div class="export-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
   }
 
   function renderCard(item){
     const href = hrefFor(item);
-    const typeLabel = item.category === 'character' ? (item.type === 'pg' ? 'PG' : 'PNG') : (item.category === 'place' ? 'Luogo' : 'Sessione');
+    const typeLabel = item.category === 'character' ? (item.type === 'pg' ? 'PG' : 'PNG') : (item.category === 'place' ? 'Luogo' : (item.category === 'object' ? 'Oggetto' : (item.category === 'spell' ? 'Incantesimo' : 'Sessione')));
     const summary = stripHtml(item.summary || item.description || item.text || '').slice(0, 260);
     const img = item.image ? `<img src="${esc(hrefFor({href:item.image}) || ROOT + item.image)}" alt="" loading="lazy"/>` : '';
     const title = esc(item.name || item.title || item.slug);
@@ -335,6 +400,7 @@
       <div class="live-card-body">
         <div class="live-pill">${esc(typeLabel)}</div>
         <h3>${heading}</h3>
+        ${item.characterName ? `<div class="live-tags"><span>${esc(item.characterName)}</span></div>` : ''}
         <p>${esc(summary)}${summary.length >= 260 ? '…' : ''}</p>
       </div>
     </article>`;
@@ -374,22 +440,6 @@
   }
 
 
-  function itemCategoryLabel(item){
-    const raw = item?.category || item?.type || (Array.isArray(item?.tags) && item.tags[0]) || 'Senza categoria';
-    const value = String(raw || 'Senza categoria').trim() || 'Senza categoria';
-    const labels = { generic:'Generico', weapon:'Arma', armor:'Armatura', wondrous:'Oggetto meraviglioso', consumable:'Consumabile', quest:'Oggetto missione', relic:'Reliquia', key:'Chiave', document:'Documento', tool:'Strumento' };
-    return labels[value.toLowerCase()] || value;
-  }
-
-  function itemCategories(){
-    const map = new Map();
-    complexItems().forEach(item=>{
-      const label = itemCategoryLabel(item);
-      map.set(label, (map.get(label)||0)+1);
-    });
-    return [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0], 'it')).map(([name,count])=>({ name, count }));
-  }
-
   function complexItems(){
     const db = archive?.data?.inventory;
     const items = db && db.items && typeof db.items === 'object' ? Object.values(db.items) : [];
@@ -425,10 +475,7 @@
 
   function renderInventoryItems(){
     const box = document.getElementById('liveItems');
-    const catBox = document.getElementById('liveItemCategories');
     if(!box) return;
-    const cats = itemCategories();
-    if(catBox) catBox.innerHTML = cats.length ? cats.map(c=>`<span>${esc(c.name)}: ${esc(c.count)}</span>`).join('') : '<span>Nessuna categoria</span>';
     const items = complexItems();
     const master = isMaster();
     const pgs = playableOptions();
@@ -439,7 +486,6 @@
       const ownerText = owners.length ? owners.map(o=>`${esc(o.name)}${o.qty>1?' × '+esc(o.qty):''}`).join(', ') : 'Nessuno';
       const img = item.image ? `<img class="live-item-thumb" src="${esc(item.image)}" alt="">` : '<div class="live-item-placeholder">◆</div>';
       const identified = item.identified === true || item.identification?.status === 'identified';
-      const category = itemCategoryLabel(item);
       const page = `item.html?id=${encodeURIComponent(id)}`;
       const select = master ? `<select class="live-item-owner-select" data-owner-select="${esc(id)}"><option value="">Nessuno</option>${pgs.map(pg=>`<option value="${esc(pg.slug)}" ${owners.some(o=>o.slug===pg.slug)?'selected':''}>${esc(pg.name)}</option>`).join('')}</select>` : '';
       return `<article class="live-item-card" data-item-id="${esc(id)}">
@@ -448,7 +494,7 @@
           <div class="live-pill">Oggetto complesso</div>
           <h3><a href="${esc(page)}">${esc(item.name || id)}</a></h3>
           <p class="section-note">Possessore: <strong>${ownerText}</strong></p>
-          <div class="live-tags"><span>${esc(category)}</span><span>${identified?'Identificato':'Non identificato'}</span>${item.unique?'<span>Unico</span>':''}<span>Ref: '+esc(id)+'</span></div>
+          <div class="live-tags"><span>${identified?'Identificato':'Non identificato'}</span>${item.unique?'<span>Unico</span>':''}<span>Ref: '+esc(id)+'</span></div>
           ${master?`<div class="live-item-actions"><label>Dai a ${select}</label><button class="button mini-action" type="button" data-assign-item="${esc(id)}">Assegna</button><button class="button ghost-button mini-action" type="button" data-delete-item="${esc(id)}">Elimina definitivamente</button></div>`:''}
         </div>
       </article>`;
@@ -464,9 +510,8 @@
 
   async function saveSheetForArchive(slug, sheet){
     const inv = invApi();
-    const clean = inv?.stripSheetForSave ? inv.stripSheetForSave(sheet || {}) : (sheet || {});
-    if(inv && inv.saveSheet) return await inv.saveSheet(slug, clean);
-    if(window.ThalorAuth?.saveCharacter) return await window.ThalorAuth.saveCharacter(slug, clean, { timeoutMs:20000 });
+    if(inv && inv.saveSheet) return await inv.saveSheet(slug, sheet);
+    if(window.ThalorAuth?.saveCharacter) return await window.ThalorAuth.saveCharacter(slug, sheet, { timeoutMs:20000 });
     try{ localStorage.setItem('thalor.sheet.'+slug+'.v5', JSON.stringify(sheet)); }catch(e){}
     return sheet;
   }
@@ -547,24 +592,28 @@
   }
 
   function renderShell(){
+    const master = isMaster();
+    const masterActions = master ? `<div class="actions export-actions live-master-actions"><button class="button" id="refreshLiveBtn" type="button">Aggiorna Archivio Vivo</button><button class="button ghost-button" id="downloadLiveBtn" type="button">Scarica JSON normalizzato</button><a class="button ghost-button" href="esporta-json.html">Vai all’export completo</a></div>` : '';
     app.innerHTML = `
       <style>
-        .live-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;margin:22px 0}.live-search{min-width:min(520px,100%);padding:12px 14px;border:1px solid rgba(218,184,108,.35);border-radius:14px;background:rgba(10,8,6,.7);color:#f6ead1}.live-tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0 22px}.live-tab{border:1px solid rgba(218,184,108,.35);border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.04);color:#f6ead1;cursor:pointer}.live-tab.active{background:rgba(218,184,108,.18);border-color:rgba(218,184,108,.8)}.live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}.live-card{border:1px solid rgba(218,184,108,.25);border-radius:18px;overflow:hidden;background:rgba(12,10,8,.62);box-shadow:0 12px 30px rgba(0,0,0,.22)}.live-card img{width:100%;height:160px;object-fit:cover;display:block}.live-card-body{padding:16px}.live-card h3{margin:8px 0 8px}.live-card h3 a{color:inherit;text-decoration:none}.live-card h3 a:hover{text-decoration:underline}.live-card p{opacity:.86;line-height:1.55}.live-pill{display:inline-block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;border:1px solid rgba(218,184,108,.32);border-radius:999px;padding:4px 8px;color:#dab86c}.live-split{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:22px}@media(max-width:900px){.live-split{grid-template-columns:1fr}}.live-timeline-row,.live-relation{border:1px solid rgba(218,184,108,.22);border-radius:16px;background:rgba(255,255,255,.035);padding:14px;margin-bottom:10px}.live-timeline-row h3{margin:6px 0}.live-timeline-row a{color:inherit}.live-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.live-tags span{font-size:.78rem;border:1px solid rgba(218,184,108,.25);border-radius:999px;padding:3px 7px;opacity:.9}.live-relation{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.live-relation small{opacity:.7}.live-muted{opacity:.75;text-align:center}.live-items-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.live-item-card{display:grid;grid-template-columns:82px minmax(0,1fr);gap:14px;border:1px solid rgba(218,184,108,.25);border-radius:18px;background:rgba(12,10,8,.62);padding:14px}.live-item-thumb,.live-item-placeholder{width:82px;height:82px;border-radius:14px;object-fit:cover;background:rgba(255,255,255,.055);display:grid;place-items:center;border:1px solid rgba(218,184,108,.2)}.live-item-body h3{margin:7px 0}.live-item-body h3 a{color:inherit;text-decoration:none}.live-item-body h3 a:hover{text-decoration:underline}.live-item-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px}.live-item-actions label{display:flex;flex-direction:column;gap:4px;font-size:.85rem}.live-item-owner-select{min-width:170px;padding:8px 10px;border-radius:10px;border:1px solid rgba(218,184,108,.35);background:#0b0806;color:#f6ead1}.mini-action{padding:8px 10px;font-size:.85rem}
+        .live-master-actions .button,.live-master-actions a.button{color:#fff!important}.live-toolbar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;justify-content:center;margin:22px 0}.live-search{min-width:min(520px,100%);padding:12px 14px;border:1px solid rgba(218,184,108,.35);border-radius:14px;background:rgba(10,8,6,.7);color:#f6ead1}.live-tabs{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:12px 0 22px}.live-tab{border:1px solid rgba(218,184,108,.35);border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.04);color:#f6ead1;cursor:pointer}.live-tab.active{background:rgba(218,184,108,.18);border-color:rgba(218,184,108,.8)}.live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}.live-card{border:1px solid rgba(218,184,108,.25);border-radius:18px;overflow:hidden;background:rgba(12,10,8,.62);box-shadow:0 12px 30px rgba(0,0,0,.22)}.live-card img{width:100%;height:160px;object-fit:cover;display:block}.live-card-body{padding:16px}.live-card h3{margin:8px 0 8px}.live-card h3 a{color:inherit;text-decoration:none}.live-card h3 a:hover{text-decoration:underline}.live-card p{opacity:.86;line-height:1.55}.live-pill{display:inline-block;font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;border:1px solid rgba(218,184,108,.32);border-radius:999px;padding:4px 8px;color:#dab86c}.live-split{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);gap:22px}@media(max-width:900px){.live-split{grid-template-columns:1fr}}.live-timeline-row,.live-relation{border:1px solid rgba(218,184,108,.22);border-radius:16px;background:rgba(255,255,255,.035);padding:14px;margin-bottom:10px}.live-timeline-row h3{margin:6px 0}.live-timeline-row a{color:inherit}.live-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.live-tags span{font-size:.78rem;border:1px solid rgba(218,184,108,.25);border-radius:999px;padding:3px 7px;opacity:.9}.live-relation{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.live-relation small{opacity:.7}.live-muted{opacity:.75;text-align:center}.live-items-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.live-item-card{display:grid;grid-template-columns:82px minmax(0,1fr);gap:14px;border:1px solid rgba(218,184,108,.25);border-radius:18px;background:rgba(12,10,8,.62);padding:14px}.live-item-thumb,.live-item-placeholder{width:82px;height:82px;border-radius:14px;object-fit:cover;background:rgba(255,255,255,.055);display:grid;place-items:center;border:1px solid rgba(218,184,108,.2)}.live-item-body h3{margin:7px 0}.live-item-body h3 a{color:inherit;text-decoration:none}.live-item-body h3 a:hover{text-decoration:underline}.live-item-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-top:12px}.live-item-actions label{display:flex;flex-direction:column;gap:4px;font-size:.85rem}.live-item-owner-select{min-width:170px;padding:8px 10px;border-radius:10px;border:1px solid rgba(218,184,108,.35);background:#0b0806;color:#f6ead1}.mini-action{padding:8px 10px;font-size:.85rem}
       </style>
-      <section class="hero export-hero"><div class="hero-box export-hero-box"><p class="eyebrow">Archivio Thalor</p><h1>Archivio Vivo</h1><p class="subtitle">Consulta i dati normalizzati del sito: personaggi, luoghi, sessioni, timeline e relazioni automatiche. Questa pagina è in sola lettura e non modifica salvataggi, login o Supabase.</p><div class="actions export-actions"><button class="button" id="refreshLiveBtn" type="button">Aggiorna Archivio Vivo</button><button class="button ghost-button" id="downloadLiveBtn" type="button">Scarica JSON normalizzato</button><a class="button ghost-button" href="esporta-json.html">Vai all’export completo</a></div></div></section>
-      <section class="panel export-panel"><h2 class="section-title">Panoramica</h2><p class="section-note">Le relazioni sono inferite automaticamente dalle citazioni nei testi: sono collegamenti utili, non ancora verità narrativa definitiva.</p><div class="export-stats" id="liveStats"></div><div class="live-toolbar"><input id="liveSearch" class="live-search" type="search" placeholder="Cerca personaggi, luoghi, sessioni, parole chiave…"/></div><div class="live-tabs" id="liveTabs"><button class="live-tab active" data-filter="all">Tutto</button><button class="live-tab" data-filter="pg">PG</button><button class="live-tab" data-filter="png">PNG</button><button class="live-tab" data-filter="places">Luoghi</button><button class="live-tab" data-filter="sessions">Sessioni</button></div><div class="live-grid" id="liveResults"><p class="live-muted">Aggiorna l’archivio per caricare i dati.</p></div></section>
+      <section class="hero export-hero"><div class="hero-box export-hero-box"><p class="eyebrow">Archivio Thalor</p><h1>Archivio Vivo</h1><p class="subtitle">Consulta i dati normalizzati del sito: personaggi, luoghi, sessioni, timeline, oggetti e incantesimi. Questa pagina è in sola lettura per i visitatori; gli strumenti di aggiornamento e download sono riservati al Master.</p>${masterActions}</div></section>
+      <section class="panel export-panel"><h2 class="section-title">Panoramica</h2><p class="section-note">Le relazioni sono inferite automaticamente dalle citazioni nei testi: sono collegamenti utili, non ancora verità narrativa definitiva.</p><div class="export-stats" id="liveStats"></div><div class="live-toolbar"><input id="liveSearch" class="live-search" type="search" placeholder="Cerca personaggi, luoghi, sessioni, parole chiave…"/></div><div class="live-tabs" id="liveTabs"><button class="live-tab active" data-filter="all">Tutto</button><button class="live-tab" data-filter="pg">PG</button><button class="live-tab" data-filter="png">PNG</button><button class="live-tab" data-filter="places">Luoghi</button><button class="live-tab" data-filter="sessions">Sessioni</button><button class="live-tab" data-filter="objects">Oggetti</button><button class="live-tab" data-filter="spells">Incantesimi</button></div><div class="live-grid" id="liveResults"><p class="live-muted">Aggiorna l’archivio per caricare i dati.</p></div></section>
       <section class="panel export-panel"><h2 class="section-title">Oggetti complessi</h2><p class="section-note">Compendio oggetti globali. Il Master può assegnare un oggetto particolare a un PG, rimuoverlo da tutti gli inventari o eliminarlo definitivamente dal database globale.</p><div class="live-items-grid" id="liveItems"><p class="live-muted">Aggiorna l’archivio per caricare gli oggetti.</p></div></section>
       <section class="live-split"><section class="panel"><h2 class="section-title">Timeline</h2><div id="liveTimeline"><p class="section-note">Aggiorna l’archivio per generare la timeline.</p></div></section><section class="panel"><h2 class="section-title">Relazioni automatiche</h2><div id="liveRelations"><p class="section-note">Aggiorna l’archivio per generare le relazioni.</p></div></section></section>
       <section class="panel"><h2 class="section-title">Log</h2><div class="export-log" id="liveLog" aria-live="polite"></div><p style="text-align:center;margin-top:28px"><a class="button ghost-button" href="../archivio.html">Torna all’Archivio</a></p></section><footer>Thalor</footer>`;
 
-    document.getElementById('refreshLiveBtn').onclick = async ()=>{
+    const refreshBtn = document.getElementById('refreshLiveBtn');
+    if(refreshBtn) refreshBtn.onclick = async ()=>{
       const btn = document.getElementById('refreshLiveBtn');
       btn.disabled = true;
       btn.textContent = 'Aggiorno…';
       try{ await collectArchive(); }
       finally{ btn.disabled = false; btn.textContent = 'Aggiorna Archivio Vivo'; }
     };
-    document.getElementById('downloadLiveBtn').onclick = downloadNormalized;
+    const downloadBtn = document.getElementById('downloadLiveBtn');
+    if(downloadBtn) downloadBtn.onclick = downloadNormalized;
     document.getElementById('liveSearch').addEventListener('input', (e)=>{ searchTerm = e.target.value || ''; renderResults(); });
     document.getElementById('liveTabs').addEventListener('click', (e)=>{
       const btn = e.target.closest('[data-filter]');
@@ -590,6 +639,11 @@
     });
   }
 
-  renderShell();
-  setTimeout(()=>collectArchive(), 250);
+  (async()=>{
+    if(window.ThalorAuth && typeof window.ThalorAuth.init === 'function'){
+      try{ await window.ThalorAuth.init(); }catch(e){}
+    }
+    renderShell();
+    setTimeout(()=>collectArchive(), 250);
+  })();
 })();

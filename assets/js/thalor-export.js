@@ -196,6 +196,25 @@
     return Object.entries(items).map(([id,item])=>Object.assign({ id }, item || {}, { id: String(item?.id || id) }));
   }
 
+  function inventoryCategoriesArray(items){
+    const map = new Map();
+    (items || []).forEach(item=>{
+      const candidates = [];
+      if(item.category) candidates.push(item.category);
+      if(item.type && !['complex','item','object'].includes(String(item.type).toLowerCase())) candidates.push(item.type);
+      if(Array.isArray(item.tags)) candidates.push(...item.tags);
+      candidates.forEach(raw=>{
+        const name = String(raw || '').trim();
+        if(!name) return;
+        const key = slugify(name);
+        const current = map.get(key) || { slug:key, name, count:0 };
+        current.count += 1;
+        map.set(key, current);
+      });
+    });
+    return [...map.values()].sort((a,b)=>a.name.localeCompare(b.name, 'it'));
+  }
+
   function spellName(spell){
     if(typeof spell === 'string') return spell;
     if(!spell || typeof spell !== 'object') return '';
@@ -302,8 +321,7 @@
     const sheets = normalizeSheets(onlineRows, registry);
     const inventoryData = compactInventoryForArchive(inventoryRes.data);
     const inventoryItems = inventoryItemsArray(inventoryData);
-    const inventoryItemCategories = inventoryCategories(inventoryItems);
-    if(inventoryData) inventoryData.categories = inventoryItemCategories;
+    const inventoryCategories = inventoryCategoriesArray(inventoryItems);
     const characterSpells = extractCharacterSpells(sheets);
     const characters = simplifyCharacters(registry, sheets);
     const playableCharacters = characters.filter(c=>c.type === 'pg');
@@ -347,7 +365,7 @@
         symbolsCategories: Array.isArray(symbolsRes.data?.categories) ? symbolsRes.data.categories.length : 0,
         inventoryItems: inventoryItems.length,
         complexItems: inventoryItems.length,
-        inventoryItemCategories: inventoryItemCategories.length,
+        inventoryCategories: inventoryCategories.length,
         characterSpellEntries: characterSpells.total
       },
       data: {
@@ -364,7 +382,7 @@
         inventory: inventoryData,
         inventoryDatabase: inventoryData,
         complexItems: inventoryItems,
-        inventoryItemCategories,
+        inventoryCategories,
         spells: characterSpells,
         compendium: {
           feats: staticData['assets/data/compendium/feats.json'] || null,
@@ -421,6 +439,7 @@
         ['Relazioni normalizzate', archive.summary.normalizedRelations || 0],
         ['Timeline normalizzata', archive.summary.normalizedTimeline || 0],
         ['Oggetti complessi', archive.summary.complexItems || 0],
+        ['Categorie oggetti', archive.summary.inventoryCategories || 0],
         ['Incantesimi nelle schede', archive.summary.characterSpellEntries || 0],
         ['Categorie documenti', archive.summary.documentsCategories],
         ['Categorie simboli', archive.summary.symbolsCategories]
@@ -473,6 +492,7 @@
 
   function renderLocked(){
     app.innerHTML = `
+      <style>.export-master-actions .button,.export-master-actions a.button{color:#fff!important}</style>
       <section class="hero export-hero">
         <div class="hero-box export-hero-box">
           <p class="eyebrow">Strumenti Master</p>
@@ -489,12 +509,13 @@
 
   function render(){
     app.innerHTML = `
+      <style>.export-master-actions .button,.export-master-actions a.button{color:#fff!important}</style>
       <section class="hero export-hero">
         <div class="hero-box export-hero-box">
           <p class="eyebrow">Archivio Thalor</p>
           <h1>Esporta JSON</h1>
           <p class="subtitle">Genera un unico file leggibile con personaggi, schede, luoghi, diario, esperienza, documenti, simboli, oggetti complessi, incantesimi delle schede e compendi statici. Include anche una sezione normalizzata con slug coerenti, relazioni automatiche e timeline base.</p>
-          <div class="actions export-actions">
+          <div class="actions export-actions export-master-actions">
             <button class="button" id="generateArchiveBtn" type="button">Genera archivio</button>
             <button class="button ghost-button" id="downloadArchiveBtn" type="button">Scarica JSON</button>
             <button class="button ghost-button" id="copyArchiveBtn" type="button">Copia JSON</button>
@@ -516,6 +537,10 @@
       btn.disabled = true;
       btn.textContent = 'Genero…';
       try{ await collectArchive(); }
+      catch(e){
+        console.error('Genera archivio fallito:', e);
+        log('Genera archivio non riuscito', e && e.message ? e.message : String(e));
+      }
       finally{ btn.disabled = false; btn.textContent = 'Genera archivio'; }
     };
     document.getElementById('downloadArchiveBtn').onclick = downloadArchive;
