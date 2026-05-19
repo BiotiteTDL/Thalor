@@ -10,6 +10,15 @@
   const isObject = (v)=>v && typeof v === 'object' && !Array.isArray(v);
   const slugify = (v)=>String(v||'oggetto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90) || 'oggetto';
   const norm = (v)=>String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  function isLocalPreview(){
+    try{
+      const h = String(location.hostname || '').toLowerCase();
+      const p = String(location.protocol || '').toLowerCase();
+      return p === 'file:' || h === '' || h === 'localhost' || h === '127.0.0.1' || h === '::1' ||
+        /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(h);
+    }catch(e){ return false; }
+  }
+
 
   function newId(prefix='item'){
     return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
@@ -246,7 +255,8 @@
     let staticSheet = null;
     try{ staticSheet = await fetchStaticSheet(slug); }catch(e){}
     try{
-      if(window.ThalorAuth && window.ThalorAuth.loadCharacter && navigator.onLine !== false){
+      const localMaster = !!(window.ThalorAuth?.state?.localMaster || window.ThalorAuth?.localMasterEnabled?.());
+      if(window.ThalorAuth && window.ThalorAuth.loadCharacter && navigator.onLine !== false && !(localMaster || isLocalPreview())){
         const online = await window.ThalorAuth.loadCharacter(slug, local || staticSheet, { publicRead:true, skipInit:true, timeoutMs:15000 });
         if(online) return normalizeSheetInventory(online);
       }
@@ -260,7 +270,8 @@
   async function saveSheet(slug, sheet){
     const data = writeLocalSheet(slug, sheet);
     try{
-      if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
+      const localMaster = !!(window.ThalorAuth?.state?.localMaster || window.ThalorAuth?.localMasterEnabled?.());
+      if(window.ThalorAuth && window.ThalorAuth.saveCharacter && !(localMaster || isLocalPreview())){
         await window.ThalorAuth.saveCharacter(slug, data, { timeoutMs:20000 });
       }
     }catch(e){
@@ -294,6 +305,7 @@
     const currency = lootCurrency(item);
     if(currency){
       d.money[currency] = (Number(d.money[currency]) || 0) + n;
+      d.__lootUpdatedAt = new Date().toISOString();
       return { sheet:d, mode:'money', currency };
     }
     const ref = String(item.itemRef||'').trim();
@@ -315,6 +327,7 @@
         instanceId: item.unique ? newId('instance') : '', history:[{ when:new Date().toISOString(), action:'loot-add', actor, qty:n }]
       }));
     }
+    d.__lootUpdatedAt = new Date().toISOString();
     return { sheet:d, mode:'item' };
   }
 
@@ -324,6 +337,7 @@
     const currency = lootCurrency(item);
     if(currency){
       d.money[currency] = Math.max(0, (Number(d.money[currency]) || 0) - n);
+      d.__lootUpdatedAt = new Date().toISOString();
       return { sheet:d, mode:'money', currency, removed:n };
     }
     const ref = String(item.itemRef||'').trim();
@@ -341,6 +355,7 @@
         left -= take;
       }
     }
+    if(n-left > 0) d.__lootUpdatedAt = new Date().toISOString();
     return { sheet:d, mode:'item', removed:n-left };
   }
 

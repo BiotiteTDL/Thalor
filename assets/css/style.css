@@ -10699,3 +10699,34 @@ body.tabletop-display-mode .tabletop-display-fullscreen{
 .loot-return-qty{width:64px;border:1px solid rgba(218,184,108,.25);background:rgba(0,0,0,.35);color:#f5e7c4;border-radius:999px;padding:7px 9px;text-align:center}
 .loot-return-btn{padding:7px 10px!important;font-size:.78rem!important}
 .inventory-db-preview{display:none!important}
+
+
+/* Loot UI fix: campi editabili scuri/leggibili, testo chiaro invariato */
+.loot-form-grid input,
+.loot-form-grid select,
+.loot-form-grid textarea,
+.loot-qty-control input,
+.loot-target,
+.loot-return-qty{
+  background:#050505!important;
+  color:#f5e7c4!important;
+  -webkit-text-fill-color:#f5e7c4!important;
+}
+.loot-form-grid input[type="file"]{
+  padding:8px 10px;
+  cursor:pointer;
+}
+.loot-form-grid input::file-selector-button{
+  border:1px solid rgba(218,184,108,.35);
+  background:#15100d;
+  color:#f5e7c4;
+  border-radius:10px;
+  padding:7px 10px;
+  margin-right:10px;
+  cursor:pointer;
+}
+.loot-form-grid option,
+.loot-target option{
+  background:#050505;
+  color:#f5e7c4;
+}
