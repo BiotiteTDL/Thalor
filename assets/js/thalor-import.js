@@ -10,7 +10,8 @@
     diario: 'diario',
     xp: 'xp',
     documenti: 'archive-documents',
-    simboli: 'archive-symbols'
+    simboli: 'archive-symbols',
+    inventario: '__inventory__'
   };
   const LOCAL_KEYS = {
     [SYSTEM_SLUGS.personaggi]: 'thalor.personaggi.registry.v2',
@@ -18,7 +19,8 @@
     [SYSTEM_SLUGS.diario]: 'thalor.diary.v1',
     [SYSTEM_SLUGS.xp]: 'thalor.xp.v1',
     [SYSTEM_SLUGS.documenti]: 'thalor.archive.documents.v1',
-    [SYSTEM_SLUGS.simboli]: 'thalor.archive.symbols.v1'
+    [SYSTEM_SLUGS.simboli]: 'thalor.archive.symbols.v1',
+    [SYSTEM_SLUGS.inventario]: 'thalor.inventory.v1'
   };
 
   let parsedArchive = null;
@@ -106,6 +108,7 @@
     if(isObject(data.xp)) planPush(SYSTEM_SLUGS.xp, data.xp, 'Tabella esperienza', 'data.xp');
     if(isObject(data.archiveDocuments)) planPush(SYSTEM_SLUGS.documenti, data.archiveDocuments, 'Documenti archivio', 'data.archiveDocuments');
     if(isObject(data.archiveSymbols)) planPush(SYSTEM_SLUGS.simboli, data.archiveSymbols, 'Simboli archivio', 'data.archiveSymbols');
+    if(isObject(data.inventory)) planPush(SYSTEM_SLUGS.inventario, data.inventory, 'Inventario globale / loot', 'data.inventory');
 
     // Schede personaggio: importiamo solo se presenti come coppie slug/data.
     safeArray(data.characterSheets).forEach(row=>{
@@ -140,7 +143,8 @@
         ['Schede', safeArray(parsedArchive?.data?.characterSheets).length],
         ['Luoghi', safeArray(parsedArchive?.data?.places?.places).length],
         ['Sessioni', safeArray(parsedArchive?.data?.diary?.sessions).length],
-        ['Relazioni normalizzate', safeArray(normalized?.relations).length]
+        ['Relazioni normalizzate', safeArray(normalized?.relations).length],
+        ['Oggetti inventario', parsedArchive?.data?.inventory?.items ? Object.keys(parsedArchive.data.inventory.items).length : 0]
       ].map(([k,v])=>`<div class="import-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
     }
     if(preview){

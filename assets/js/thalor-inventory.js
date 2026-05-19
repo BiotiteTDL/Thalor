@@ -1,0 +1,356 @@
+(function(){
+  'use strict';
+
+  const SYSTEM_SLUG = '__inventory__';
+  const STORAGE_KEY = 'thalor.inventory.v1';
+  const CURRENCY_KEYS = ['MP','MO','MA','MR'];
+
+  const esc = (v)=>String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safeArray = (v)=>Array.isArray(v) ? v : [];
+  const isObject = (v)=>v && typeof v === 'object' && !Array.isArray(v);
+  const slugify = (v)=>String(v||'oggetto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90) || 'oggetto';
+  const norm = (v)=>String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+
+  function newId(prefix='item'){
+    return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
+  }
+
+  const blankItem = {
+    id:'', name:'Nuovo oggetto', type:'generic', rarity:'', value:'', weight:'', image:'', page:'',
+    identified:true, identification:{ status:'identified', dc:'', method:'', notes:'' },
+    unique:false, uniqueId:'', description:'', publicNotes:'', gmNotes:'', tags:[], bonuses:[], history:[]
+  };
+
+  const blankDatabase = {
+    schema:'thalor_inventory_db_v1', version:1, updatedAt:'', items:{}, sharedLoot:{ sections:[] }
+  };
+
+  const blankStack = {
+    entryType:'simple', itemType:'simple', itemRef:'', instanceId:'', name:'Nuovo oggetto', qty:1,
+    weight:'', equipped:'No', identified:'Sì', image:'', page:'', bonuses:[], notes:'', history:[]
+  };
+
+  const blankLootItem = {
+    id:'', name:'Nuovo oggetto', qty:1, itemRef:'', entryType:'simple', itemType:'simple',
+    currency:'', unique:false, image:'', notes:'', publicNotes:'', taken:[], removed:false
+  };
+
+  function currencyFrom(input){
+    if(!input) return '';
+    const raw = norm(input).replace(/[._-]+/g,' ');
+    if(['mp','platino','monete platino','moneta platino','monete di platino','moneta di platino'].includes(raw)) return 'MP';
+    if(['mo','oro','monete oro','moneta oro','monete d oro','moneta d oro','monete di oro','moneta di oro','monete d\'oro','moneta d\'oro'].includes(raw)) return 'MO';
+    if(['ma','argento','monete argento','moneta argento','monete d argento','moneta d argento','monete di argento','moneta di argento'].includes(raw)) return 'MA';
+    if(['mr','rame','monete rame','moneta rame','monete di rame','moneta di rame'].includes(raw)) return 'MR';
+    return '';
+  }
+  function lootCurrency(item){
+    const explicit = currencyFrom(item?.currency || item?.coin || item?.moneyType || item?.denomination);
+    if(explicit) return explicit;
+    if(String(item?.type||'').toLowerCase()==='currency') return currencyFrom(item?.name);
+    return '';
+  }
+  function isCurrencyItem(item){ return !!lootCurrency(item); }
+
+  function normalizeDatabase(input){
+    const db = Object.assign({}, blankDatabase, isObject(input) ? input : {});
+    db.items = isObject(db.items) ? db.items : {};
+    const out = {};
+    Object.entries(db.items).forEach(([key,val])=>{
+      if(!isObject(val)) return;
+      const id = String(val.id || key || newId()).trim();
+      out[id] = Object.assign({}, blankItem, val, {
+        id,
+        identified: val.identified !== false,
+        identification: Object.assign({}, blankItem.identification, isObject(val.identification) ? val.identification : {}),
+        tags: safeArray(val.tags),
+        bonuses: safeArray(val.bonuses),
+        history: safeArray(val.history)
+      });
+    });
+    db.items = out;
+    db.sharedLoot = isObject(db.sharedLoot) ? db.sharedLoot : { sections:[] };
+    db.sharedLoot.sections = safeArray(db.sharedLoot.sections).map(sec=>Object.assign({ id:newId('loot'), name:'Loot condiviso', notes:'', items:[], log:[] }, sec || {}, {
+      id: sec?.id || newId('loot'),
+      items: safeArray(sec?.items).map(normalizeLootItem),
+      log: safeArray(sec?.log)
+    }));
+    return db;
+  }
+
+  function normalizeLootItem(input){
+    if(typeof input === 'string') input = { name: input };
+    const row = Object.assign({}, blankLootItem, isObject(input) ? input : {});
+    row.id = String(row.id || newId('lootitem')).trim();
+    if(row.ref && !row.itemRef) row.itemRef = row.ref;
+    if(row.itemId && !row.itemRef) row.itemRef = row.itemId;
+    if(row.itemRef) row.entryType = row.itemType = 'complex';
+    row.itemType = row.entryType === 'complex' || row.itemType === 'complex' ? 'complex' : 'simple';
+    row.entryType = row.itemType;
+    row.qty = Math.max(0, Number(row.qty ?? row.quantity ?? 1) || 0);
+    row.currency = lootCurrency(row);
+    row.unique = !!row.unique || row.qty === 1 && row.itemType === 'complex';
+    row.taken = safeArray(row.taken);
+    return row;
+  }
+
+  function normalizeStack(input){
+    if(typeof input === 'string') input = { name: input };
+    const row = Object.assign({}, blankStack, isObject(input) ? input : {});
+    if(row.ref && !row.itemRef) row.itemRef = row.ref;
+    if(row.itemId && !row.itemRef) row.itemRef = row.itemId;
+    if(row.kind === 'complex' && row.entryType === 'simple') row.entryType = 'complex';
+    if(row.itemRef) row.entryType = row.itemType = 'complex';
+    row.itemType = row.entryType === 'complex' || row.itemType === 'complex' ? 'complex' : 'simple';
+    row.entryType = row.itemType;
+    row.qty = Math.max(0, Number(row.qty ?? row.quantity ?? 1) || 0);
+    row.identified = String(row.identified ?? 'Sì');
+    row.bonuses = safeArray(row.bonuses);
+    row.history = safeArray(row.history);
+    if(!String(row.name||'').trim() && row.itemRef) row.name = '';
+    return row;
+  }
+
+  function normalizeSheetInventory(sheet){
+    const d = isObject(sheet) ? sheet : {};
+    d.inventoryDatabase = normalizeDatabase(d.inventoryDatabase);
+    d.inventorySections = safeArray(d.inventorySections);
+    if(!d.inventorySections.length && Array.isArray(d.inventory) && d.inventory.length){
+      d.inventorySections = [{ name:'Inventario', notes:'', items:d.inventory }];
+    }
+    d.inventorySections = d.inventorySections.map(sec=>Object.assign({ name:'Inventario', notes:'', items:[] }, sec || {}, {
+      items: safeArray(sec?.items).map(normalizeStack)
+    }));
+    d.inventory = safeArray(d.inventory).map(normalizeStack);
+    d.money = Object.assign({MP:0,MO:0,MA:0,MR:0}, isObject(d.money)?d.money:{});
+    CURRENCY_KEYS.forEach(k=>{ d.money[k] = Number(d.money[k] || 0) || 0; });
+    return d;
+  }
+
+  function effectiveItem(stack, db){
+    const s = normalizeStack(stack);
+    const database = normalizeDatabase(db);
+    const ref = s.itemRef ? database.items[s.itemRef] : null;
+    if(!ref) return s;
+    const identified = String(s.identified || '').toLowerCase().startsWith('s') || ref.identified === true || ref.identification?.status === 'identified';
+    const merged = Object.assign({}, ref, s, {
+      name: s.name || (identified ? ref.name : (ref.unidentifiedName || 'Oggetto non identificato')),
+      image: s.image || ref.image || '',
+      page: s.page || ref.page || '',
+      weight: s.weight || ref.weight || '',
+      notes: [identified ? ref.publicNotes : '', s.notes].filter(Boolean).join('\n\n'),
+      bonuses: safeArray(ref.bonuses).concat(safeArray(s.bonuses)),
+      identified: identified ? 'Sì' : 'No'
+    });
+    return merged;
+  }
+
+  function readLocal(){
+    try{ return normalizeDatabase(JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null')); }
+    catch(e){ return normalizeDatabase(null); }
+  }
+
+  function writeLocal(db){
+    const data = normalizeDatabase(db);
+    data.updatedAt = new Date().toISOString();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return data;
+  }
+
+  async function loadOnline(options={}){
+    try{
+      if(!window.ThalorAuth || !window.ThalorAuth.loadCharacter) return null;
+      const raw = await window.ThalorAuth.loadCharacter(SYSTEM_SLUG, null, Object.assign({ publicRead:true, skipInit:true, timeoutMs:15000 }, options));
+      if(!raw) return null;
+      return normalizeDatabase(raw);
+    }catch(e){ return null; }
+  }
+
+  async function saveOnline(db){
+    const data = writeLocal(db);
+    try{
+      if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
+        await window.ThalorAuth.saveCharacter(SYSTEM_SLUG, data, { timeoutMs:20000 });
+      }
+    }catch(e){ console.warn('Inventario globale: salvataggio online non riuscito', e); throw e; }
+    return data;
+  }
+
+
+  async function fetchStaticSheet(slug){
+    const s = String(slug||'').trim();
+    if(!s) return null;
+    const candidates = [
+      '../assets/data/characters/' + encodeURIComponent(s) + '.json',
+      './assets/data/characters/' + encodeURIComponent(s) + '.json',
+      'assets/data/characters/' + encodeURIComponent(s) + '.json'
+    ];
+    for(const url of candidates){
+      try{
+        const res = await fetch(url, { cache:'no-store' });
+        if(res && res.ok){
+          const data = await res.json();
+          if(data && typeof data === 'object') return data;
+        }
+      }catch(e){}
+    }
+    return null;
+  }
+
+  function hasRealSheetIdentity(sheet){
+    return !!(sheet && typeof sheet === 'object' && sheet.identity && (sheet.identity.name || sheet.meta || sheet.combat || sheet.abilities));
+  }
+
+  function mergeSheetKeepingLootAndMoney(base, local){
+    const out = Object.assign({}, base || {});
+    const loc = local && typeof local === 'object' ? local : {};
+    Object.keys(loc).forEach(k=>{
+      if(['inventorySections','inventory','inventoryDatabase','money'].includes(k)) return;
+      if(out[k] === undefined) out[k] = loc[k];
+    });
+    out.inventorySections = safeArray(loc.inventorySections).length ? loc.inventorySections : safeArray(out.inventorySections);
+    out.inventory = safeArray(loc.inventory).length ? loc.inventory : safeArray(out.inventory);
+    out.inventoryDatabase = loc.inventoryDatabase || out.inventoryDatabase;
+    out.money = Object.assign({}, out.money || {}, loc.money || {});
+    return out;
+  }
+
+
+  function sheetStorageKey(slug){ return 'thalor.sheet.' + String(slug||'').trim() + '.v5'; }
+  function sheetStorageKeys(slug){
+    const s = String(slug||'').trim();
+    return ['v5','v4','v3','v2','v1'].map(v=>'thalor.sheet.' + s + '.' + v);
+  }
+
+  function readLocalSheet(slug){
+    for(const key of sheetStorageKeys(slug)){
+      try{
+        const raw = localStorage.getItem(key);
+        if(raw) return JSON.parse(raw);
+      }catch(e){}
+    }
+    return null;
+  }
+
+  function writeLocalSheet(slug, sheet){
+    const data = normalizeSheetInventory(sheet || {});
+    try{
+      localStorage.setItem(sheetStorageKey(slug), JSON.stringify(data));
+      ['v4','v3','v2','v1'].forEach(v=>localStorage.removeItem('thalor.sheet.' + String(slug||'').trim() + '.' + v));
+    }catch(e){}
+    return data;
+  }
+
+  async function loadSheet(slug){
+    const local = readLocalSheet(slug);
+    let staticSheet = null;
+    try{ staticSheet = await fetchStaticSheet(slug); }catch(e){}
+    try{
+      if(window.ThalorAuth && window.ThalorAuth.loadCharacter && navigator.onLine !== false){
+        const online = await window.ThalorAuth.loadCharacter(slug, local || staticSheet, { publicRead:true, skipInit:true, timeoutMs:15000 });
+        if(online) return normalizeSheetInventory(online);
+      }
+    }catch(e){}
+    if(local && staticSheet && !hasRealSheetIdentity(local)) return normalizeSheetInventory(mergeSheetKeepingLootAndMoney(staticSheet, local));
+    if(local) return normalizeSheetInventory(local);
+    if(staticSheet) return normalizeSheetInventory(staticSheet);
+    return normalizeSheetInventory({});
+  }
+
+  async function saveSheet(slug, sheet){
+    const data = writeLocalSheet(slug, sheet);
+    try{
+      if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
+        await window.ThalorAuth.saveCharacter(slug, data, { timeoutMs:20000 });
+      }
+    }catch(e){
+      console.warn('Scheda salvata in locale, ma non online:', slug, e);
+      data.__lootOnlineSaveError = e && (e.message || String(e));
+    }
+    return data;
+  }
+
+  function primaryAuthCharacter(){
+    const auth = window.ThalorAuth;
+    const st = auth?.state || {};
+    const access = safeArray(st.access).filter(a=>a && a.can_edit && a.character_slug && !String(a.character_slug).startsWith('__'));
+    if(access.length === 1) return String(access[0].character_slug);
+    return '';
+  }
+
+  function currentActorLabel(){
+    const auth = window.ThalorAuth;
+    const st = auth?.state || {};
+    try{
+      if(auth?.localMasterEnabled?.() || st.localMaster) return 'Master offline';
+    }catch(e){}
+    if(auth?.isMaster?.() && !st.user) return 'Master';
+    return st.profile?.display_name || st.user?.user_metadata?.full_name || st.user?.email || 'Giocatore';
+  }
+
+  function addStackToSheet(sheet, item, qty, actor){
+    const d = normalizeSheetInventory(sheet || {});
+    const n = Math.max(1, Number(qty)||1);
+    const currency = lootCurrency(item);
+    if(currency){
+      d.money[currency] = (Number(d.money[currency]) || 0) + n;
+      return { sheet:d, mode:'money', currency };
+    }
+    const ref = String(item.itemRef||'').trim();
+    let section = d.inventorySections.find(s=>String(s.name||'').toLowerCase()==='loot');
+    if(!section){ section = { name:'Loot', notes:'Oggetti presi dalla pagina Loot. Puoi spostarli in qualsiasi categoria dell’inventario in modalità modifica.', items:[] }; d.inventorySections.unshift(section); }
+    const match = section.items.find(x=>{
+      if(ref) return String(x.itemRef||'') === ref;
+      return !x.itemRef && norm(x.name) === norm(item.name);
+    });
+    if(match && !item.unique){
+      match.qty = (Number(match.qty)||0) + n;
+      match.history = safeArray(match.history);
+      match.history.push({ when:new Date().toISOString(), action:'loot-add', actor, qty:n });
+    }else{
+      section.items.unshift(normalizeStack({
+        entryType: ref ? 'complex' : 'simple', itemType: ref ? 'complex' : 'simple', itemRef: ref,
+        sourceLootItemId: item.id || '', sourceLootName: item.name || '',
+        name: item.name || item.itemRef || 'Oggetto', qty:n, image:item.image||'', page:item.page||'', notes:item.notes||item.publicNotes||'',
+        instanceId: item.unique ? newId('instance') : '', history:[{ when:new Date().toISOString(), action:'loot-add', actor, qty:n }]
+      }));
+    }
+    return { sheet:d, mode:'item' };
+  }
+
+  function removeStackFromSheet(sheet, item, qty, actor){
+    const d = normalizeSheetInventory(sheet || {});
+    const n = Math.max(1, Number(qty)||1);
+    const currency = lootCurrency(item);
+    if(currency){
+      d.money[currency] = Math.max(0, (Number(d.money[currency]) || 0) - n);
+      return { sheet:d, mode:'money', currency, removed:n };
+    }
+    const ref = String(item.itemRef||'').trim();
+    let left = n;
+    for(const section of d.inventorySections){
+      section.items = safeArray(section.items);
+      for(let i=section.items.length-1;i>=0 && left>0;i--){
+        const x = section.items[i];
+        const same = ref ? String(x.itemRef||'') === ref : (!x.itemRef && norm(x.name) === norm(item.name));
+        if(!same) continue;
+        const have = Math.max(0, Number(x.qty)||0);
+        const take = Math.min(have || 1, left);
+        if(have <= take) section.items.splice(i,1);
+        else { x.qty = have - take; x.history = safeArray(x.history); x.history.push({ when:new Date().toISOString(), action:'loot-return', actor, qty:take }); }
+        left -= take;
+      }
+    }
+    return { sheet:d, mode:'item', removed:n-left };
+  }
+
+  window.ThalorInventory = {
+    SYSTEM_SLUG, STORAGE_KEY, CURRENCY_KEYS, blankItem, blankStack, blankLootItem,
+    esc, slugify, newId, norm,
+    normalizeDatabase, normalizeStack, normalizeLootItem, normalizeSheetInventory, effectiveItem,
+    currencyFrom, lootCurrency, isCurrencyItem,
+    readLocal, writeLocal, loadOnline, saveOnline,
+    sheetStorageKey, sheetStorageKeys, readLocalSheet, writeLocalSheet, loadSheet, saveSheet,
+    fetchStaticSheet, primaryAuthCharacter, currentActorLabel, addStackToSheet, removeStackFromSheet
+  };
+})();

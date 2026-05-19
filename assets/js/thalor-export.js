@@ -11,7 +11,8 @@
     diario: 'diario',
     xp: 'xp',
     documenti: 'archive-documents',
-    simboli: 'archive-symbols'
+    simboli: 'archive-symbols',
+    inventario: '__inventory__'
   };
   const LOCAL_KEYS = {
     personaggi: 'thalor.personaggi.registry.v2',
@@ -19,7 +20,8 @@
     diario: 'thalor.diary.v1',
     xp: 'thalor.xp.v1',
     documenti: 'thalor.archive.documents.v1',
-    simboli: 'thalor.archive.symbols.v1'
+    simboli: 'thalor.archive.symbols.v1',
+    inventario: 'thalor.inventory.v1'
   };
   const PLAYABLE_SLUGS = new Set(['abraxas','igor','ralph','arolf','irven']);
   const STATIC_JSON = [
@@ -199,13 +201,14 @@
       return { source:'missing', data:null };
     };
 
-    const [registryRes, placesRes, diaryRes, xpRes, documentsRes, symbolsRes] = await Promise.all([
+    const [registryRes, placesRes, diaryRes, xpRes, documentsRes, symbolsRes, inventoryRes] = await Promise.all([
       loadPriority('personaggi', SYSTEM_SLUGS.personaggi, LOCAL_KEYS.personaggi),
       loadPriority('luoghi', SYSTEM_SLUGS.luoghi, LOCAL_KEYS.luoghi),
       loadPriority('diario', SYSTEM_SLUGS.diario, LOCAL_KEYS.diario),
       loadPriority('xp', SYSTEM_SLUGS.xp, LOCAL_KEYS.xp),
       loadPriority('documenti', SYSTEM_SLUGS.documenti, LOCAL_KEYS.documenti),
-      loadPriority('simboli', SYSTEM_SLUGS.simboli, LOCAL_KEYS.simboli)
+      loadPriority('simboli', SYSTEM_SLUGS.simboli, LOCAL_KEYS.simboli),
+      loadPriority('inventario', SYSTEM_SLUGS.inventario, LOCAL_KEYS.inventario)
     ]);
 
     const staticData = {};
@@ -247,6 +250,7 @@
         xp: xpRes.source,
         documenti: documentsRes.source,
         simboli: symbolsRes.source,
+        inventario: inventoryRes.source,
         characterSheets: onlineRows.length ? 'supabase-list/localStorage-fallback' : 'localStorage/static-fallback',
         staticJson: Object.keys(staticData)
       },
@@ -259,7 +263,8 @@
         sessions: Array.isArray(diaryRes.data?.sessions) ? diaryRes.data.sessions.length : 0,
         xpEvents: Array.isArray(xpRes.data?.registro_xp) ? xpRes.data.registro_xp.length : 0,
         documentsCategories: Array.isArray(documentsRes.data?.categories) ? documentsRes.data.categories.length : 0,
-        symbolsCategories: Array.isArray(symbolsRes.data?.categories) ? symbolsRes.data.categories.length : 0
+        symbolsCategories: Array.isArray(symbolsRes.data?.categories) ? symbolsRes.data.categories.length : 0,
+        inventoryItems: inventoryRes.data?.items ? Object.keys(inventoryRes.data.items).length : 0
       },
       data: {
         registry: normalizeRegistry(registry),
@@ -272,6 +277,7 @@
         xp: xpRes.data || staticData['assets/data/xp.json'] || null,
         archiveDocuments: documentsRes.data || null,
         archiveSymbols: symbolsRes.data || null,
+        inventory: inventoryRes.data || null,
         compendium: {
           feats: staticData['assets/data/compendium/feats.json'] || null,
           features: staticData['assets/data/compendium/features.json'] || null,

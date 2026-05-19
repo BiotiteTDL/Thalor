@@ -2312,6 +2312,46 @@ body.editing .dynamic-sheet-page .spell-circle-adder{
   background:var(--sheet-accent-soft);
 }
 
+.dynamic-sheet-page .hp-quick-control{
+  margin-top:8px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  color:var(--sheet-ink)!important;
+}
+.dynamic-sheet-page .hp-quick-control .hp-quick-label{
+  font-size:.78rem;
+  opacity:.82;
+  color:var(--sheet-ink);
+}
+.dynamic-sheet-page .hp-quick-control strong{
+  min-width:34px;
+  text-align:center;
+  color:var(--sheet-accent);
+}
+.dynamic-sheet-page .hp-quick-actions{
+  display:inline-flex;
+  gap:5px;
+  flex-wrap:wrap;
+}
+.dynamic-sheet-page .hp-step{
+  min-width:30px;
+  height:28px;
+  border-radius:999px;
+  border:1px solid var(--sheet-border);
+  background:rgba(0,0,0,.28);
+  color:var(--sheet-accent);
+  font-weight:900;
+  cursor:pointer;
+  line-height:1;
+}
+.dynamic-sheet-page .hp-step:hover{
+  border-color:var(--sheet-accent);
+  background:var(--sheet-accent-soft);
+}
+#characterSheetApp.no-edit-permission .hp-quick-control{display:none!important;}
+
 
 /* v87 — stabilizzazione edit/salva e rifinitura menu modifica */
 .dynamic-sheet-page{
@@ -10634,3 +10674,28 @@ body.tabletop-display-mode .tabletop-display-fullscreen{
   opacity:.75!important;
   cursor:wait!important;
 }
+
+/* Inventario / Loot Thalor — patch retrocompatibile v1 */
+.inventory-complex-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;padding:10px;border:1px solid rgba(218,184,108,.18);border-radius:14px;background:rgba(255,255,255,.025)}
+.inventory-complex-fields label{display:flex;flex-direction:column;gap:4px;font-size:.82rem;color:#e8d6ad}
+.inventory-item-thumb{width:48px;height:48px;object-fit:cover;border-radius:12px;border:1px solid rgba(218,184,108,.35);box-shadow:0 8px 18px rgba(0,0,0,.22);flex:0 0 auto}
+.inventory-type-badge{display:inline-flex;align-items:center;border:1px solid rgba(218,184,108,.28);border-radius:999px;padding:3px 7px;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:#f2dfb3;background:rgba(255,255,255,.035)}
+.inventory-type-badge.complex{border-color:rgba(126,181,255,.36)}
+.inventory-type-badge.simple{opacity:.82}
+.inventory-type-badge.unidentified{border-color:rgba(180,25,45,.42);color:#ffd1d8}
+.inventory-type-badge.unique{border-color:rgba(218,184,108,.58);box-shadow:0 0 0 1px rgba(218,184,108,.08) inset}
+.inventory-db-preview{margin-top:16px;padding:14px;border:1px dashed rgba(218,184,108,.28);border-radius:16px;background:rgba(12,10,8,.35)}
+.loot-system-note{margin-bottom:22px}.loot-summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.loot-summary span,.loot-tags span{border:1px solid rgba(218,184,108,.28);border-radius:999px;padding:4px 8px;font-size:.78rem;color:#f2dfb3;background:rgba(255,255,255,.035)}
+.loot-item-card{overflow:hidden}.loot-item-card>img{width:100%;height:170px;object-fit:cover;display:block}.loot-placeholder{height:170px;display:grid;place-items:center;font-size:2.4rem;background:rgba(255,255,255,.035)}.loot-card-body{padding:16px}.loot-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}.loot-shared-section ul{margin:10px 0 0;padding-left:20px}.loot-shared-section li{margin:6px 0}
+
+/* Loot phase 1 fix: valuta separata, presa da auth, controlli master sicuri */
+.loot-status{margin-top:10px;min-height:1.2em;color:#f2dfb3}.loot-status.ok{color:#bfe8b7}.loot-status.warn{color:#ffd08a}.loot-master-panel{margin:22px 0}.loot-master-panel summary{cursor:pointer;color:#f2dfb3}.loot-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:16px}.loot-form-grid label{display:flex;flex-direction:column;gap:6px;color:#d8c391;font-size:.88rem}.loot-form-grid input,.loot-form-grid select{width:100%;border:1px solid rgba(218,184,108,.25);background:rgba(0,0,0,.35);color:#f5e7c4;border-radius:12px;padding:10px}.loot-form-grid input[type="checkbox"]{width:auto}.loot-wide{grid-column:1/-1}.loot-form-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}.loot-section{margin:22px 0}.loot-section>.section-head{align-items:flex-start}.loot-take-list{display:grid;gap:14px}.loot-take-card{display:grid;grid-template-columns:94px 1fr;gap:14px;border:1px solid rgba(218,184,108,.18);border-radius:18px;background:rgba(0,0,0,.18);padding:12px}.loot-mini-img,.loot-mini-placeholder{width:94px;height:94px;border-radius:14px;object-fit:cover;background:rgba(255,255,255,.045);display:grid;place-items:center;font-size:2rem}.loot-card-top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between}.loot-card-top h3{margin:0;color:#f4dfb6}.loot-badges{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.loot-badge,.loot-taken-chip,.loot-auth-target{border:1px solid rgba(218,184,108,.25);border-radius:999px;padding:4px 8px;font-size:.75rem;color:#f2dfb3;background:rgba(255,255,255,.035)}.loot-badge.money{border-color:rgba(255,209,116,.45)}.loot-badge.unique{border-color:rgba(204,93,93,.45)}.loot-item-note{margin:8px 0;color:#d5c6a5}.loot-remaining{font-weight:700;color:#f2dfb3;margin:8px 0}.loot-taken-details{margin:8px 0}.loot-taken-details summary{cursor:pointer;color:#c9b27c}.loot-taken-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.loot-muted{opacity:.65}.loot-actions-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}.loot-qty-control{display:inline-flex;align-items:center;border:1px solid rgba(218,184,108,.25);border-radius:999px;overflow:hidden;background:rgba(0,0,0,.25)}.loot-qty-control button{border:0;background:rgba(255,255,255,.06);color:#f2dfb3;width:34px;height:34px;font-size:1.1rem;cursor:pointer}.loot-qty-control input{width:60px;text-align:center;border:0;border-left:1px solid rgba(218,184,108,.18);border-right:1px solid rgba(218,184,108,.18);background:transparent;color:#f5e7c4;height:34px}.loot-target{border:1px solid rgba(218,184,108,.25);background:rgba(0,0,0,.35);color:#f5e7c4;border-radius:999px;padding:9px 12px}.loot-log{margin-top:14px}.loot-log summary{cursor:pointer;color:#c9b27c}.loot-log li{margin:6px 0;color:#d8c391}.inventory-type-badge,.inventory-ref-badge,.inventory-id-badge,.inventory-unique-badge{display:inline-flex;border:1px solid rgba(218,184,108,.25);border-radius:999px;padding:3px 7px;font-size:.72rem;color:#f2dfb3;background:rgba(255,255,255,.035);margin-right:4px}.inventory-type-badge.complex,.inventory-unique-badge{border-color:rgba(188,127,255,.4)}.inventory-id-badge.unidentified{border-color:rgba(204,93,93,.45)}
+@media(max-width:700px){.loot-take-card{grid-template-columns:1fr}.loot-mini-img,.loot-mini-placeholder{width:100%;height:150px}.loot-card-top{display:block}.loot-badges{justify-content:flex-start;margin-top:8px}.loot-actions-row .button{width:100%;justify-content:center}.loot-target{width:100%}}
+
+/* Loot restituzione e inventario normale — patch v2 */
+.loot-taken-list{display:block}
+.loot-taken-entry{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0}
+.loot-return-controls{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.loot-return-qty{width:64px;border:1px solid rgba(218,184,108,.25);background:rgba(0,0,0,.35);color:#f5e7c4;border-radius:999px;padding:7px 9px;text-align:center}
+.loot-return-btn{padding:7px 10px!important;font-size:.78rem!important}
+.inventory-db-preview{display:none!important}

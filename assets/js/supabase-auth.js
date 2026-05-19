@@ -518,6 +518,12 @@
     if(isMaster()) return true;
 
     const wanted = norm(slug);
+    // Il loot condiviso è un documento di sistema: i giocatori autenticati devono poterlo
+    // aggiornare quando prelevano un oggetto, mentre la pagina limita comunque le azioni
+    // distruttive ai Master. Se Supabase ha policy più restrittive, il salvataggio online
+    // fallirà in modo esplicito senza toccare gli inventari già salvati.
+    if(wanted === '__inventory__' && state.user) return true;
+
     return !!(state.access || []).find(a =>
       norm(a.character_slug) === wanted &&
       a.can_edit === true
