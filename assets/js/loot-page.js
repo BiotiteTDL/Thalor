@@ -166,13 +166,14 @@
   }
 
   async function saveDb(msg='Loot salvato.'){
-    state.db = inv.writeLocal(state.db);
+    state.db = inv.normalizeDatabase(state.db);
     if(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false){
+      state.db = inv.writeLocal(state.db);
       notify(msg + ' (locale)', 'ok');
       return state.db;
     }
     try{ state.db = await inv.saveOnline(state.db); notify(msg,'ok'); }
-    catch(e){ notify('Salvato in locale, ma non online: '+(e.message||e),'warn'); }
+    catch(e){ notify('Salvataggio online non riuscito: '+(e.message||e),'warn'); }
     return state.db;
   }
 
@@ -190,7 +191,7 @@
     return sec;
   }
 
-  function resizeLootImageFile(file, maxSide=760, quality=0.68, maxChars=220000){
+  function resizeLootImageFile(file, maxSide=760, quality=0.68, maxChars=900000){
     return new Promise(resolve=>{
       if(!file || !String(file.type||'').startsWith('image/')){ resolve(''); return; }
       const reader = new FileReader();
@@ -217,7 +218,7 @@
             let out = make();
             while(out.length > maxChars && q > 0.42){ q -= 0.08; out = make(); }
             while(out.length > maxChars && side > 420){ side = Math.round(side*0.82); q = Math.max(0.42, q-0.04); out = make(); }
-            resolve(out.length <= Math.max(maxChars*1.45, 320000) ? out : '');
+            resolve(out.length <= Math.max(maxChars*1.15, 980000) ? out : '');
           }catch(e){ resolve(''); }
         };
         img.src = String(reader.result||'');

@@ -164,10 +164,31 @@
     catch(e){ return normalizeDatabase(null); }
   }
 
+  function stripOnlineImagesForLocal(value){
+    try{
+      const copy = JSON.parse(JSON.stringify(value || {}));
+      const walk = (node)=>{
+        if(!node || typeof node !== 'object') return;
+        if(Array.isArray(node)){ node.forEach(walk); return; }
+        Object.keys(node).forEach(k=>{
+          if(k === 'image' && typeof node[k] === 'string' && node[k].startsWith('data:image/')) node[k] = '';
+          else walk(node[k]);
+        });
+      };
+      walk(copy);
+      return copy;
+    }catch(e){ return value; }
+  }
+
   function writeLocal(db){
     const data = normalizeDatabase(db);
     data.updatedAt = new Date().toISOString();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    try{
+      const localCopy = stripOnlineImagesForLocal(data);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localCopy));
+    }catch(e){
+      console.warn('Inventario globale: cache locale saltata (probabile quota localStorage). I dati online restano usabili.', e);
+    }
     return data;
   }
 
@@ -181,11 +202,13 @@
   }
 
   async function saveOnline(db){
-    const data = writeLocal(db);
+    const data = normalizeDatabase(db);
+    data.updatedAt = new Date().toISOString();
     try{
       if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
         await window.ThalorAuth.saveCharacter(SYSTEM_SLUG, data, { timeoutMs:20000 });
       }
+      writeLocal(data);
     }catch(e){ console.warn('Inventario globale: salvataggio online non riuscito', e); throw e; }
     return data;
   }
@@ -385,7 +408,7 @@
     return Object.assign({}, blankItem, item.databaseItem || {}, {
       id: ref,
       name: item.name || item.databaseItem?.name || 'Oggetto',
-      image: item.image || item.databaseItem?.image || '',
+      image: '',
       page: item.page || item.databaseItem?.page || itemPageUrl(ref),
       publicNotes: item.publicNotes || item.notes || item.databaseItem?.publicNotes || '',
       description: item.description || item.databaseItem?.description || '',
@@ -432,7 +455,7 @@
       section.items.unshift(normalizeStack({
         entryType: ref ? 'complex' : 'simple', itemType: ref ? 'complex' : 'simple', itemRef: ref,
         sourceLootItemId: item.id || '', sourceLootName: item.name || '',
-        name: item.name || item.itemRef || 'Oggetto', qty:n, image:item.image||'', page:item.page || (ref ? itemPageUrl(ref) : ''), notes:item.notes||item.publicNotes||'',
+        name: item.name || item.itemRef || 'Oggetto', qty:n, image:ref ? '' : (item.image||''), page:item.page || (ref ? itemPageUrl(ref) : ''), notes:item.notes||item.publicNotes||'',
         identified: ref ? ((item.identified === true || item.identification?.status === 'identified') ? 'Sì' : 'No') : 'Sì',
         instanceId: item.unique ? newId('instance') : '', history:[{ when:new Date().toISOString(), action:'loot-add', actor, qty:n }]
       }));

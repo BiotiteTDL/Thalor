@@ -37,7 +37,7 @@
     const box=document.getElementById('itemStatus');
     if(box){box.textContent=msg||'';box.className='loot-status '+(kind||'');}
   }
-  function resizeItemImageFile(file, maxSide=860, quality=0.70, maxChars=240000){
+  function resizeItemImageFile(file, maxSide=860, quality=0.70, maxChars=900000){
     return new Promise(resolve=>{
       if(!file || !String(file.type||'').startsWith('image/')){ resolve(''); return; }
       const reader=new FileReader();
@@ -64,7 +64,7 @@
             let out=make();
             while(out.length>maxChars && q>0.42){ q-=0.08; out=make(); }
             while(out.length>maxChars && side>420){ side=Math.round(side*0.82); q=Math.max(0.42,q-0.04); out=make(); }
-            resolve(out.length<=Math.max(maxChars*1.45,340000)?out:'');
+            resolve(out.length<=Math.max(maxChars*1.15,980000)?out:'');
           }catch(e){ resolve(''); }
         };
         img.src=String(reader.result||'');
@@ -90,16 +90,13 @@
     return state.item;
   }
   async function saveDb(){
+    state.db=inv.normalizeDatabase(state.db);
     state.db.updatedAt=new Date().toISOString();
-    try{ inv.writeLocal(state.db); }
-    catch(e){
-      if(String(e&&e.message||e).toLowerCase().includes('quota')){
-        throw new Error('Spazio locale esaurito: immagine troppo pesante. Riprova con un file più piccolo.');
-      }
-      throw e;
+    if(inv.shouldUseOnline?.()){
+      state.db = await inv.saveOnline(state.db);
+    }else{
+      state.db = inv.writeLocal(state.db);
     }
-    if(!inv.shouldUseOnline?.()) return;
-    await inv.saveOnline(state.db);
   }
   function render(){
     if(!inv){app.innerHTML='<article class="card"><h3>Modulo inventario non caricato</h3></article>';return;}
@@ -145,7 +142,7 @@
     try{ if(window.ThalorAuth?.init) await window.ThalorAuth.init(); }catch(e){}
     state.db=inv.readLocal();
     if(!isLocalPreview() && !inv.isOfflineMaster?.() && navigator.onLine!==false){
-      try{const online=await inv.loadOnline(); if(online) state.db=inv.writeLocal(online);}catch(e){}
+      try{const online=await inv.loadOnline(); if(online){ state.db=online; inv.writeLocal(online); }}catch(e){}
     }
     ensureItem();
     render();
