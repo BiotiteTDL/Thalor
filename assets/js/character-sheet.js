@@ -305,35 +305,79 @@ function yesNo(path,val){const v=String(val||'No'); const yes=(v==='Sì'||v==='t
 function readonly(v){return `<output>${richText(v)}</output>`}
 function tipText(x,f='Descrizione da aggiungere.'){const p=[];const desc=String(x?.description||x?.notes||'').trim();const source=String(x?.source||'').trim();if(desc)p.push(desc);if(source)p.push(`Fonte / note:\n${source}`);return p.length?p.join('\n\n'):f}
 function setPath(obj,path,value){let p=path.split('.'),o=obj;for(let i=0;i<p.length-1;i++){let k=p[i],n=p[i+1];if(!(k in o)||o[k]==null)o[k]=/^\d+$/.test(n)?[]:{};o=o[k];}o[p.at(-1)]=value}
-function stripHeavySheetPayload(value,options={}){
-  const dropInventoryDatabase=options.dropInventoryDatabase===true;
-  const seen=new WeakMap();
-  const walk=(node,path=[])=>{
-    if(node==null||typeof node!=='object')return node;
-    if(seen.has(node))return seen.get(node);
-    if(Array.isArray(node)){const arr=[];seen.set(node,arr);node.forEach((v,i)=>arr[i]=walk(v,path.concat(String(i))));return arr;}
-    const out={};seen.set(node,out);
-    Object.keys(node).forEach(k=>{
-      if(dropInventoryDatabase&&k==='inventoryDatabase'){out[k]=normalizeInventoryDb(null);return;}
-      const v=node[k];
-      if((k==='image'||k==='img'||k==='portraitImage')&&typeof v==='string'&&v.startsWith('data:image/')){out[k]='';return;}
-      if(typeof v==='string'&&v.length>240000&&v.startsWith('data:')){out[k]='';return;}
-      out[k]=walk(v,path.concat(k));
-    });
-    return out;
+
+function isDataImageString(v){return typeof v==='string' && /^data:image\//i.test(v) && v.length>12000;}
+function lightInventoryStackForSheet(it){
+  it=it&&typeof it==='object'?it:{};
+  const ref=String(it.itemRef||it.ref||it.itemId||'').trim();
+  const out={
+    entryType: ref?'complex':(it.entryType||it.itemType||'simple'),
+    itemType: ref?'complex':(it.itemType||it.entryType||'simple'),
+    itemRef: ref,
+    instanceId: it.instanceId||'',
+    name: it.name||it.displayName||'',
+    qty: it.qty??1,
+    weight: it.weight||'',
+    equipped: it.equipped||'No',
+    identified: it.identified||'Sì',
+    page: it.page||'',
+    notes: it.notes||'',
+    bonuses: normalizeBonusList(it.bonuses||[]),
+    history: asArray(it.history).map(h=>({
+      owner:h.owner||h.slug||'',
+      action:h.action||'',
+      qty:h.qty??'',
+      when:h.when||h.date||''
+    })).slice(-20)
   };
-  return walk(value);
+  // Le immagini degli oggetti complessi vivono nel database globale __inventory__.
+  // Dentro la scheda lasciamo solo URL leggeri; mai base64 pesante, perché blocca/quota il salvataggio.
+  if(it.image && !isDataImageString(it.image)) out.image=it.image;
+  else out.image='';
+  return out;
 }
-function prepareSheetForPersistence(data){
-  const c=stripHeavySheetPayload(data,{dropInventoryDatabase:false});
-  if(c&&c.inventoryDatabase&&c.inventoryDatabase.items){
-    Object.values(c.inventoryDatabase.items).forEach(it=>{
-      if(it&&typeof it==='object'&&typeof it.image==='string'&&it.image.startsWith('data:image/')) it.image='';
-    });
-  }
+function lightInventoryDbForSheet(db){
+  // La scheda deve contenere solo riferimenti agli item; il database completo resta in __inventory__.
+  return {schema:'thalor_inventory_db_v1',version:1,items:{},sharedLoot:{sections:[]}};
+}
+function lightSheetForCollect(data){
+  const c=Object.assign({}, data||{});
+  c.inventoryDatabase=lightInventoryDbForSheet(c.inventoryDatabase);
+  c.inventorySections=asArray(c.inventorySections).map(sec=>({
+    name:sec?.name||'Inventario',
+    notes:sec?.notes||'',
+    items:asArray(sec?.items).map(lightInventoryStackForSheet)
+  }));
+  c.inventory=asArray(c.inventory).map(lightInventoryStackForSheet);
+  // Evita che eventuali dati globali finiti per errore nella scheda vengano risalvati.
+  delete c.__inventory__;
+  delete c.globalInventory;
+  delete c.itemDatabase;
+  return JSON.parse(JSON.stringify(c));
+}
+function stripSheetForSave(data){
+  const d=lightSheetForCollect(data);
+  d.inventoryDatabase=lightInventoryDbForSheet(null);
+  d.inventorySections=asArray(d.inventorySections).map(sec=>Object.assign({},sec,{items:asArray(sec.items).map(lightInventoryStackForSheet)}));
+  d.inventory=asArray(d.inventory).map(lightInventoryStackForSheet);
+  if(d.companions) d.companions=asArray(d.companions).map(c=>{
+    const cc=Object.assign({},c||{});
+    if(cc.sheet) cc.sheet=stripSheetForSave(cc.sheet);
+    return cc;
+  });
+  return d;
+}
+function collect(data){
+  let c=lightSheetForCollect(data);
+  document.querySelectorAll('[data-path]').forEach(el=>{
+    let val=(el.type==='number')?num(el.value):el.value;
+    // Non raccogliere base64 enormi dagli item della scheda: l'immagine vera è nel database oggetti globale.
+    if(/inventorySections\.\d+\.items\.\d+\.image$/.test(el.dataset.path||'') && isDataImageString(val)) val='';
+    setPath(c,el.dataset.path,val)
+  });
+  c=stripSheetForSave(c);
   return c;
 }
-function collect(data){let c=stripHeavySheetPayload(data,{dropInventoryDatabase:false});document.querySelectorAll('[data-path]').forEach(el=>{let val=(el.type==='number')?num(el.value):el.value;setPath(c,el.dataset.path,val)});return c}
 
 function addImpliedConditionRows(d){
  const existing=new Map((d.conditions||[]).map(c=>[String(c.name||'').toUpperCase(),c]));
@@ -905,7 +949,9 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     closeSpellDescriptionPopovers();
     // fromDom=true: normale salvataggio dagli input visibili.
     // fromDom=false: salvataggio diretto dell'oggetto già modificato, utile per azioni rapide.
-    let draft=prepareSheetForPersistence(normalize(fromDom?collect(data):data));
+    let draft=stripSheetForSave(fromDom?collect(data):data);
+    draft=normalize(draft);
+    draft=stripSheetForSave(draft);
     saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
     if(!await refreshEditPermission()){
       try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
@@ -915,8 +961,8 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     }
     let previous=null;try{previous=JSON.parse(localStorage.getItem(storageKey)||'null')}catch(e){}
     if(isCompanion){try{let pp=JSON.parse(localStorage.getItem(parentStorageKey)||'null');if(pp&&pp.companions&&pp.companions[companionIndex]&&pp.companions[companionIndex].sheet)previous=pp.companions[companionIndex].sheet;}catch(e){}}
-    if(previous)pushSnapshot(prepareSheetForPersistence(previous),detail||'Prima del salvataggio');
-    let u=draft;
+    if(previous)pushSnapshot(previous,detail||'Prima del salvataggio');
+    let u=stripSheetForSave(draft);
     u.changeLog=u.changeLog||[];
     u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate online.'});
     let parentForCloud=null;
@@ -1145,7 +1191,7 @@ function bind(data,xpData,compendium){
     const ls=document.getElementById('localStatus');
     if(ls)ls.textContent=app.classList.contains('editing')?'Clic Salva ricevuto: preparo il salvataggio…':'Clic Modifica ricevuto…';
     if(app.classList.contains('editing')){
-      await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);
+      await saveCurrentSheet(data,xpData,'Salvataggio completo dal menu flottante.',true,false);
       keepViewportStable(()=>enable(false));
     }else{
       if(await refreshEditPermission())keepViewportStable(()=>enable(true));
@@ -1153,8 +1199,8 @@ function bind(data,xpData,compendium){
     }
   });
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
-  const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(normalize(collect(data)),null,2));
-  const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};
+  const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(stripSheetForSave(normalize(collect(data))),null,2));
+  const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(stripSheetForSave(normalize(collect(data))),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};
   const exportCompendiumBtn=document.getElementById('exportCompendium'); if(exportCompendiumBtn) exportCompendiumBtn.onclick=()=>download('thalor-compendio-locale.json',JSON.stringify(mergeCompendium(window.__thalorCompendium||{}),null,2));
   const printSheetBtn=document.getElementById('floatPrintSheet'); if(printSheetBtn) printSheetBtn.onclick=()=>{document.querySelectorAll('details').forEach(d=>d.open=true);window.print();};
   const importSheetInput=document.getElementById('importSheet'); if(importSheetInput) importSheetInput.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const u=normalize(JSON.parse(r.result));u.changeLog=u.changeLog||[];u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Import JSON',detail:'Scheda importata manualmente.'});saveCurrentSheet(u,xpData,'Scheda importata manualmente.',false,false);enable(false);document.getElementById('localStatus').textContent='Scheda importata e salvata nel browser.'}catch(err){alert('JSON non valido')}};r.readAsText(f)};
