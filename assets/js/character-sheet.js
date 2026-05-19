@@ -1035,10 +1035,52 @@ function bindHorizontalWheelScroll(){
   });
 }
 
+function bindSheetButtonAction(el,handler){
+  if(!el||el.__thalorSheetActionBound)return;
+  el.__thalorSheetActionBound=true;
+  let last=0;
+  const run=async(ev)=>{
+    if(ev){
+      if(ev.type==='keydown' && ev.key!=='Enter' && ev.key!==' ')return;
+      ev.preventDefault?.();
+      ev.stopPropagation?.();
+    }
+    if(el.disabled||el.getAttribute('aria-disabled')==='true')return;
+    const now=Date.now();
+    if(now-last<380)return;
+    last=now;
+    try{ await handler(ev); }catch(err){ console.error('Azione scheda non riuscita:',err); }
+  };
+  // Safari/macOS a volte perde il click sui controlli fixed dopo re-render o focus su input.
+  // Usiamo anche pointerup/touchend/keydown con dedupe, così il pulsante Salva risponde sempre.
+  el.addEventListener('pointerup',run,{passive:false});
+  el.addEventListener('touchend',run,{passive:false});
+  el.addEventListener('click',run,false);
+  el.addEventListener('keydown',run,false);
+}
+
 function bind(data,xpData,compendium){
   bindHorizontalWheelScroll();
-  const floatToggle=document.getElementById('sheetFloatingToggle'); if(floatToggle) floatToggle.onclick=()=>{const nav=floatToggle.closest('.sheet-floating-actions');const open=!nav.classList.contains('open');nav.classList.toggle('open',open);floatToggle.setAttribute('aria-expanded',open?'true':'false');};
-  const floatEditSave=document.getElementById('floatEditSaveSheet'); if(floatEditSave) floatEditSave.onclick=async()=>{if(app.classList.contains('editing')){await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);keepViewportStable(()=>enable(false));}else{if(await refreshEditPermission())keepViewportStable(()=>enable(true));else alert(editDeniedMessage());}};
+  const floatToggle=document.getElementById('sheetFloatingToggle');
+  bindSheetButtonAction(floatToggle,async()=>{
+    const nav=floatToggle.closest('.sheet-floating-actions');
+    if(!nav)return;
+    const open=!nav.classList.contains('open');
+    nav.classList.toggle('open',open);
+    floatToggle.setAttribute('aria-expanded',open?'true':'false');
+  });
+  const floatEditSave=document.getElementById('floatEditSaveSheet');
+  bindSheetButtonAction(floatEditSave,async()=>{
+    const ls=document.getElementById('localStatus');
+    if(ls)ls.textContent=app.classList.contains('editing')?'Clic Salva ricevuto: preparo il salvataggio…':'Clic Modifica ricevuto…';
+    if(app.classList.contains('editing')){
+      await saveCurrentSheet(normalize(collect(data)),xpData,'Salvataggio completo dal menu flottante.',true,false);
+      keepViewportStable(()=>enable(false));
+    }else{
+      if(await refreshEditPermission())keepViewportStable(()=>enable(true));
+      else alert(editDeniedMessage());
+    }
+  });
   const resetSheetBtn=document.getElementById('resetSheet'); if(resetSheetBtn) resetSheetBtn.onclick=()=>{if(!sheetCanEdit()){alert(editDeniedMessage());return;}if(isCompanion){alert('Questa è una scheda secondaria: per eliminarla torna alla scheda principale e usa la X sulla card. Per azzerarla puoi importare un JSON vuoto/template.');return;}localStorage.removeItem(storageKey);oldKeys.forEach(k=>localStorage.removeItem(k));location.reload()};
   const exportSheetBtn=document.getElementById('exportSheet'); if(exportSheetBtn) exportSheetBtn.onclick=()=>download(`thalor-${slug}${isCompanion?'-creatura-'+companionIndex:''}-scheda.json`,JSON.stringify(normalize(collect(data)),null,2));
   const copySheetBtn=document.getElementById('copySheet'); if(copySheetBtn) copySheetBtn.onclick=async()=>{await navigator.clipboard.writeText(JSON.stringify(normalize(collect(data)),null,2));document.getElementById('localStatus').textContent='Backup JSON copiato negli appunti.'};

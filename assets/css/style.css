@@ -10619,3 +10619,18 @@ body.tabletop-display-mode .tabletop-display-fullscreen{
   bottom:14px!important;
   top:auto!important;
 }
+
+
+/* v166 — Safari/macOS: click affidabile sui pulsanti Modifica/Salva scheda */
+.sheet-floating-menu,
+.sheet-floating-menu *,
+#floatEditSaveSheet,
+#sheetFloatingToggle{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:transparent!important;
+}
+#floatEditSaveSheet.is-saving{
+  opacity:.75!important;
+  cursor:wait!important;
+}
