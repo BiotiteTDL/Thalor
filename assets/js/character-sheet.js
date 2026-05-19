@@ -305,7 +305,35 @@ function yesNo(path,val){const v=String(val||'No'); const yes=(v==='Sì'||v==='t
 function readonly(v){return `<output>${richText(v)}</output>`}
 function tipText(x,f='Descrizione da aggiungere.'){const p=[];const desc=String(x?.description||x?.notes||'').trim();const source=String(x?.source||'').trim();if(desc)p.push(desc);if(source)p.push(`Fonte / note:\n${source}`);return p.length?p.join('\n\n'):f}
 function setPath(obj,path,value){let p=path.split('.'),o=obj;for(let i=0;i<p.length-1;i++){let k=p[i],n=p[i+1];if(!(k in o)||o[k]==null)o[k]=/^\d+$/.test(n)?[]:{};o=o[k];}o[p.at(-1)]=value}
-function collect(data){let c=JSON.parse(JSON.stringify(data));document.querySelectorAll('[data-path]').forEach(el=>{let val=(el.type==='number')?num(el.value):el.value;setPath(c,el.dataset.path,val)});return c}
+function stripHeavySheetPayload(value,options={}){
+  const dropInventoryDatabase=options.dropInventoryDatabase===true;
+  const seen=new WeakMap();
+  const walk=(node,path=[])=>{
+    if(node==null||typeof node!=='object')return node;
+    if(seen.has(node))return seen.get(node);
+    if(Array.isArray(node)){const arr=[];seen.set(node,arr);node.forEach((v,i)=>arr[i]=walk(v,path.concat(String(i))));return arr;}
+    const out={};seen.set(node,out);
+    Object.keys(node).forEach(k=>{
+      if(dropInventoryDatabase&&k==='inventoryDatabase'){out[k]=normalizeInventoryDb(null);return;}
+      const v=node[k];
+      if((k==='image'||k==='img'||k==='portraitImage')&&typeof v==='string'&&v.startsWith('data:image/')){out[k]='';return;}
+      if(typeof v==='string'&&v.length>240000&&v.startsWith('data:')){out[k]='';return;}
+      out[k]=walk(v,path.concat(k));
+    });
+    return out;
+  };
+  return walk(value);
+}
+function prepareSheetForPersistence(data){
+  const c=stripHeavySheetPayload(data,{dropInventoryDatabase:false});
+  if(c&&c.inventoryDatabase&&c.inventoryDatabase.items){
+    Object.values(c.inventoryDatabase.items).forEach(it=>{
+      if(it&&typeof it==='object'&&typeof it.image==='string'&&it.image.startsWith('data:image/')) it.image='';
+    });
+  }
+  return c;
+}
+function collect(data){let c=stripHeavySheetPayload(data,{dropInventoryDatabase:false});document.querySelectorAll('[data-path]').forEach(el=>{let val=(el.type==='number')?num(el.value):el.value;setPath(c,el.dataset.path,val)});return c}
 
 function addImpliedConditionRows(d){
  const existing=new Map((d.conditions||[]).map(c=>[String(c.name||'').toUpperCase(),c]));
@@ -877,7 +905,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     closeSpellDescriptionPopovers();
     // fromDom=true: normale salvataggio dagli input visibili.
     // fromDom=false: salvataggio diretto dell'oggetto già modificato, utile per azioni rapide.
-    let draft=normalize(fromDom?collect(data):data);
+    let draft=prepareSheetForPersistence(normalize(fromDom?collect(data):data));
     saveEmergencyDraft(draft, detail||'Bozza prima del salvataggio');
     if(!await refreshEditPermission()){
       try{ localStorage.setItem(storageKey,JSON.stringify(draft)); }catch(e){}
@@ -887,7 +915,7 @@ async function saveCurrentSheet(data,xpData,detail,fromDom=true,keepEdit=null){
     }
     let previous=null;try{previous=JSON.parse(localStorage.getItem(storageKey)||'null')}catch(e){}
     if(isCompanion){try{let pp=JSON.parse(localStorage.getItem(parentStorageKey)||'null');if(pp&&pp.companions&&pp.companions[companionIndex]&&pp.companions[companionIndex].sheet)previous=pp.companions[companionIndex].sheet;}catch(e){}}
-    if(previous)pushSnapshot(previous,detail||'Prima del salvataggio');
+    if(previous)pushSnapshot(prepareSheetForPersistence(previous),detail||'Prima del salvataggio');
     let u=draft;
     u.changeLog=u.changeLog||[];
     u.changeLog.push({when:new Date().toLocaleString('it-IT'),action:'Salvataggio scheda',detail:detail||'Modifiche salvate online.'});
