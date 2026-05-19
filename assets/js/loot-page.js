@@ -101,7 +101,9 @@
 
   function lootItemCard(sec, si, item, ii){
     const c = inv.lootCurrency(item);
-    const img = item.image ? `<img class="loot-mini-img" src="${esc(item.image)}" alt="${esc(itemTitle(item))}" loading="lazy">` : `<div class="loot-mini-placeholder">${c?'¤':'💎'}</div>`;
+    const refItem = item.itemRef && state.db?.items ? state.db.items[item.itemRef] : null;
+    const effectiveImage = item.image || refItem?.image || item.databaseItem?.image || '';
+    const img = effectiveImage ? `<img class="loot-mini-img" src="${esc(effectiveImage)}" alt="${esc(itemTitle(item))}" loading="lazy">` : `<div class="loot-mini-placeholder">${c?'¤':'💎'}</div>`;
     const disabled = state.busy || !canTake() || !item.qty || item.qty <= 0;
     const max = Math.max(0, Number(item.qty)||0);
     const pageUrl = item.itemRef ? inv.itemPageUrl(item.itemRef) : '';
@@ -254,6 +256,7 @@
       identification: Object.assign({}, inv.blankItem.identification, old.identification || {}, { status: identified ? 'identified' : 'unidentified' })
     });
     item.page = db.items[ref].page;
+    item.image = item.image || db.items[ref].image || '';
     item.identified = identified;
     item.identification = db.items[ref].identification;
     item.databaseItem = db.items[ref];
