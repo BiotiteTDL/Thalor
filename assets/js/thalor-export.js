@@ -181,6 +181,80 @@
     return out;
   }
 
+
+  function compactInventoryForArchive(input){
+    const inv = (input && typeof input === 'object') ? input : null;
+    if(!inv) return null;
+    const out = JSON.parse(JSON.stringify(inv));
+    out.items = (out.items && typeof out.items === 'object' && !Array.isArray(out.items)) ? out.items : {};
+    out.sharedLoot = (out.sharedLoot && typeof out.sharedLoot === 'object') ? out.sharedLoot : { sections:[] };
+    return out;
+  }
+
+  function inventoryItemsArray(inventory){
+    const items = inventory && inventory.items && typeof inventory.items === 'object' && !Array.isArray(inventory.items) ? inventory.items : {};
+    return Object.entries(items).map(([id,item])=>Object.assign({ id }, item || {}, { id: String(item?.id || id) }));
+  }
+
+  function spellName(spell){
+    if(typeof spell === 'string') return spell;
+    if(!spell || typeof spell !== 'object') return '';
+    return spell.name || spell.title || spell.spell || spell.id || '';
+  }
+
+  function extractCharacterSpells(sheets){
+    const byCharacter = [];
+    const flat = [];
+    (sheets || []).forEach(row=>{
+      const slug = String(row?.slug || '').trim();
+      const sheet = row?.data && typeof row.data === 'object' ? row.data : {};
+      const identity = sheet.identity || sheet.meta || {};
+      const groups = Array.isArray(sheet.spellcasting?.groups) ? sheet.spellcasting.groups : [];
+      const normalizedGroups = [];
+      groups.forEach((group, groupIndex)=>{
+        const spells = Array.isArray(group?.spells) ? group.spells : [];
+        const normalizedSpells = spells.map((spell, spellIndex)=>{
+          const normalized = (spell && typeof spell === 'object') ? JSON.parse(JSON.stringify(spell)) : { name:String(spell || '') };
+          const name = spellName(normalized);
+          flat.push({
+            characterSlug: slug,
+            characterName: identity.name || identity.displayName || slug,
+            groupIndex,
+            spellIndex,
+            level: group?.level ?? group?.circle ?? '',
+            className: group?.className || group?.class || '',
+            name,
+            data: normalized
+          });
+          return normalized;
+        });
+        normalizedGroups.push({
+          groupIndex,
+          level: group?.level ?? group?.circle ?? '',
+          className: group?.className || group?.class || '',
+          ability: group?.ability || group?.castingAbility || '',
+          slots: group?.slots ?? group?.slotsTotal ?? '',
+          slotsUsed: group?.slotsUsed ?? group?.used ?? '',
+          notes: group?.notes || '',
+          spells: normalizedSpells
+        });
+      });
+      if(normalizedGroups.some(g=>g.spells.length)){
+        byCharacter.push({
+          characterSlug: slug,
+          characterName: identity.name || identity.displayName || slug,
+          groups: normalizedGroups
+        });
+      }
+    });
+    return {
+      schema:'thalor_spells_export_v1',
+      byCharacter,
+      flat,
+      total: flat.length
+    };
+  }
+
   async function collectArchive(){
     log('Avvio esportazione', 'Leggo dati online, cache locale e JSON statici.');
     if(window.ThalorAuth && window.ThalorAuth.init){
@@ -226,6 +300,9 @@
     }
     const placesData = normalizePlacesData(placesRes.data, staticPlaces);
     const sheets = normalizeSheets(onlineRows, registry);
+    const inventoryData = compactInventoryForArchive(inventoryRes.data);
+    const inventoryItems = inventoryItemsArray(inventoryData);
+    const characterSpells = extractCharacterSpells(sheets);
     const characters = simplifyCharacters(registry, sheets);
     const playableCharacters = characters.filter(c=>c.type === 'pg');
     const nonPlayerCharacters = characters.filter(c=>c.type !== 'pg');
@@ -251,6 +328,8 @@
         documenti: documentsRes.source,
         simboli: symbolsRes.source,
         inventario: inventoryRes.source,
+        oggettiComplessi: inventoryRes.source,
+        incantesimiSchede: 'characterSheets.spellcasting.groups',
         characterSheets: onlineRows.length ? 'supabase-list/localStorage-fallback' : 'localStorage/static-fallback',
         staticJson: Object.keys(staticData)
       },
@@ -264,7 +343,9 @@
         xpEvents: Array.isArray(xpRes.data?.registro_xp) ? xpRes.data.registro_xp.length : 0,
         documentsCategories: Array.isArray(documentsRes.data?.categories) ? documentsRes.data.categories.length : 0,
         symbolsCategories: Array.isArray(symbolsRes.data?.categories) ? symbolsRes.data.categories.length : 0,
-        inventoryItems: inventoryRes.data?.items ? Object.keys(inventoryRes.data.items).length : 0
+        inventoryItems: inventoryItems.length,
+        complexItems: inventoryItems.length,
+        characterSpellEntries: characterSpells.total
       },
       data: {
         registry: normalizeRegistry(registry),
@@ -277,7 +358,10 @@
         xp: xpRes.data || staticData['assets/data/xp.json'] || null,
         archiveDocuments: documentsRes.data || null,
         archiveSymbols: symbolsRes.data || null,
-        inventory: inventoryRes.data || null,
+        inventory: inventoryData,
+        inventoryDatabase: inventoryData,
+        complexItems: inventoryItems,
+        spells: characterSpells,
         compendium: {
           feats: staticData['assets/data/compendium/feats.json'] || null,
           features: staticData['assets/data/compendium/features.json'] || null,
@@ -332,6 +416,8 @@
         ['Eventi XP', archive.summary.xpEvents],
         ['Relazioni normalizzate', archive.summary.normalizedRelations || 0],
         ['Timeline normalizzata', archive.summary.normalizedTimeline || 0],
+        ['Oggetti complessi', archive.summary.complexItems || 0],
+        ['Incantesimi nelle schede', archive.summary.characterSpellEntries || 0],
         ['Categorie documenti', archive.summary.documentsCategories],
         ['Categorie simboli', archive.summary.symbolsCategories]
       ].map(([k,v])=>`<div class="export-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
@@ -403,7 +489,7 @@
         <div class="hero-box export-hero-box">
           <p class="eyebrow">Archivio Thalor</p>
           <h1>Esporta JSON</h1>
-          <p class="subtitle">Genera un unico file leggibile con personaggi, schede, luoghi, diario, esperienza, documenti, simboli e compendi statici. Include anche una sezione normalizzata con slug coerenti, relazioni automatiche e timeline base.</p>
+          <p class="subtitle">Genera un unico file leggibile con personaggi, schede, luoghi, diario, esperienza, documenti, simboli, oggetti complessi, incantesimi delle schede e compendi statici. Include anche una sezione normalizzata con slug coerenti, relazioni automatiche e timeline base.</p>
           <div class="actions export-actions">
             <button class="button" id="generateArchiveBtn" type="button">Genera archivio</button>
             <button class="button ghost-button" id="downloadArchiveBtn" type="button">Scarica JSON</button>

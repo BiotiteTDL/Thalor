@@ -94,6 +94,46 @@
     return { items };
   }
 
+
+  function inventoryFromArchiveData(data){
+    if(isObject(data.inventory)) return data.inventory;
+    if(isObject(data.inventoryDatabase)) return data.inventoryDatabase;
+    if(safeArray(data.complexItems).length){
+      const items = {};
+      data.complexItems.forEach(item=>{
+        if(!isObject(item)) return;
+        const id = String(item.id || item.itemRef || item.slug || '').trim();
+        if(id) items[id] = Object.assign({}, item, { id });
+      });
+      return { schema:'thalor_inventory_db_v1', version:1, updatedAt:new Date().toISOString(), items, sharedLoot:{ sections:[] } };
+    }
+    return null;
+  }
+
+  function spellsByCharacterMap(data){
+    const map = new Map();
+    safeArray(data?.spells?.byCharacter).forEach(row=>{
+      const slug = String(row?.characterSlug || row?.slug || '').trim();
+      if(slug) map.set(slug, row);
+    });
+    return map;
+  }
+
+  function mergeSpellsIntoSheet(sheetData, spellRow){
+    if(!isObject(sheetData) || !isObject(spellRow)) return sheetData;
+    const copy = JSON.parse(JSON.stringify(sheetData));
+    copy.spellcasting = isObject(copy.spellcasting) ? copy.spellcasting : {};
+    if(safeArray(spellRow.groups).length){
+      copy.spellcasting.groups = safeArray(spellRow.groups).map(group=>{
+        const out = Object.assign({}, group);
+        delete out.groupIndex;
+        out.spells = safeArray(group.spells);
+        return out;
+      });
+    }
+    return copy;
+  }
+
   function buildPlan(archive){
     const data = archive?.data || {};
     const plan = [];
@@ -108,13 +148,17 @@
     if(isObject(data.xp)) planPush(SYSTEM_SLUGS.xp, data.xp, 'Tabella esperienza', 'data.xp');
     if(isObject(data.archiveDocuments)) planPush(SYSTEM_SLUGS.documenti, data.archiveDocuments, 'Documenti archivio', 'data.archiveDocuments');
     if(isObject(data.archiveSymbols)) planPush(SYSTEM_SLUGS.simboli, data.archiveSymbols, 'Simboli archivio', 'data.archiveSymbols');
-    if(isObject(data.inventory)) planPush(SYSTEM_SLUGS.inventario, data.inventory, 'Inventario globale / loot', 'data.inventory');
+    const inventoryData = inventoryFromArchiveData(data);
+    if(isObject(inventoryData)) planPush(SYSTEM_SLUGS.inventario, inventoryData, 'Inventario globale / loot / oggetti complessi', data.inventory ? 'data.inventory' : (data.inventoryDatabase ? 'data.inventoryDatabase' : 'data.complexItems'));
 
+    const spellMap = spellsByCharacterMap(data);
     // Schede personaggio: importiamo solo se presenti come coppie slug/data.
+    // Se l'export contiene anche data.spells.byCharacter, riallineiamo spellcasting.groups alla sezione incantesimi esportata.
     safeArray(data.characterSheets).forEach(row=>{
       const slug = String(row?.slug || '').trim();
-      const sheetData = row?.data;
-      if(slug && isObject(sheetData)) planPush(slug, sheetData, 'Scheda ' + slug, 'data.characterSheets');
+      let sheetData = row?.data;
+      if(slug && isObject(sheetData) && spellMap.has(slug)) sheetData = mergeSpellsIntoSheet(sheetData, spellMap.get(slug));
+      if(slug && isObject(sheetData)) planPush(slug, sheetData, 'Scheda ' + slug, spellMap.has(slug) ? 'data.characterSheets + data.spells' : 'data.characterSheets');
     });
 
     // Se il JSON è stato modificato solo nella sezione rawSupabaseRows, accettiamo anche quei dati,
@@ -144,7 +188,8 @@
         ['Luoghi', safeArray(parsedArchive?.data?.places?.places).length],
         ['Sessioni', safeArray(parsedArchive?.data?.diary?.sessions).length],
         ['Relazioni normalizzate', safeArray(normalized?.relations).length],
-        ['Oggetti inventario', parsedArchive?.data?.inventory?.items ? Object.keys(parsedArchive.data.inventory.items).length : 0]
+        ['Oggetti inventario', (inventoryFromArchiveData(parsedArchive?.data || {})?.items ? Object.keys(inventoryFromArchiveData(parsedArchive.data).items).length : 0)],
+        ['Incantesimi nelle schede', parsedArchive?.data?.spells?.total || safeArray(parsedArchive?.data?.spells?.flat).length || 0]
       ].map(([k,v])=>`<div class="import-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
     }
     if(preview){
@@ -242,7 +287,7 @@
         <div class="hero-box export-hero-box">
           <p class="eyebrow">Archivio Thalor</p>
           <h1>Importa JSON</h1>
-          <p class="subtitle">Carica un JSON esportato da Thalor e aggiornato fuori dal sito. L’import aggiorna registro personaggi, luoghi, diario, XP, documenti, simboli e schede presenti nel file.</p>
+          <p class="subtitle">Carica un JSON esportato da Thalor e aggiornato fuori dal sito. L’import aggiorna registro personaggi, luoghi, diario, XP, documenti, simboli, inventario globale/oggetti complessi e schede presenti nel file.</p>
           <div class="actions import-actions">
             <a class="button ghost-button" href="esporta-json.html">Vai all’export</a>
             <a class="button ghost-button" href="../auth.html">Auth Master</a>
