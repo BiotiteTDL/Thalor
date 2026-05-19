@@ -1437,6 +1437,11 @@ function registryBlankSheetFromList(slug){
     window.__thalorParentBase=normalize(base);
     let comp=mergeCompendium({spells:spells||[],feats:feats||[],features:features||[]});
     let sheetData=shouldPreferLocalSheet(localFound, onlineBase) ? normalize(localFound.data) : (onlineBase ? normalize(onlineBase) : chooseSheetData(base, localFound));
+    try{
+      if(window.ThalorInventory && typeof window.ThalorInventory.consumePendingLootUpdates === 'function'){
+        sheetData = normalize(window.ThalorInventory.consumePendingLootUpdates(slug, sheetData));
+      }
+    }catch(e){ console.warn('Applicazione loot offline in sospeso non riuscita:', e); }
     try{ localStorage.setItem(parentStorageKey,JSON.stringify(normalize(sheetData))); }catch(e){ console.warn('Cache locale scheda non aggiornata: spazio browser insufficiente.', e); }
     if(isCompanion){let parent=normalize(sheetData);let row=parent.companions&&parent.companions[companionIndex];if(!row||!row.sheet)throw new Error('Scheda secondaria non trovata. Torna alla scheda principale e creala di nuovo.');render(row.sheet,xp,comp)}else{render(sheetData,xp,comp)}
   }catch(err){app.innerHTML=`<section class="panel"><h1>Errore scheda</h1><p>${esc(err.message)}</p></section>`;}

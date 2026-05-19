@@ -10,15 +10,6 @@
   const isObject = (v)=>v && typeof v === 'object' && !Array.isArray(v);
   const slugify = (v)=>String(v||'oggetto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,90) || 'oggetto';
   const norm = (v)=>String(v||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  function isLocalPreview(){
-    try{
-      const h = String(location.hostname || '').toLowerCase();
-      const p = String(location.protocol || '').toLowerCase();
-      return p === 'file:' || h === '' || h === 'localhost' || h === '127.0.0.1' || h === '::1' ||
-        /^192\.168\./.test(h) || /^10\./.test(h) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(h);
-    }catch(e){ return false; }
-  }
-
 
   function newId(prefix='item'){
     return prefix + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,8);
@@ -255,8 +246,7 @@
     let staticSheet = null;
     try{ staticSheet = await fetchStaticSheet(slug); }catch(e){}
     try{
-      const localMaster = !!(window.ThalorAuth?.state?.localMaster || window.ThalorAuth?.localMasterEnabled?.());
-      if(window.ThalorAuth && window.ThalorAuth.loadCharacter && navigator.onLine !== false && !(localMaster || isLocalPreview())){
+      if(window.ThalorAuth && window.ThalorAuth.loadCharacter && navigator.onLine !== false){
         const online = await window.ThalorAuth.loadCharacter(slug, local || staticSheet, { publicRead:true, skipInit:true, timeoutMs:15000 });
         if(online) return normalizeSheetInventory(online);
       }
@@ -270,8 +260,7 @@
   async function saveSheet(slug, sheet){
     const data = writeLocalSheet(slug, sheet);
     try{
-      const localMaster = !!(window.ThalorAuth?.state?.localMaster || window.ThalorAuth?.localMasterEnabled?.());
-      if(window.ThalorAuth && window.ThalorAuth.saveCharacter && !(localMaster || isLocalPreview())){
+      if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
         await window.ThalorAuth.saveCharacter(slug, data, { timeoutMs:20000 });
       }
     }catch(e){
@@ -299,13 +288,69 @@
     return st.profile?.display_name || st.user?.user_metadata?.full_name || st.user?.email || 'Giocatore';
   }
 
-  function addStackToSheet(sheet, item, qty, actor){
+
+  function lootPendingKey(slug){ return 'thalor.loot.pending.' + String(slug||'').trim(); }
+  function lootAppliedKey(op){ return String(op || '').trim(); }
+  function readPendingLoot(slug){
+    try{
+      const arr = JSON.parse(localStorage.getItem(lootPendingKey(slug)) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    }catch(e){ return []; }
+  }
+  function writePendingLoot(slug, arr){
+    try{ localStorage.setItem(lootPendingKey(slug), JSON.stringify(safeArray(arr))); }catch(e){}
+  }
+  function queuePendingLoot(slug, entry){
+    const opId = lootAppliedKey(entry && entry.opId) || newId('lootop');
+    const arr = readPendingLoot(slug).filter(x=>lootAppliedKey(x && x.opId) !== opId);
+    arr.push(Object.assign({}, entry || {}, { opId, queuedAt:new Date().toISOString() }));
+    writePendingLoot(slug, arr);
+    return opId;
+  }
+  function markLootApplied(sheet, opId){
+    const id = lootAppliedKey(opId);
+    if(!id) return sheet;
+    const d = sheet && typeof sheet === 'object' ? sheet : {};
+    d.__lootAppliedIds = safeArray(d.__lootAppliedIds);
+    if(!d.__lootAppliedIds.includes(id)) d.__lootAppliedIds.push(id);
+    d.__lootUpdatedAt = new Date().toISOString();
+    d.__thalorLocalUpdatedAt = d.__lootUpdatedAt;
+    return d;
+  }
+  function isLootApplied(sheet, opId){
+    const id = lootAppliedKey(opId);
+    return !!(id && sheet && Array.isArray(sheet.__lootAppliedIds) && sheet.__lootAppliedIds.includes(id));
+  }
+  function consumePendingLootUpdates(slug, sheet){
+    let d = normalizeSheetInventory(sheet || {});
+    const pending = readPendingLoot(slug);
+    if(!pending.length) return d;
+    const keep = [];
+    pending.forEach(entry=>{
+      const opId = lootAppliedKey(entry && entry.opId);
+      if(!opId) return;
+      if(isLootApplied(d, opId)) return;
+      try{
+        const item = entry.item || {};
+        const qty = Math.max(1, Number(entry.qty)||1);
+        const actor = entry.actor || 'Loot offline';
+        if(entry.action === 'return') d = removeStackFromSheet(d, item, qty, actor, { opId }).sheet;
+        else d = addStackToSheet(d, item, qty, actor, { opId }).sheet;
+      }catch(e){ keep.push(entry); }
+    });
+    writePendingLoot(slug, keep);
+    if(keep.length !== pending.length) writeLocalSheet(slug, d);
+    return d;
+  }
+
+  function addStackToSheet(sheet, item, qty, actor, meta={}){
     const d = normalizeSheetInventory(sheet || {});
+    if(meta && meta.opId && isLootApplied(d, meta.opId)) return { sheet:d, mode:'already-applied' };
     const n = Math.max(1, Number(qty)||1);
     const currency = lootCurrency(item);
     if(currency){
       d.money[currency] = (Number(d.money[currency]) || 0) + n;
-      d.__lootUpdatedAt = new Date().toISOString();
+      markLootApplied(d, meta && meta.opId);
       return { sheet:d, mode:'money', currency };
     }
     const ref = String(item.itemRef||'').trim();
@@ -327,17 +372,18 @@
         instanceId: item.unique ? newId('instance') : '', history:[{ when:new Date().toISOString(), action:'loot-add', actor, qty:n }]
       }));
     }
-    d.__lootUpdatedAt = new Date().toISOString();
+    markLootApplied(d, meta && meta.opId);
     return { sheet:d, mode:'item' };
   }
 
-  function removeStackFromSheet(sheet, item, qty, actor){
+  function removeStackFromSheet(sheet, item, qty, actor, meta={}){
     const d = normalizeSheetInventory(sheet || {});
+    if(meta && meta.opId && isLootApplied(d, meta.opId)) return { sheet:d, mode:'already-applied', removed:0 };
     const n = Math.max(1, Number(qty)||1);
     const currency = lootCurrency(item);
     if(currency){
       d.money[currency] = Math.max(0, (Number(d.money[currency]) || 0) - n);
-      d.__lootUpdatedAt = new Date().toISOString();
+      markLootApplied(d, meta && meta.opId);
       return { sheet:d, mode:'money', currency, removed:n };
     }
     const ref = String(item.itemRef||'').trim();
@@ -355,7 +401,7 @@
         left -= take;
       }
     }
-    if(n-left > 0) d.__lootUpdatedAt = new Date().toISOString();
+    markLootApplied(d, meta && meta.opId);
     return { sheet:d, mode:'item', removed:n-left };
   }
 
@@ -366,6 +412,7 @@
     currencyFrom, lootCurrency, isCurrencyItem,
     readLocal, writeLocal, loadOnline, saveOnline,
     sheetStorageKey, sheetStorageKeys, readLocalSheet, writeLocalSheet, loadSheet, saveSheet,
-    fetchStaticSheet, primaryAuthCharacter, currentActorLabel, addStackToSheet, removeStackFromSheet
+    fetchStaticSheet, primaryAuthCharacter, currentActorLabel, addStackToSheet, removeStackFromSheet,
+    lootPendingKey, readPendingLoot, writePendingLoot, queuePendingLoot, consumePendingLootUpdates, isLootApplied
   };
 })();

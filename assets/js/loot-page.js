@@ -64,26 +64,6 @@
     if(box){ box.textContent = msg || ''; box.className = 'loot-status ' + (kind||''); }
   }
 
-  function readImageFile(file){
-    return new Promise((resolve, reject)=>{
-      if(!file){ resolve(''); return; }
-      if(!String(file.type || '').startsWith('image/')){
-        reject(new Error('Il file selezionato non è un’immagine.'));
-        return;
-      }
-      const maxBytes = 2.5 * 1024 * 1024;
-      if(file.size > maxBytes){
-        reject(new Error('Immagine troppo pesante. Usa un file sotto 2,5 MB.'));
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = ()=>resolve(String(reader.result || ''));
-      reader.onerror = ()=>reject(new Error('Impossibile leggere l’immagine.'));
-      reader.readAsDataURL(file);
-    });
-  }
-
-
   function itemTitle(item){
     const c = inv.lootCurrency(item);
     return c ? moneyNames[c] : (item.name || item.itemRef || 'Oggetto');
@@ -167,7 +147,7 @@
         <label>Valuta <select id="lootNewCurrency"><option value="MO">MO - oro</option><option value="MA">MA - argento</option><option value="MP">MP - platino</option><option value="MR">MR - rame</option></select></label>
         <label>Quantità <input id="lootNewQty" type="number" min="1" value="1"></label>
         <label>Ref oggetto complesso <input id="lootNewRef" placeholder="opzionale"></label>
-        <label>Immagine <input id="lootNewImage" type="file" accept="image/*"></label>
+        <label>Immagine <input id="lootNewImage" placeholder="assets/img/... opzionale"></label>
         <label class="loot-wide">Note pubbliche <input id="lootNewNotes" placeholder="Descrizione breve visibile ai giocatori"></label>
         <label><input id="lootNewUnique" type="checkbox"> Oggetto unico</label>
       </div>
@@ -221,21 +201,13 @@
       const kind = document.getElementById('lootNewKind')?.value || 'item';
       const qty = Math.max(1, Number(document.getElementById('lootNewQty')?.value)||1);
       const currency = document.getElementById('lootNewCurrency')?.value || 'MO';
-      let imageData = '';
-      try{
-        const fileInput = document.getElementById('lootNewImage');
-        imageData = await readImageFile(fileInput && fileInput.files ? fileInput.files[0] : null);
-      }catch(e){
-        notify(e.message || 'Immagine non valida.', 'warn');
-        return;
-      }
       const item = inv.normalizeLootItem({
         id:inv.newId('lootitem'),
         name: kind==='money' ? moneyNames[currency] : (document.getElementById('lootNewName')?.value?.trim() || 'Nuovo oggetto'),
         qty,
         currency: kind==='money' ? currency : '',
         itemRef: kind==='item' ? (document.getElementById('lootNewRef')?.value?.trim() || '') : '',
-        image: imageData || '',
+        image: document.getElementById('lootNewImage')?.value?.trim() || '',
         publicNotes: document.getElementById('lootNewNotes')?.value?.trim() || '',
         unique: !!document.getElementById('lootNewUnique')?.checked
       });
@@ -285,7 +257,8 @@
         const base = await inv.loadSheet(target);
         if(!base) throw new Error('Scheda non trovata: '+target);
         const actor = isMaster() ? (state.characters.find(c=>c.slug===target)?.name || target) : inv.currentActorLabel();
-        const applied = inv.addStackToSheet(base, item, qty, actor);
+        const opId = inv.queuePendingLoot(target, { action:'take', item:inv.normalizeLootItem(item), qty, actor, lootSectionId:sec.id||'', lootItemId:item.id||'' });
+        const applied = inv.addStackToSheet(base, item, qty, actor, { opId });
         await inv.saveSheet(target, applied.sheet);
         item.qty = Math.max(0, (Number(item.qty)||0) - qty);
         item.taken = item.taken || [];
@@ -313,7 +286,8 @@
       try{
         const base = await inv.loadSheet(target);
         const actor = isMaster() ? inv.currentActorLabel() : (entry.actor || inv.currentActorLabel());
-        const applied = inv.removeStackFromSheet(base, item, qty, actor);
+        const opId = inv.queuePendingLoot(target, { action:'return', item:inv.normalizeLootItem(item), qty, actor, lootSectionId:sec.id||'', lootItemId:item.id||'' });
+        const applied = inv.removeStackFromSheet(base, item, qty, actor, { opId });
         await inv.saveSheet(target, applied.sheet);
         item.qty = (Number(item.qty)||0) + qty;
         entry.qty = Math.max(0, (Number(entry.qty)||0) - qty);
