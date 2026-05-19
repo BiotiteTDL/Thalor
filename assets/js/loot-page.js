@@ -190,15 +190,49 @@
     return sec;
   }
 
-  function readImageFileInput(){
+  function resizeLootImageFile(file, maxSide=760, quality=0.68, maxChars=220000){
     return new Promise(resolve=>{
-      const file = document.getElementById('lootNewImageFile')?.files?.[0];
-      if(!file){ resolve(''); return; }
+      if(!file || !String(file.type||'').startsWith('image/')){ resolve(''); return; }
       const reader = new FileReader();
-      reader.onload = ()=>resolve(String(reader.result || ''));
       reader.onerror = ()=>resolve('');
+      reader.onload = ()=>{
+        const img = new Image();
+        img.onerror = ()=>resolve('');
+        img.onload = ()=>{
+          try{
+            let w = img.naturalWidth || img.width || maxSide;
+            let h = img.naturalHeight || img.height || maxSide;
+            let side = maxSide;
+            let q = quality;
+            const make = ()=>{
+              const scale = Math.min(1, side / Math.max(w,h));
+              const cw = Math.max(1, Math.round(w*scale));
+              const ch = Math.max(1, Math.round(h*scale));
+              const canvas = document.createElement('canvas');
+              canvas.width = cw; canvas.height = ch;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img,0,0,cw,ch);
+              return canvas.toDataURL('image/jpeg', q);
+            };
+            let out = make();
+            while(out.length > maxChars && q > 0.42){ q -= 0.08; out = make(); }
+            while(out.length > maxChars && side > 420){ side = Math.round(side*0.82); q = Math.max(0.42, q-0.04); out = make(); }
+            resolve(out.length <= Math.max(maxChars*1.45, 320000) ? out : '');
+          }catch(e){ resolve(''); }
+        };
+        img.src = String(reader.result||'');
+      };
       reader.readAsDataURL(file);
     });
+  }
+
+  async function readImageFileInput(){
+    const input = document.getElementById('lootNewImageFile');
+    const file = input?.files?.[0];
+    if(!file) return '';
+    const data = await resizeLootImageFile(file);
+    if(!data) notify('Immagine troppo pesante o non leggibile: oggetto salvato senza immagine.', 'warn');
+    return data;
   }
 
   function createOrUpdateDatabaseItem(db, item){
