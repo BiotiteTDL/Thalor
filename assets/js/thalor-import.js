@@ -11,7 +11,8 @@
     xp: 'xp',
     documenti: 'archive-documents',
     simboli: 'archive-symbols',
-    inventario: '__inventory__'
+    inventario: '__inventory__',
+    loot: '__loot__'
   };
   const LOCAL_KEYS = {
     [SYSTEM_SLUGS.personaggi]: 'thalor.personaggi.registry.v2',
@@ -20,7 +21,8 @@
     [SYSTEM_SLUGS.xp]: 'thalor.xp.v1',
     [SYSTEM_SLUGS.documenti]: 'thalor.archive.documents.v1',
     [SYSTEM_SLUGS.simboli]: 'thalor.archive.symbols.v1',
-    [SYSTEM_SLUGS.inventario]: 'thalor.inventory.v1'
+    [SYSTEM_SLUGS.inventario]: 'thalor.inventory.v1',
+    [SYSTEM_SLUGS.loot]: 'thalor.loot.v1'
   };
 
   let parsedArchive = null;
@@ -110,6 +112,16 @@
     return null;
   }
 
+
+
+  function lootFromArchiveData(data){
+    if(isObject(data.loot)) return data.loot;
+    if(isObject(data.sharedLoot)) return { schema:'thalor_loot_db_v1', version:1, updatedAt:new Date().toISOString(), sharedLoot:data.sharedLoot };
+    if(isObject(data.inventory?.sharedLoot)) return { schema:'thalor_loot_db_v1', version:1, updatedAt:new Date().toISOString(), sharedLoot:data.inventory.sharedLoot };
+    if(isObject(data.inventoryDatabase?.sharedLoot)) return { schema:'thalor_loot_db_v1', version:1, updatedAt:new Date().toISOString(), sharedLoot:data.inventoryDatabase.sharedLoot };
+    return null;
+  }
+
   function spellsByCharacterMap(data){
     const map = new Map();
     safeArray(data?.spells?.byCharacter).forEach(row=>{
@@ -149,7 +161,13 @@
     if(isObject(data.archiveDocuments)) planPush(SYSTEM_SLUGS.documenti, data.archiveDocuments, 'Documenti archivio', 'data.archiveDocuments');
     if(isObject(data.archiveSymbols)) planPush(SYSTEM_SLUGS.simboli, data.archiveSymbols, 'Simboli archivio', 'data.archiveSymbols');
     const inventoryData = inventoryFromArchiveData(data);
-    if(isObject(inventoryData)) planPush(SYSTEM_SLUGS.inventario, inventoryData, 'Inventario globale / loot / oggetti complessi', data.inventory ? 'data.inventory' : (data.inventoryDatabase ? 'data.inventoryDatabase' : 'data.complexItems'));
+    if(isObject(inventoryData)) {
+      const invOnly = JSON.parse(JSON.stringify(inventoryData));
+      invOnly.sharedLoot = { sections:[] };
+      planPush(SYSTEM_SLUGS.inventario, invOnly, 'Inventario globale / oggetti complessi', data.inventory ? 'data.inventory' : (data.inventoryDatabase ? 'data.inventoryDatabase' : 'data.complexItems'));
+    }
+    const lootData = lootFromArchiveData(data);
+    if(isObject(lootData)) planPush(SYSTEM_SLUGS.loot, lootData, 'Loot condiviso', data.loot ? 'data.loot' : (data.sharedLoot ? 'data.sharedLoot' : 'data.inventory.sharedLoot'));
 
     const spellMap = spellsByCharacterMap(data);
     // Schede personaggio: importiamo solo se presenti come coppie slug/data.
@@ -189,6 +207,7 @@
         ['Sessioni', safeArray(parsedArchive?.data?.diary?.sessions).length],
         ['Relazioni normalizzate', safeArray(normalized?.relations).length],
         ['Oggetti inventario', (inventoryFromArchiveData(parsedArchive?.data || {})?.items ? Object.keys(inventoryFromArchiveData(parsedArchive.data).items).length : 0)],
+        ['Loot condivisi', safeArray(lootFromArchiveData(parsedArchive?.data || {})?.sharedLoot?.sections).length],
         ['Incantesimi nelle schede', parsedArchive?.data?.spells?.total || safeArray(parsedArchive?.data?.spells?.flat).length || 0]
       ].map(([k,v])=>`<div class="import-stat"><span>${esc(k)}</span><strong>${esc(v)}</strong></div>`).join('');
     }

@@ -12,7 +12,8 @@
     xp: 'xp',
     documenti: 'archive-documents',
     simboli: 'archive-symbols',
-    inventario: '__inventory__'
+    inventario: '__inventory__',
+    loot: '__loot__'
   };
   const LOCAL_KEYS = {
     personaggi: 'thalor.personaggi.registry.v2',
@@ -21,7 +22,8 @@
     xp: 'thalor.xp.v1',
     documenti: 'thalor.archive.documents.v1',
     simboli: 'thalor.archive.symbols.v1',
-    inventario: 'thalor.inventory.v1'
+    inventario: 'thalor.inventory.v1',
+    loot: 'thalor.loot.v1'
   };
   const PLAYABLE_SLUGS = new Set(['abraxas','igor','ralph','arolf','irven']);
   const STATIC_JSON = [
@@ -191,6 +193,19 @@
     return out;
   }
 
+
+
+  function compactLootForArchive(input, inventoryFallback){
+    let src = (input && typeof input === 'object') ? input : null;
+    if(!src && inventoryFallback && typeof inventoryFallback === 'object' && inventoryFallback.sharedLoot) src = { sharedLoot: inventoryFallback.sharedLoot };
+    const out = src ? JSON.parse(JSON.stringify(src)) : { schema:'thalor_loot_db_v1', version:1, sharedLoot:{ sections:[] } };
+    out.schema = out.schema || 'thalor_loot_db_v1';
+    out.version = out.version || 1;
+    out.sharedLoot = (out.sharedLoot && typeof out.sharedLoot === 'object') ? out.sharedLoot : { sections:[] };
+    out.sharedLoot.sections = Array.isArray(out.sharedLoot.sections) ? out.sharedLoot.sections : [];
+    return out;
+  }
+
   function inventoryItemsArray(inventory){
     const items = inventory && inventory.items && typeof inventory.items === 'object' && !Array.isArray(inventory.items) ? inventory.items : {};
     return Object.entries(items).map(([id,item])=>Object.assign({ id }, item || {}, { id: String(item?.id || id) }));
@@ -294,14 +309,15 @@
       return { source:'missing', data:null };
     };
 
-    const [registryRes, placesRes, diaryRes, xpRes, documentsRes, symbolsRes, inventoryRes] = await Promise.all([
+    const [registryRes, placesRes, diaryRes, xpRes, documentsRes, symbolsRes, inventoryRes, lootRes] = await Promise.all([
       loadPriority('personaggi', SYSTEM_SLUGS.personaggi, LOCAL_KEYS.personaggi),
       loadPriority('luoghi', SYSTEM_SLUGS.luoghi, LOCAL_KEYS.luoghi),
       loadPriority('diario', SYSTEM_SLUGS.diario, LOCAL_KEYS.diario),
       loadPriority('xp', SYSTEM_SLUGS.xp, LOCAL_KEYS.xp),
       loadPriority('documenti', SYSTEM_SLUGS.documenti, LOCAL_KEYS.documenti),
       loadPriority('simboli', SYSTEM_SLUGS.simboli, LOCAL_KEYS.simboli),
-      loadPriority('inventario', SYSTEM_SLUGS.inventario, LOCAL_KEYS.inventario)
+      loadPriority('inventario', SYSTEM_SLUGS.inventario, LOCAL_KEYS.inventario),
+      loadPriority('loot', SYSTEM_SLUGS.loot, LOCAL_KEYS.loot)
     ]);
 
     const staticData = {};
@@ -320,6 +336,7 @@
     const placesData = normalizePlacesData(placesRes.data, staticPlaces);
     const sheets = normalizeSheets(onlineRows, registry);
     const inventoryData = compactInventoryForArchive(inventoryRes.data);
+    const lootData = compactLootForArchive(lootRes.data, inventoryData);
     const inventoryItems = inventoryItemsArray(inventoryData);
     const inventoryCategories = inventoryCategoriesArray(inventoryItems);
     const characterSpells = extractCharacterSpells(sheets);
@@ -348,6 +365,7 @@
         documenti: documentsRes.source,
         simboli: symbolsRes.source,
         inventario: inventoryRes.source,
+        loot: lootRes.source || (inventoryData?.sharedLoot?.sections?.length ? 'legacy-inventory-sharedLoot' : 'missing'),
         oggettiComplessi: inventoryRes.source,
         incantesimiSchede: 'characterSheets.spellcasting.groups',
         characterSheets: onlineRows.length ? 'supabase-list/localStorage-fallback' : 'localStorage/static-fallback',
@@ -366,6 +384,7 @@
         inventoryItems: inventoryItems.length,
         complexItems: inventoryItems.length,
         inventoryCategories: inventoryCategories.length,
+        sharedLootSections: Array.isArray(lootData?.sharedLoot?.sections) ? lootData.sharedLoot.sections.length : 0,
         characterSpellEntries: characterSpells.total
       },
       data: {
@@ -381,6 +400,8 @@
         archiveSymbols: symbolsRes.data || null,
         inventory: inventoryData,
         inventoryDatabase: inventoryData,
+        loot: lootData,
+        sharedLoot: lootData.sharedLoot,
         complexItems: inventoryItems,
         inventoryCategories,
         spells: characterSpells,

@@ -2,7 +2,9 @@
   'use strict';
 
   const SYSTEM_SLUG = '__inventory__';
+  const LOOT_SYSTEM_SLUG = '__loot__';
   const STORAGE_KEY = 'thalor.inventory.v1';
+  const LOOT_STORAGE_KEY = 'thalor.loot.v1';
   const CURRENCY_KEYS = ['MP','MO','MA','MR'];
 
   const esc = (v)=>String(v ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -76,6 +78,59 @@
       log: safeArray(sec?.log)
     }));
     return db;
+  }
+
+
+
+  const blankLootDocument = { schema:'thalor_loot_db_v1', version:1, updatedAt:'', sharedLoot:{ sections:[] } };
+
+  function normalizeLootDocument(input){
+    let src = isObject(input) ? input : {};
+    // Retrocompatibilità: se arriva il vecchio __inventory__, usa sharedLoot da lì.
+    if(!isObject(src.sharedLoot) && isObject(src.data) && isObject(src.data.sharedLoot)) src = src.data;
+    const doc = Object.assign({}, blankLootDocument, src);
+    doc.sharedLoot = isObject(doc.sharedLoot) ? doc.sharedLoot : { sections:[] };
+    doc.sharedLoot.sections = safeArray(doc.sharedLoot.sections).map(sec=>Object.assign({ id:newId('loot'), name:'Loot condiviso', notes:'', items:[], log:[] }, sec || {}, {
+      id: sec?.id || newId('loot'),
+      items: safeArray(sec?.items).map(normalizeLootItem),
+      log: safeArray(sec?.log)
+    }));
+    return doc;
+  }
+
+  function mergeLootIntoDatabase(db, lootDoc){
+    const out = normalizeDatabase(db);
+    const loot = normalizeLootDocument(lootDoc);
+    out.sharedLoot = loot.sharedLoot;
+    return out;
+  }
+
+  function extractLootDocument(db){
+    const data = normalizeDatabase(db);
+    return normalizeLootDocument({ updatedAt:data.updatedAt || '', sharedLoot:data.sharedLoot || { sections:[] } });
+  }
+
+
+  function stripLootDocumentForSave(lootDoc){
+    const doc = normalizeLootDocument(lootDoc);
+    doc.sharedLoot.sections = safeArray(doc.sharedLoot.sections).map(sec=>Object.assign({}, sec, {
+      items: safeArray(sec.items).map(it=>{
+        const row = Object.assign({}, it);
+        delete row.databaseItem;
+        delete row.fullDescription;
+        if(row.itemRef){
+          // Gli oggetti complessi usano immagine/descrizioni da __inventory__, non duplicarle in __loot__.
+          row.image = '';
+          row.description = '';
+          row.gmNotes = '';
+        }else if(typeof row.image === 'string' && /^data:image\//i.test(row.image) && row.image.length > 900000){
+          row.image = '';
+        }
+        return normalizeLootItem(row);
+      }),
+      log: safeArray(sec.log)
+    }));
+    return doc;
   }
 
   function normalizeLootItem(input){
@@ -192,6 +247,25 @@
     return data;
   }
 
+
+
+  function readLocalLoot(){
+    try{
+      const raw = localStorage.getItem(LOOT_STORAGE_KEY);
+      if(raw) return normalizeLootDocument(JSON.parse(raw));
+    }catch(e){}
+    // Migrazione compatibile: vecchio loot dentro thalor.inventory.v1
+    try{ return extractLootDocument(readLocal()); }catch(e){ return normalizeLootDocument(null); }
+  }
+
+  function writeLocalLoot(lootDoc){
+    const data = stripLootDocumentForSave(lootDoc);
+    data.updatedAt = new Date().toISOString();
+    try{ localStorage.setItem(LOOT_STORAGE_KEY, JSON.stringify(data)); }
+    catch(e){ console.warn('Loot globale: cache locale non scritta.', e); }
+    return data;
+  }
+
   async function loadOnline(options={}){
     try{
       if(!window.ThalorAuth || !window.ThalorAuth.loadCharacter) return null;
@@ -203,6 +277,8 @@
 
   async function saveOnline(db){
     const data = normalizeDatabase(db);
+    // Da ora __inventory__ è solo compendio oggetti: il loot condiviso vive in __loot__.
+    data.sharedLoot = { sections:[] };
     data.updatedAt = new Date().toISOString();
     try{
       if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
@@ -210,6 +286,31 @@
       }
       writeLocal(data);
     }catch(e){ console.warn('Inventario globale: salvataggio online non riuscito', e); throw e; }
+    return data;
+  }
+
+
+  async function loadLootOnline(options={}){
+    try{
+      if(!window.ThalorAuth || !window.ThalorAuth.loadCharacter) return null;
+      const raw = await window.ThalorAuth.loadCharacter(LOOT_SYSTEM_SLUG, null, Object.assign({ publicRead:true, skipInit:true, timeoutMs:15000 }, options));
+      if(raw) return normalizeLootDocument(raw);
+      // Migrazione: se __loot__ non esiste ancora, leggi il vecchio sharedLoot da __inventory__.
+      const old = await loadOnline(options);
+      if(old && Array.isArray(old.sharedLoot?.sections)) return extractLootDocument(old);
+      return null;
+    }catch(e){ return null; }
+  }
+
+  async function saveLootOnline(lootDoc){
+    const data = stripLootDocumentForSave(lootDoc);
+    data.updatedAt = new Date().toISOString();
+    try{
+      if(window.ThalorAuth && window.ThalorAuth.saveCharacter){
+        await window.ThalorAuth.saveCharacter(LOOT_SYSTEM_SLUG, data, { timeoutMs:20000 });
+      }
+      writeLocalLoot(data);
+    }catch(e){ console.warn('Loot globale: salvataggio online non riuscito', e); throw e; }
     return data;
   }
 
@@ -529,11 +630,11 @@
   }
 
   window.ThalorInventory = {
-    SYSTEM_SLUG, STORAGE_KEY, CURRENCY_KEYS, blankItem, blankStack, blankLootItem,
+    SYSTEM_SLUG, LOOT_SYSTEM_SLUG, STORAGE_KEY, LOOT_STORAGE_KEY, CURRENCY_KEYS, blankItem, blankStack, blankLootItem,
     esc, slugify, newId, norm,
-    normalizeDatabase, normalizeStack, normalizeLootItem, normalizeSheetInventory, stripSheetForSave, effectiveItem, itemPageUrl, itemIdentified, normalizeDatabaseItemFromLoot, mergeDatabaseItemIntoSheet,
+    normalizeDatabase, normalizeLootDocument, mergeLootIntoDatabase, extractLootDocument, stripLootDocumentForSave, normalizeStack, normalizeLootItem, normalizeSheetInventory, stripSheetForSave, effectiveItem, itemPageUrl, itemIdentified, normalizeDatabaseItemFromLoot, mergeDatabaseItemIntoSheet,
     currencyFrom, lootCurrency, isCurrencyItem,
-    readLocal, writeLocal, loadOnline, saveOnline,
+    readLocal, writeLocal, readLocalLoot, writeLocalLoot, loadOnline, saveOnline, loadLootOnline, saveLootOnline,
     sheetStorageKey, sheetStorageKeys, readLocalSheet, writeLocalSheet, loadSheet, saveSheet,
     fetchStaticSheet, primaryAuthCharacter, currentActorLabel, isLocalPreview, isOfflineMaster, shouldUseOnline, addStackToSheet, removeStackFromSheet,
     lootPendingKey, readPendingLoot, writePendingLoot, queuePendingLoot, consumePendingLootUpdates, isLootApplied

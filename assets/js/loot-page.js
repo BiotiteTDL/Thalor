@@ -76,14 +76,14 @@
 
   async function rollbackOnlineLoot(snapshot){
     if(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false) return;
-    try{ await inv.saveOnline(inv.normalizeDatabase(cloneData(snapshot))); }
+    try{ await inv.saveLootOnline(inv.extractLootDocument(cloneData(snapshot))); }
     catch(e){ console.warn('Rollback online loot non riuscito:', e); }
   }
 
   function onlineRequiredMessage(err){
     const raw = String(err && (err.message || err.body || err) || '');
     if(/row-level security|violates row-level|permission denied|not authorized|non hai i permessi|403|401/i.test(raw)){
-      return 'Il giocatore non ha permesso Supabase per aggiornare il Loot globale (__inventory__). Applica la policy SQL per permettere agli utenti autenticati di aggiornare __inventory__. Dettaglio: ' + raw;
+      return 'Il giocatore non ha permesso Supabase per aggiornare il Loot globale (__loot__). Applica la policy SQL sicura per permettere agli utenti autenticati di aggiornare solo __loot__. Dettaglio: ' + raw;
     }
     return raw || 'Salvataggio online non riuscito.';
   }
@@ -191,15 +191,25 @@
     bind();
   }
 
-  async function saveDb(msg='Loot salvato.'){
+  async function saveDb(msg='Loot salvato.', options={}){
     state.db = inv.normalizeDatabase(state.db);
+    const lootDoc = inv.extractLootDocument(state.db);
+    const shouldSaveInventory = !!options.saveInventory || isMaster();
+
     if(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false){
-      state.db = inv.writeLocal(state.db);
+      if(shouldSaveInventory) state.db = inv.writeLocal(state.db);
+      const savedLoot = inv.writeLocalLoot(lootDoc);
+      state.db = inv.mergeLootIntoDatabase(state.db, savedLoot);
       notify(msg + ' (locale)', 'ok');
       return state.db;
     }
+
     try{
-      state.db = await inv.saveOnline(state.db);
+      // Master: se ha creato/modificato un oggetto complesso, salva anche il compendio __inventory__.
+      // Player: scrive SOLO __loot__, mai il compendio oggetti.
+      if(shouldSaveInventory) await inv.saveOnline(state.db);
+      const savedLoot = await inv.saveLootOnline(lootDoc);
+      state.db = inv.mergeLootIntoDatabase(state.db, savedLoot);
       notify(msg,'ok');
       return state.db;
     }catch(e){
@@ -330,7 +340,7 @@
       });
       if(item.itemRef) createOrUpdateDatabaseItem(state.db, item);
       sec.items.push(item);
-      await saveDb('Loot aggiornato.');
+      await saveDb('Loot aggiornato.', { saveInventory: !!item.itemRef });
       render();
     });
     document.getElementById('lootNewSectionOnly')?.addEventListener('click', async ()=>{ getOrCreateSection(); await saveDb('Contenitore loot creato.'); render(); });
@@ -380,7 +390,7 @@
         const applied = inv.addStackToSheet(base, item, qty, actor, { opId });
 
         // Online-authoritative: prima si salva il documento Loot globale.
-        // Se il giocatore non ha policy Supabase su __inventory__, abortiamo qui e NON tocchiamo la scheda.
+        // Se il giocatore non ha policy Supabase su __loot__, abortiamo qui e NON tocchiamo la scheda.
         item.qty = Math.max(0, (Number(item.qty)||0) - qty);
         item.taken = item.taken || [];
         item.taken.push({ when:new Date().toISOString(), actor:actor, targetSlug:target, qty, itemName:itemTitle(item), mode:applied.mode, currency:applied.currency||'' });
@@ -478,15 +488,27 @@
       if(window.ThalorAuth?.init) await window.ThalorAuth.init();
       forceOfflineMasterState();
     }catch(e){ forceOfflineMasterState(); }
-    state.db = inv.readLocal();
+    const localInventory = inv.readLocal();
+    const localLoot = inv.readLocalLoot();
+    state.db = inv.mergeLootIntoDatabase(localInventory, localLoot);
     state.source = 'localStorage';
     if(!isLocalPreview() && !inv.isOfflineMaster?.() && navigator.onLine !== false){
       try{
-        const online = await inv.loadOnline();
-        if(online && Array.isArray(online.sharedLoot?.sections) && online.sharedLoot.sections.length){
-          state.db = inv.writeLocal(online);
-          state.source = 'Supabase';
+        const onlineInventory = await inv.loadOnline();
+        const onlineLoot = await inv.loadLootOnline();
+        if(onlineInventory) state.db = inv.normalizeDatabase(onlineInventory);
+        if(onlineLoot){
+          state.db = inv.mergeLootIntoDatabase(state.db, onlineLoot);
+          inv.writeLocalLoot(onlineLoot);
+          state.source = 'Supabase (__inventory__ + __loot__)';
+        }else if(onlineInventory && Array.isArray(onlineInventory.sharedLoot?.sections) && onlineInventory.sharedLoot.sections.length){
+          // Retrocompatibilità: vecchi loot ancora dentro __inventory__.
+          const migratedLoot = inv.extractLootDocument(onlineInventory);
+          state.db = inv.mergeLootIntoDatabase(state.db, migratedLoot);
+          inv.writeLocalLoot(migratedLoot);
+          state.source = 'Supabase legacy (__inventory__)';
         }
+        if(onlineInventory) inv.writeLocal(onlineInventory);
       }catch(e){ console.warn('Loot globale: lettura online non riuscita', e); }
     }
     try{ await loadCharacters(); }catch(e){ console.warn('Lista personaggi non disponibile', e); }
