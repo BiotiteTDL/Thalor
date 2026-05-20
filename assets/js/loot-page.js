@@ -64,6 +64,30 @@
     if(box){ box.textContent = msg || ''; box.className = 'loot-status ' + (kind||''); }
   }
 
+  function cloneData(value){
+    try{ return JSON.parse(JSON.stringify(value || null)); }
+    catch(e){ return value; }
+  }
+
+  function replaceDbFromSnapshot(snapshot){
+    state.db = inv.normalizeDatabase(cloneData(snapshot));
+    return state.db;
+  }
+
+  async function rollbackOnlineLoot(snapshot){
+    if(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false) return;
+    try{ await inv.saveOnline(inv.normalizeDatabase(cloneData(snapshot))); }
+    catch(e){ console.warn('Rollback online loot non riuscito:', e); }
+  }
+
+  function onlineRequiredMessage(err){
+    const raw = String(err && (err.message || err.body || err) || '');
+    if(/row-level security|violates row-level|permission denied|not authorized|non hai i permessi|403|401/i.test(raw)){
+      return 'Il giocatore non ha permesso Supabase per aggiornare il Loot globale (__inventory__). Applica la policy SQL per permettere agli utenti autenticati di aggiornare __inventory__. Dettaglio: ' + raw;
+    }
+    return raw || 'Salvataggio online non riuscito.';
+  }
+
   function itemTitle(item){
     const c = inv.lootCurrency(item);
     return c ? moneyNames[c] : (item.name || item.itemRef || 'Oggetto');
@@ -167,18 +191,9 @@
     bind();
   }
 
-  function cloneData(value){
-    try{ return JSON.parse(JSON.stringify(value || null)); }catch(e){ return value; }
-  }
-
-  function isOnlineAuthoritative(){
-    return !(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false);
-  }
-
-  async function saveDb(msg='Loot salvato.', options={}){
+  async function saveDb(msg='Loot salvato.'){
     state.db = inv.normalizeDatabase(state.db);
-    const strict = options.strict !== false;
-    if(!isOnlineAuthoritative()){
+    if(isLocalPreview() || inv.isOfflineMaster?.() || navigator.onLine === false){
       state.db = inv.writeLocal(state.db);
       notify(msg + ' (locale)', 'ok');
       return state.db;
@@ -188,31 +203,9 @@
       notify(msg,'ok');
       return state.db;
     }catch(e){
-      const message = 'Salvataggio online non riuscito: ' + (e.message || e);
-      notify(message,'warn');
-      if(strict) throw e;
-      return state.db;
-    }
-  }
-
-  async function saveSheetStrict(slug, sheet){
-    const saved = await inv.saveSheet(slug, sheet);
-    if(saved && saved.__lootOnlineSaveError){
-      throw new Error(saved.__lootOnlineSaveError);
-    }
-    return saved;
-  }
-
-  async function rollbackLootAndSheet(dbBefore, target, sheetBefore, reason){
-    state.db = inv.normalizeDatabase(cloneData(dbBefore));
-    try{
-      if(target && sheetBefore) inv.writeLocalSheet(target, sheetBefore);
-    }catch(e){}
-    if(isOnlineAuthoritative()){
-      try{ await inv.saveOnline(state.db); }
-      catch(e){ console.warn('Rollback loot online non riuscito dopo errore: ' + reason, e); }
-    }else{
-      try{ inv.writeLocal(state.db); }catch(e){}
+      const message = onlineRequiredMessage(e);
+      notify('Salvataggio online non riuscito: '+message,'warn');
+      throw new Error(message);
     }
   }
 
@@ -315,43 +308,32 @@
     });
 
     document.getElementById('lootAddItem')?.addEventListener('click', async ()=>{
-      const dbBefore = cloneData(state.db);
-      try{
-        const sec = getOrCreateSection();
-        const kind = document.getElementById('lootNewKind')?.value || 'item';
-        const qty = Math.max(1, Number(document.getElementById('lootNewQty')?.value)||1);
-        const currency = document.getElementById('lootNewCurrency')?.value || 'MO';
-        const itemName = kind==='money' ? moneyNames[currency] : (document.getElementById('lootNewName')?.value?.trim() || 'Nuovo oggetto');
-        const imageData = await readImageFileInput();
-        const isComplex = kind==='item' && !!document.getElementById('lootNewComplex')?.checked;
-        const refInput = document.getElementById('lootNewRef')?.value?.trim() || '';
-        const item = inv.normalizeLootItem({
-          id:inv.newId('lootitem'),
-          name: itemName,
-          qty,
-          currency: kind==='money' ? currency : '',
-          itemRef: kind==='item' ? (refInput || (isComplex ? inv.slugify(itemName) : '')) : '',
-          image: imageData,
-          publicNotes: document.getElementById('lootNewNotes')?.value?.trim() || '',
-          unique: !!document.getElementById('lootNewUnique')?.checked,
-          identified: false,
-          identification: { status:'unidentified' }
-        });
-        if(item.itemRef) createOrUpdateDatabaseItem(state.db, item);
-        sec.items.push(item);
-        await saveDb('Loot aggiornato online.');
-        render();
-      }catch(e){
-        state.db = inv.normalizeDatabase(cloneData(dbBefore));
-        notify('Aggiunta loot annullata: ' + (e.message || e), 'warn');
-        render();
-      }
+      const sec = getOrCreateSection();
+      const kind = document.getElementById('lootNewKind')?.value || 'item';
+      const qty = Math.max(1, Number(document.getElementById('lootNewQty')?.value)||1);
+      const currency = document.getElementById('lootNewCurrency')?.value || 'MO';
+      const itemName = kind==='money' ? moneyNames[currency] : (document.getElementById('lootNewName')?.value?.trim() || 'Nuovo oggetto');
+      const imageData = await readImageFileInput();
+      const isComplex = kind==='item' && !!document.getElementById('lootNewComplex')?.checked;
+      const refInput = document.getElementById('lootNewRef')?.value?.trim() || '';
+      const item = inv.normalizeLootItem({
+        id:inv.newId('lootitem'),
+        name: itemName,
+        qty,
+        currency: kind==='money' ? currency : '',
+        itemRef: kind==='item' ? (refInput || (isComplex ? inv.slugify(itemName) : '')) : '',
+        image: imageData,
+        publicNotes: document.getElementById('lootNewNotes')?.value?.trim() || '',
+        unique: !!document.getElementById('lootNewUnique')?.checked,
+        identified: false,
+        identification: { status:'unidentified' }
+      });
+      if(item.itemRef) createOrUpdateDatabaseItem(state.db, item);
+      sec.items.push(item);
+      await saveDb('Loot aggiornato.');
+      render();
     });
-    document.getElementById('lootNewSectionOnly')?.addEventListener('click', async ()=>{
-      const dbBefore = cloneData(state.db);
-      try{ getOrCreateSection(); await saveDb('Contenitore loot creato online.'); render(); }
-      catch(e){ state.db = inv.normalizeDatabase(cloneData(dbBefore)); notify('Creazione contenitore annullata: ' + (e.message || e), 'warn'); render(); }
-    });
+    document.getElementById('lootNewSectionOnly')?.addEventListener('click', async ()=>{ getOrCreateSection(); await saveDb('Contenitore loot creato.'); render(); });
 
     app.querySelectorAll('.loot-plus,.loot-minus').forEach(btn=>btn.addEventListener('click',()=>{
       const card = btn.closest('.loot-take-card'); const input = card.querySelector('.loot-qty');
@@ -365,33 +347,19 @@
       const sec = state.db.sharedLoot.sections[si]; const item = sec?.items?.[ii];
       if(!item) return;
       if(!confirm('Togliere questo item dalla pagina Loot? Gli inventari dei personaggi NON verranno modificati.')) return;
-      const dbBefore = cloneData(state.db);
-      try{
-        sec.items.splice(ii,1);
-        sec.log = sec.log || [];
-        sec.log.push({ when:new Date().toLocaleString('it-IT'), action:'removed-from-loot', actor:inv.currentActorLabel(), itemName:itemTitle(item), qty:item.qty||0 });
-        await saveDb('Item tolto dal loot online. Gli inventari non sono stati toccati.');
-        render();
-      }catch(e){
-        state.db = inv.normalizeDatabase(cloneData(dbBefore));
-        notify('Rimozione dal loot annullata: ' + (e.message || e), 'warn');
-        render();
-      }
+      sec.items.splice(ii,1);
+      sec.log = sec.log || [];
+      sec.log.push({ when:new Date().toLocaleString('it-IT'), action:'removed-from-loot', actor:inv.currentActorLabel(), itemName:itemTitle(item), qty:item.qty||0 });
+      await saveDb('Item tolto dal loot. Gli inventari non sono stati toccati.');
+      render();
     }));
 
     app.querySelectorAll('.loot-delete-section').forEach(btn=>btn.addEventListener('click', async ()=>{
       const secEl = btn.closest('.loot-section'); const si = Number(secEl.dataset.sectionIndex);
       if(!confirm('Eliminare questo contenitore loot dalla pagina? Gli inventari già aggiornati non vengono toccati.')) return;
-      const dbBefore = cloneData(state.db);
-      try{
-        state.db.sharedLoot.sections.splice(si,1);
-        await saveDb('Loot eliminato online dalla pagina.');
-        render();
-      }catch(e){
-        state.db = inv.normalizeDatabase(cloneData(dbBefore));
-        notify('Eliminazione loot annullata: ' + (e.message || e), 'warn');
-        render();
-      }
+      state.db.sharedLoot.sections.splice(si,1);
+      await saveDb('Loot eliminato dalla pagina.');
+      render();
     }));
 
     app.querySelectorAll('.loot-take-btn').forEach(btn=>btn.addEventListener('click', async ()=>{
@@ -402,33 +370,31 @@
       const target = card.querySelector('.loot-target')?.value || inv.primaryAuthCharacter();
       if(!target){ notify('Nessun personaggio selezionato/assegnato all’account.', 'warn'); return; }
       if(qty > (Number(item.qty)||0)){ notify('Quantità non disponibile.', 'warn'); return; }
-      const dbBefore = cloneData(state.db);
-      state.busy = true; render(); notify('Salvataggio online loot…');
+      state.busy = true; render(); notify('Aggiorno loot online…');
+      const dbSnapshot = cloneData(state.db);
       try{
         const base = await inv.loadSheet(target);
         if(!base) throw new Error('Scheda non trovata: '+target);
-        const sheetBefore = cloneData(base);
         const actor = isMaster() ? (state.characters.find(c=>c.slug===target)?.name || target) : inv.currentActorLabel();
         const opId = inv.newId('lootop');
         const applied = inv.addStackToSheet(base, item, qty, actor, { opId });
 
+        // Online-authoritative: prima si salva il documento Loot globale.
+        // Se il giocatore non ha policy Supabase su __inventory__, abortiamo qui e NON tocchiamo la scheda.
         item.qty = Math.max(0, (Number(item.qty)||0) - qty);
         item.taken = item.taken || [];
         item.taken.push({ when:new Date().toISOString(), actor:actor, targetSlug:target, qty, itemName:itemTitle(item), mode:applied.mode, currency:applied.currency||'' });
         sec.log = sec.log || [];
         sec.log.push({ when:new Date().toLocaleString('it-IT'), actor:actor, targetSlug:target, qty, itemName:itemTitle(item), mode:applied.mode, currency:applied.currency||'' });
-
         await saveDb('Loot aggiornato online.');
+
         notify('Loot salvato online. Aggiorno scheda…');
-        try{
-          await saveSheetStrict(target, applied.sheet);
-        }catch(sheetErr){
-          await rollbackLootAndSheet(dbBefore, target, sheetBefore, sheetErr.message || sheetErr);
-          throw new Error('Scheda non salvata online, loot annullato: ' + (sheetErr.message || sheetErr));
-        }
-        notify('Loot preso e scheda aggiornata online.', 'ok');
+        const savedSheet = await inv.saveSheet(target, applied.sheet);
+        if(savedSheet && savedSheet.__lootOnlineSaveError) throw new Error(savedSheet.__lootOnlineSaveError);
+        notify('Loot preso e scheda aggiornata.', 'ok');
       }catch(e){
-        state.db = inv.normalizeDatabase(cloneData(dbBefore));
+        replaceDbFromSnapshot(dbSnapshot);
+        await rollbackOnlineLoot(dbSnapshot);
         notify('Operazione annullata: '+(e.message||e), 'warn');
       }finally{
         state.busy = false; render();
@@ -444,12 +410,10 @@
       const qty = Math.max(1, Math.min(Number(entry.qty)||1, Number(wrap?.querySelector('.loot-return-qty')?.value)||1));
       const target = entry.targetSlug || inv.primaryAuthCharacter();
       if(!target){ notify('Personaggio non trovato per la restituzione.', 'warn'); return; }
-      const dbBefore = cloneData(state.db);
-      state.busy = true; render(); notify('Salvataggio online restituzione…');
+      state.busy = true; render(); notify('Restituisco loot online…');
+      const dbSnapshot = cloneData(state.db);
       try{
         const base = await inv.loadSheet(target);
-        if(!base) throw new Error('Scheda non trovata: '+target);
-        const sheetBefore = cloneData(base);
         const actor = isMaster() ? inv.currentActorLabel() : (entry.actor || inv.currentActorLabel());
         const opId = inv.newId('lootop');
         const applied = inv.removeStackFromSheet(base, item, qty, actor, { opId });
@@ -459,18 +423,15 @@
         if(entry.qty <= 0) item.taken.splice(ti,1);
         sec.log = sec.log || [];
         sec.log.push({ when:new Date().toLocaleString('it-IT'), action:'returned', actor, targetSlug:target, qty, itemName:itemTitle(item), mode:applied.mode, currency:applied.currency||'' });
+        await saveDb('Loot restituito online.');
 
-        await saveDb('Restituzione loot salvata online.');
         notify('Loot salvato online. Aggiorno scheda…');
-        try{
-          await saveSheetStrict(target, applied.sheet);
-        }catch(sheetErr){
-          await rollbackLootAndSheet(dbBefore, target, sheetBefore, sheetErr.message || sheetErr);
-          throw new Error('Scheda non salvata online, restituzione annullata: ' + (sheetErr.message || sheetErr));
-        }
-        notify('Loot restituito e scheda aggiornata online.', 'ok');
+        const savedSheet = await inv.saveSheet(target, applied.sheet);
+        if(savedSheet && savedSheet.__lootOnlineSaveError) throw new Error(savedSheet.__lootOnlineSaveError);
+        notify('Loot restituito e scheda aggiornata.', 'ok');
       }catch(e){
-        state.db = inv.normalizeDatabase(cloneData(dbBefore));
+        replaceDbFromSnapshot(dbSnapshot);
+        await rollbackOnlineLoot(dbSnapshot);
         notify('Restituzione annullata: '+(e.message||e), 'warn');
       }finally{
         state.busy = false; render();
